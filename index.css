@@ -1177,13 +1177,13 @@ footer {
 
 #main-logo {
   display: block;
-  margin: 0 auto 10px;
-  max-width: 100px;
+  margin: 0 auto 8px;
+  max-width: 60px; /* smaller width */
   height: auto;
 }
 
 @media (max-width: 600px) {
   #main-logo {
-    max-width: 80px;
+    max-width: 40px; /* smaller on mobile */
   }
 }
