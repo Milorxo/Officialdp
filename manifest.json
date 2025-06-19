@@ -1,0 +1,20 @@
+{
+  "name": "Daily Productivity",
+  "short_name": "DP",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#00ffff",
+  "icons": [
+    {
+      "src": "dp.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "dp.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
