@@ -1188,7 +1188,7 @@ footer {
 @media (max-width: 600px) {
   #main-logo {
     max-width: 40px;
-    border-radius: 12px;
+    border-radius: 50px;
     padding: 3px;
   }
 }
