@@ -1178,19 +1178,19 @@ footer {
 .logo-box {
   width: 50px;
   height: 50px;
-  background-color: cyan;
-  border-radius: 12px; /* change to 50% if you want it perfectly round */
+  background-color: #00FFFF; /* Cyan */
+  border-radius: 12px; /* use 50% if you want a circle */
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 10px;
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.6); /* Glow effect */
 }
 
 .logo-text {
-  color: cyan;
-  background-color: black;
-  border: 2px solid purple;
+  color: #00FFFF; /* Cyan text border */
+  background-color: #000000; /* Black background */
+  border: 2px solid #A020F0; /* Purple border */
   padding: 4px 8px;
   border-radius: 6px;
   font-weight: bold;
