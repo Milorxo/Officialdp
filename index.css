@@ -1179,16 +1179,11 @@ footer {
   display: block;
   margin: 0 auto 8px;
   max-width: 60px;
-  height: auto;
-  border-radius: 50px; /* Rounded corners */
-  box-shadow: 0 0 8px rgba(0, 255, 255, 0.7); /* Optional: nice cyan glow */
-  background-color: black; /* To make it stand out if your logo has transparency */
-  padding: 5px; /* Optional: spacing inside border */
-}
-@media (max-width: 600px) {
-  #main-logo {
-    max-width: 40px;
-    border-radius: 50px;
-    padding: 3px;
-  }
+  height: 60px;
+  border-radius: 50%;  /* Circle */
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.7);
+  background-color: black;
+  padding: 5px;
+  object-fit: cover;
+  overflow: hidden;
 }
