@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Productivity Tracker</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="app-container">
+        <div id="main-content-wrapper">
+            <aside id="dashboard-column" role="complementary">
+                <h2>Activity Dashboard</h2>
+                <div id="dashboard-summaries">
+                    <!-- Statistics will be populated here by JS -->
+                </div>
+                <div class="main-tab-intro">
+                    <p>Here's an overview of your weekly and monthly progress. Select a category in the Daily Productivity to view and manage specific tasks. Reflect on your day below and check past entries in the calendar.</p>
+                </div>
+            </aside>
+            <div id="left-column">
+                <header>
+                    <h1>Daily Productivity</h1>
+                </header>
+                <nav id="tabs">
+                    <button id="dashboard-tab-button" class="tab-button active main-tab-highlight" aria-selected="true" role="tab">Main</button>
+                    <button id="health-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="health">Health</button>
+                    <button id="god-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="god">God</button>
+                    <button id="personal-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="personal">Personal</button>
+                    <button id="routine-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="routine">Routine</button>
+                </nav>
+                <main id="tab-content">
+                    <section id="dashboard-content" role="tabpanel" aria-labelledby="dashboard-tab-button">
+                        <div id="calendar-container">
+                            <div id="calendar-header">
+                                <span id="calendar-month-year"></span>
+                            </div>
+                            <div id="calendar-grid">
+                                <!-- Calendar days will be populated by JS -->
+                            </div>
+                        </div>
+
+                        <div id="save-progress-button-container">
+                            <button id="save-progress-button">Save Progress</button>
+                        </div>
+
+                        <div id="daily-note-container">
+                            <h3>Today's Reflection</h3>
+                            <textarea id="daily-note-input" placeholder="How was your day? Any thoughts or learnings..."></textarea>
+                            <button id="save-note-button">Save Note</button>
+                        </div>
+                        
+                        <div id="weekly-progress-container">
+                            <h3>Weekly Progress</h3>
+                            <div class="progress-bar-container">
+                                <div id="weekly-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                            </div>
+                            <p id="weekly-points-stat" class="points-stat">0 / 2700 points</p>
+                        </div>
+                        <div id="monthly-progress-container">
+                            <h3>Monthly Progress</h3>
+                            <div class="progress-bar-container">
+                                <div id="monthly-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                            </div>
+                            <p id="monthly-points-stat" class="points-stat">0 / 20000 points</p>
+                        </div>
+                    </section>
+                    <section id="health-content" role="tabpanel" aria-labelledby="health-tab-button" class="hidden">
+                        <h2>Health Tasks</h2>
+                        <div class="unclick-all-container">
+                            <button id="unclick-all-health-button" class="unclick-all-button" data-category="health">Unclick All Health Tasks</button>
+                        </div>
+                        <ul id="health-task-list" class="task-list" aria-live="polite"></ul>
+                    </section>
+                    <section id="god-content" role="tabpanel" aria-labelledby="god-tab-button" class="hidden">
+                        <h2>God Tasks</h2>
+                        <div class="unclick-all-container">
+                            <button id="unclick-all-god-button" class="unclick-all-button" data-category="god">Unclick All God Tasks</button>
+                        </div>
+                        <ul id="god-task-list" class="task-list" aria-live="polite"></ul>
+                    </section>
+                    <section id="personal-content" role="tabpanel" aria-labelledby="personal-tab-button" class="hidden">
+                        <h2>Personal Tasks</h2>
+                        <div class="unclick-all-container">
+                            <button id="unclick-all-personal-button" class="unclick-all-button" data-category="personal">Unclick All Personal Tasks</button>
+                        </div>
+                        <ul id="personal-task-list" class="task-list" aria-live="polite"></ul>
+                    </section>
+                    <section id="routine-content" role="tabpanel" aria-labelledby="routine-tab-button" class="hidden">
+                        <h2>Routine Tasks</h2>
+                        <div class="unclick-all-container">
+                            <button id="unclick-all-routine-button" class="unclick-all-button" data-category="routine">Unclick All Routine Tasks</button>
+                        </div>
+                        <ul id="routine-task-list" class="task-list" aria-live="polite"></ul>
+                    </section>
+                </main>
+            </div>
+        </div>
+        <footer>
+            <p>&copy; 2024 Daily Productivity Tracker</p>
+        </footer>
+    </div>
+
+    <div id="history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="history-modal-title-text">
+        <div class="modal-content">
+            <button id="history-modal-close-button" class="close-button" aria-label="Close history modal">&times;</button>
+            <h3 id="history-modal-title-text">History for <span id="history-modal-date"></span></h3>
+            <div id="history-modal-stats">
+                <p><strong>Points Earned:</strong> <span id="history-modal-points"></span></p>
+                <p><strong>Completion:</strong> <span id="history-modal-percentage"></span>%</p>
+            </div>
+            <h4>Completed Tasks:</h4>
+            <div id="history-tasks-list">
+                <!-- Completed tasks will be populated here by JS -->
+            </div>
+            <h4>My Reflection:</h4>
+            <div id="historical-reflection-wrapper">
+                <p id="history-user-note-display" class="history-note-paragraph hidden"></p> <!-- Keep hidden, textarea used instead -->
+                <textarea id="history-user-note-edit" aria-label="Reflection for selected date"></textarea>
+                <div id="historical-note-controls" class="hidden"> <!-- Visibility controlled by JS -->
+                    <button id="save-historical-note-button">Save Reflection</button>
+                    <button id="clear-historical-note-button">Clear Reflection</button>
+                    <span id="historical-note-status"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="save-progress-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="save-progress-modal-title">
+        <div class="modal-content save-progress-modal-content">
+            <button id="save-progress-close-button" class="close-button" aria-label="Close confirmation">&times;</button>
+            <h3 id="save-progress-modal-title">Confirm Save Progress</h3>
+            <p id="save-progress-message">You're saving progress before 8 PM. Are you sure you're done for today?</p>
+            <div id="save-progress-actions">
+                <button id="confirm-save-progress-button">Yes, it's completed</button>
+                <button id="cancel-save-progress-button">No, not yet</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module" src="index.js"></script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

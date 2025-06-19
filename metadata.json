@@ -1,0 +1,6 @@
+{
+  "name": "Daily Productivity Github Version",
+  "description": "A web app to track daily tasks across various life categories like Health, God, Personal, and Routine. Tasks reset daily and progress is saved in localStorage.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
