@@ -1174,3 +1174,42 @@ footer {
     #history-user-note-edit { font-size: 0.95em; }
     footer { padding: 15px 20px; }
 }
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.outer-cn {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  border: 3px solid purple;
+  border-radius: 15px; /* Or change to 50% for circle */
+  color: purple;
+  font-weight: 900;
+  font-size: 2.5rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: default;
+  user-select: none;
+}
+
+.inner-dp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2px 8px;
+  border: 2px solid purple;
+  border-radius: 6px;
+  background-color: black;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  pointer-events: none;
+}
