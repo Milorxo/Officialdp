@@ -1180,7 +1180,7 @@ footer {
   margin: 0 auto 8px;
   max-width: 60px;
   height: auto;
-  border-radius: 15px; /* Rounded corners */
+  border-radius: 50px; /* Rounded corners */
   box-shadow: 0 0 8px rgba(0, 255, 255, 0.7); /* Optional: nice cyan glow */
   background-color: black; /* To make it stand out if your logo has transparency */
   padding: 5px; /* Optional: spacing inside border */
