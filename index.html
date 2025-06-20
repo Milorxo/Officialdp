@@ -107,8 +107,13 @@
             <button id="history-modal-close-button" class="close-button" aria-label="Close history modal">&times;</button>
             <h3 id="history-modal-title-text">History for <span id="history-modal-date"></span></h3>
             <div id="history-modal-stats">
-                <p><strong>Points Earned:</strong> <span id="history-modal-points"></span></p>
-                <p><strong>Completion:</strong> <span id="history-modal-percentage"></span>%</p>
+                <p class="points-stat history-points-text">Points Earned: <span id="history-modal-points-value">0</span> / <span id="history-modal-points-total">0</span></p>
+                <!-- Removed points progress bar -->
+                <p class="points-stat history-percentage-label">Completion Percentage:</p> <!-- Label for clarity -->
+                <div class="progress-bar-container">
+                    <div id="history-percentage-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                </div>
+                <!-- Removed standalone percentage text: <p class="points-stat history-percentage-text">Completion: <span id="history-modal-percentage-value">0</span>%</p> -->
             </div>
             <div class="history-section">
                 <div class="history-section-header">
