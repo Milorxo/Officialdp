@@ -8,7 +8,7 @@
   "icons": [
     {
       "src": "dp.png",
-      "type": "image/png",
+      "type": "image/x-icon",
       "sizes": "512x512",
       "purpose": "any maskable"
     }
