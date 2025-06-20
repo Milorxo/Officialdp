@@ -1122,6 +1122,14 @@ function showHistoryModal(dateString) {
   domElements.historyModal.classList.remove('hidden');
 }
 
+function closeHistoryModal() {
+  if (domElements.historyModal) {
+    domElements.historyModal.classList.add('hidden');
+  }
+  currentModalDate = null; // Reset the current modal date context
+}
+
+
 function saveHistoricalNote() {
     if (!currentModalDate || !domElements.historyUserNoteEdit || !domElements.historicalNoteStatus) return;
 
@@ -1172,13 +1180,6 @@ function clearHistoricalNote() {
     // For now, just clears the textarea, user needs to click "Save Reflection"
 }
 
-
-function closeHistoryModal() {
-  if (domElements.historyModal) {
-      domElements.historyModal.classList.add('hidden');
-  }
-  currentModalDate = null;
-}
 
 function populateMonthYearPicker() {
     if (!domElements.pickerMonthsGrid || !domElements.pickerYearsList) return;
@@ -1761,6 +1762,19 @@ function initializeApp() {
 
   // Ensure initial save progress button state is correct
   updateSaveProgressButtonState();
+
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        })
+        .catch(error => {
+          console.log('ServiceWorker registration failed: ', error);
+        });
+    });
+  }
 }
 
 // Start the app
