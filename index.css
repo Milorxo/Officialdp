@@ -1,3 +1,4 @@
+
 /* Global Resets and Base Styles */
 * {
     box-sizing: border-box;
@@ -113,7 +114,8 @@ main#tab-content.main-area-scroll-hidden {
     100% { opacity: 1; transform: scale(1); }
 }
 
-.points-stat.progress-value-resetting {
+.points-stat.progress-value-resetting,
+.progress-bar-fill.progress-value-resetting {
     animation: quickFadeOutIn 0.5s ease-in-out;
 }
 
@@ -535,20 +537,6 @@ main#tab-content {
 #save-note-button:hover { background-color: #33DFFF; }
 #save-note-button:active { transform: scale(0.98); background-color: #00B8D4; }
 
-/* Save Progress Button Styles */
-#save-progress-button-container { display: flex; justify-content: center; margin-top: 25px; margin-bottom: 0; }
-#save-progress-button {
-    padding: 12px 25px; background-color: #7FFFD4; color: #12101A; border: none;
-    border-radius: 8px; font-family: 'Playfair Display', serif; font-size: 1.05em; font-weight: 600;
-    cursor: pointer; transition: background-color 0.25s ease, transform 0.1s ease, opacity 0.25s ease;
-    box-shadow: 0 2px 5px rgba(127, 255, 212, 0.25);
-}
-#save-progress-button:hover:not(:disabled) { background-color: #AFFFFF; }
-#save-progress-button:active:not(:disabled) { transform: scale(0.98); background-color: #6FE0B8; }
-#save-progress-button:disabled {
-    background-color: #455A53; color: #8A9C96; cursor: not-allowed;
-    box-shadow: none; opacity: 0.7;
-}
 
 /* Calendar Styles */
 #calendar-container {
@@ -556,6 +544,7 @@ main#tab-content {
     border: 1px solid rgba(255, 255, 255, 0.07); padding: 20px;
     box-shadow: 0 2px 6px rgba(0,0,0, 0.08);
     position: relative; 
+    margin-top: 35px; /* Added margin-top to separate from items above */
 }
 #calendar-header {
     display: flex;
@@ -1162,22 +1151,6 @@ footer {
     color: #D5D0E5;
 }
 
-/* Save Progress Confirmation Modal Styles */
-.save-progress-modal-content { max-width: 450px; padding: 25px 30px; }
-#save-progress-modal-title { margin-top: 0; margin-bottom: 15px; color: #7FFFD4; font-size: 1.6em; text-align: center; }
-#save-progress-message { color: #C5C1D6; font-size: 1.05em; line-height: 1.6; text-align: center; margin-bottom: 25px; }
-#save-progress-actions { display: flex; justify-content: center; gap: 15px; }
-#save-progress-actions button {
-    padding: 10px 20px; border: none; border-radius: 8px; font-family: 'Playfair Display', serif;
-    font-size: 1em; font-weight: 600; cursor: pointer; transition: background-color 0.25s ease, transform 0.1s ease;
-}
-#confirm-save-progress-button { background-color: #7FFFD4; color: #12101A; box-shadow: 0 2px 5px rgba(127, 255, 212, 0.2); }
-#confirm-save-progress-button:hover { background-color: #AFFFFF; }
-#confirm-save-progress-button:active { transform: scale(0.98); background-color: #6FE0B8; }
-#cancel-save-progress-button { background-color: #454153; color: #C5C1D6; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
-#cancel-save-progress-button:hover { background-color: #5a556b; }
-#cancel-save-progress-button:active { transform: scale(0.98); background-color: #3a3647; }
-
 /* Delete Confirmation Modal Styles (Generic) */
 .delete-task-modal-content { max-width: 400px; padding: 25px 30px; } 
 #delete-confirmation-title { margin-top: 0; margin-bottom: 15px; color: #FF6B6B; font-size: 1.6em; text-align: center; }
@@ -1277,14 +1250,12 @@ footer {
     .dashboard-category-summary h3 { font-size: 1.3em; margin-bottom: 12px; padding-bottom: 10px; }
     .dashboard-category-summary .category-stats { font-size: 1em; }
     .main-tab-intro { padding: 20px; font-size: 1em; }
-    #save-progress-button-container { margin-top: 20px; }
-    #save-progress-button { font-size: 1em; padding: 10px 22px; }
     #daily-note-container { padding: 18px; margin-top: 30px; margin-bottom: 30px; }
     #daily-note-container h3 { font-size: 1.25em; margin-bottom: 12px; }
     #daily-note-input { font-size: 0.95em; min-height: 80px; }
     #save-note-button { font-size: 0.95em; padding: 10px 18px; }
     
-    #calendar-container { padding: 15px; }
+    #calendar-container { padding: 15px; margin-top: 30px; }
     .calendar-nav-button { font-size: 1.6em; padding: 0 8px;}
     .calendar-month-year-button { padding: 4px 8px; }
     #calendar-month-year { font-size: 1.25em; }
@@ -1332,10 +1303,10 @@ footer {
     .task-edit-input { flex-basis: 100%; margin-bottom: 8px; margin-left: 0; }
 
     .modal-content { padding: 25px; width: 95%; } 
-    .save-progress-modal-content, .delete-task-modal-content { padding: 20px 25px; } 
-    #save-progress-modal-title, #delete-confirmation-title { font-size: 1.5em; }
-    #save-progress-message, #delete-confirmation-message { font-size: 1em; }
-    #save-progress-actions button, #delete-confirmation-actions button { font-size: 0.95em; padding: 9px 18px; }
+    .delete-task-modal-content { padding: 20px 25px; } 
+    #delete-confirmation-title { font-size: 1.5em; }
+    #delete-confirmation-message { font-size: 1em; }
+    #delete-confirmation-actions button { font-size: 0.95em; padding: 9px 18px; }
     
     .history-section-header h4 { font-size: 1.1em; }
     .expand-section-button svg { width: 16px; height: 16px; }
@@ -1394,14 +1365,12 @@ footer {
     .dashboard-category-summary h3 { font-size: 1.25em; margin-bottom: 10px; padding-bottom: 8px; }
     .dashboard-category-summary .category-stats { font-size: 0.95em; }
     .main-tab-intro { padding: 18px; font-size: 0.95em; }
-    #save-progress-button-container { margin-top: 18px; }
-    #save-progress-button { font-size: 0.95em; padding: 9px 20px; }
     #daily-note-container { padding: 15px; margin-top: 25px; margin-bottom: 25px; }
     #daily-note-container h3 { font-size: 1.2em; }
     #daily-note-input { font-size: 0.9em; }
     #save-note-button { font-size: 0.9em; }
 
-    #calendar-container { padding: 12px; }
+    #calendar-container { padding: 12px; margin-top: 25px; }
     .calendar-nav-button { font-size: 1.5em; padding: 0 6px;}
     .calendar-month-year-button { padding: 3px 6px; }
     #calendar-month-year { font-size: 1.15em; }
@@ -1437,10 +1406,10 @@ footer {
     .task-delete-button-editmode svg { width: 16px; height: 16px; }
 
     .modal-content { padding: 20px; } 
-    .save-progress-modal-content, .delete-task-modal-content { padding: 18px 22px; }
-    #save-progress-modal-title, #delete-confirmation-title { font-size: 1.4em; }
-    #save-progress-message, #delete-confirmation-message { font-size: 0.95em; }
-    #save-progress-actions button, #delete-confirmation-actions button { font-size: 0.9em; padding: 8px 16px; }
+    .delete-task-modal-content { padding: 18px 22px; }
+    #delete-confirmation-title { font-size: 1.4em; }
+    #delete-confirmation-message { font-size: 0.95em; }
+    #delete-confirmation-actions button { font-size: 0.9em; padding: 8px 16px; }
 
     .history-section-header h4 { font-size: 1.1em; }
     .expand-section-button svg { width: 14px; height: 14px; }
