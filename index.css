@@ -179,7 +179,7 @@ header h1 {
     letter-spacing: 0.2px;
     white-space: nowrap;
     user-select: none;
-    position: relative;
+    position: relative; /* For checkmark positioning */
     transition: color 0.3s ease, border-bottom-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease, border-radius 0.2s ease;
 }
 
@@ -230,6 +230,21 @@ header h1 {
     background-color: rgba(0, 207, 232, 0.07);
     box-shadow: 0 -1px 7px rgba(0, 207, 232, 0.25), 0 0 8px rgba(170, 70, 255, 0.15);
     color: #00E5FF;
+}
+
+/* Category Tab Completion Checkmark */
+.tab-button.category-complete-indicator::before {
+    content: '✔';
+    position: absolute;
+    top: 8px;
+    left: 10px;
+    font-size: 12px;
+    color: #7FFFD4;
+    font-weight: bold;
+    line-height: 1;
+    z-index: 3;
+    padding: 1px 2px;
+    text-shadow: 0 0 3px rgba(0,0,0,0.5); /* Subtle shadow for better visibility */
 }
 
 /* Tab Content */
@@ -454,6 +469,13 @@ main#tab-content {
     background-color: #00CFE8 !important; /* Bright cyan for current day, ensure override */
     box-shadow: none;
 }
+/* New rule for high fill contrast on current day */
+.calendar-day-cell.current-day.high-fill .calendar-day-number {
+    color: #12101A; /* Dark contrast for light fill */
+    font-weight: 700; /* Ensure boldness */
+    z-index: 3; /* Ensure it's above fill */
+}
+
 .calendar-day-cell.has-history:not(.current-day) { border-bottom: 3px dotted rgba(190, 147, 253, 0.7); }
 .calendar-day-cell.has-history:not(.current-day):hover { background-color: rgba(190, 147, 253, 0.1); border-color: rgba(190, 147, 253, 0.4); }
 
@@ -566,17 +588,28 @@ main#tab-content {
     font-size: 1.5em; color: #00CFE8; margin-bottom: 15px; font-weight: 600;
     letter-spacing: 0.2px; border-bottom: 1px solid rgba(0, 207, 232, 0.2); padding-bottom: 12px;
 }
-.dashboard-category-summary .category-stats { font-size: 1.05em; color: #B0ACC9; font-weight: 500; }
+.dashboard-category-summary .category-stats {
+    font-size: 1.05em;
+    color: #B0ACC9; /* Default gray */
+    font-weight: 500;
+    font-family: 'Poppins', sans-serif; /* Poppins font */
+}
+.dashboard-category-summary .category-stats.fully-completed {
+    color: #7FFFD4; /* Brighter color for full completion */
+    font-weight: 600; /* Slightly bolder for emphasis */
+}
 
-/* Weekly and Monthly Progress Sections */
-#weekly-progress-container, #monthly-progress-container {
+
+/* Renamed Progress Sections */
+#today-progress-container, #current-week-progress-container {
     background-color: rgba(255, 255, 255, 0.03); padding: 30px; border-radius: 14px;
     border: 1px solid rgba(255, 255, 255, 0.06); box-shadow: 0 3px 8px rgba(0,0,0, 0.1);
     margin-bottom: 30px; text-align: left;
 }
-#weekly-progress-container { margin-top: 0; }
-#monthly-progress-container { margin-top: 30px; }
-#weekly-progress-container h3, #monthly-progress-container h3 {
+#today-progress-container { margin-top: 0; }
+#current-week-progress-container { margin-top: 30px; }
+
+#today-progress-container h3, #current-week-progress-container h3 {
     font-size: 1.6em; color: #BE93FD; margin-bottom: 22px; font-weight: 600;
     text-align: left; letter-spacing: 0.3px;
 }
@@ -1031,6 +1064,11 @@ footer {
         padding: 22px 10px; /* Adjusted for consistency */
     }
     #dashboard-tab-button { margin-right: 10px; }
+    .tab-button.category-complete-indicator::before {
+        top: 6px;
+        left: 8px;
+        font-size: 10px;
+    }
 
     .category-section .category-header h2 { font-size: 1.8em; }
     .category-section .category-header { margin-bottom: 20px; padding-bottom: 15px; }
@@ -1067,9 +1105,9 @@ footer {
     .calendar-day-number { font-size: 0.9em; }
     #calendar-grid { gap: 6px; }
 
-    #weekly-progress-container, #monthly-progress-container { padding: 25px; }
-    #monthly-progress-container { margin-top: 25px; }
-    #weekly-progress-container h3, #monthly-progress-container h3 { font-size: 1.4em; margin-bottom: 18px; }
+    #today-progress-container, #current-week-progress-container { padding: 25px; }
+    #current-week-progress-container { margin-top: 25px; }
+    #today-progress-container h3, #current-week-progress-container h3 { font-size: 1.4em; margin-bottom: 18px; }
     .progress-bar-container { height: 20px; margin-bottom: 16px; }
     .progress-bar-fill { line-height: 20px; font-size: 0.8em; }
     .points-stat { font-size: 1.05em; }
@@ -1128,6 +1166,12 @@ footer {
         padding: 20px 8px; /* Adjusted for consistency */
     }
     #dashboard-tab-button { margin-right: 8px; }
+    .tab-button.category-complete-indicator::before {
+        top: 5px;
+        left: 6px;
+        font-size: 9px;
+    }
+
 
     .category-section .category-header h2 { font-size: 1.6em; }
     .category-section .category-header { margin-bottom: 18px; padding-bottom: 12px; }
@@ -1164,9 +1208,9 @@ footer {
     .calendar-day-number { font-size: 0.85em; }
     #calendar-grid { gap: 4px; }
 
-    #weekly-progress-container, #monthly-progress-container { padding: 22px; }
-    #monthly-progress-container { margin-top: 22px; }
-    #weekly-progress-container h3, #monthly-progress-container h3 { font-size: 1.3em; margin-bottom: 15px; }
+    #today-progress-container h3, #current-week-progress-container h3 { font-size: 1.3em; margin-bottom: 15px; }
+    #today-progress-container, #current-week-progress-container { padding: 22px; }
+    #current-week-progress-container { margin-top: 22px; }
     .progress-bar-container { height: 18px; margin-bottom: 14px; }
     .progress-bar-fill { font-size: 0.75em; line-height: 18px; }
     .points-stat { font-size: 0.95em; }
