@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#00CFE8">
@@ -9,7 +8,6 @@
     
     <link rel="icon" type="image/x-icon" sizes="192x192" href="dp.png">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
-<!-- Android home screen icon -->
     <link rel="manifest" href="manifest.json">
 
     
@@ -29,7 +27,7 @@
                     <!-- Statistics will be populated here by JS -->
                 </div>
                 <div class="main-tab-intro">
-                    <p>Here's an overview of your weekly and monthly progress. Select a category in the Daily Productivity to view and manage specific tasks. Reflect on your day below and check past entries in the calendar.</p>
+                    <p>Here's an overview of your daily and weekly progress. Select a category in the Daily Productivity to view and manage specific tasks. Reflect on your day below and check past entries in the calendar.</p>
                 </div>
             </aside>
             <div id="left-column">
@@ -71,19 +69,19 @@
                             <button id="save-note-button">Save Note</button>
                         </div>
                         
-                        <div id="weekly-progress-container">
+                        <div id="today-progress-container"> 
+                            <h3>Today's Progress</h3>
+                            <div class="progress-bar-container">
+                                <div id="today-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                            </div>
+                            <p id="today-points-stat" class="points-stat">0 / 2700 points</p>
+                        </div>
+                        <div id="current-week-progress-container">
                             <h3>Weekly Progress</h3>
                             <div class="progress-bar-container">
-                                <div id="weekly-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                                <div id="current-week-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
                             </div>
-                            <p id="weekly-points-stat" class="points-stat">0 / 2700 points</p>
-                        </div>
-                        <div id="monthly-progress-container">
-                            <h3>Monthly Progress</h3>
-                            <div class="progress-bar-container">
-                                <div id="monthly-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
-                            </div>
-                            <p id="monthly-points-stat" class="points-stat">0 / 20000 points</p>
+                            <p id="current-week-points-stat" class="points-stat">0 / 20000 points</p>
                         </div>
                     </section>
                     <section id="health-content" class="category-section" role="tabpanel" aria-labelledby="health-tab-button" class="hidden">
