@@ -4,25 +4,25 @@
   "description": "A web app to track daily tasks across various life categories like Health, God, Personal, and Routine. Tasks reset daily and progress is saved in localStorage.",
   "start_url": "/index.html",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#12101A",
+  "theme_color": "#00CFE8",
   "icons": [
     {
       "src": "dp_192.png",
       "sizes": "192x192",
-      "type": "image/x-icon",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
       "src": "dp_512.png",
       "sizes": "512x512",
-      "type": "image/x-icon",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
       "src": "dp.png",
       "sizes": "192x192",
-      "type": "image/x-icon",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
