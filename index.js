@@ -92,8 +92,11 @@ const domElements = {
   historyModal: null,
   historyModalCloseButton: null,
   historyModalDate: null,
-  historyModalPoints: null,
-  historyModalPercentage: null,
+  historyModalPointsValue: null,        
+  historyModalPointsTotal: null,       
+  // historyPointsProgressFill: null, // Removed: No longer a separate bar for points
+  // historyModalPercentageValue: null, // Removed: Percentage is inside the bar
+  historyPercentageProgressFill: null, 
   historyTasksList: null,
   expandTasksButton: null,
   historicalReflectionWrapper: null,
@@ -116,6 +119,15 @@ const domElements = {
   fullscreenModalArea: null,
   fullscreenModalCloseButton: null,
 };
+
+function getProgressFillColor(percentage) {
+    const p = Math.max(0, Math.min(100, percentage));
+    // Hue: 0 (red) -> 60 (yellow) -> 120 (green)
+    const hue = (p / 100) * 120;
+    // Using HSL for vibrant colors. L=50% is standard. S=100% is full saturation.
+    return `hsl(${hue}, 100%, 50%)`;
+}
+
 
 function getTodayDateString() {
   const now = new Date();
@@ -350,7 +362,8 @@ function saveDayToHistory(dateToSave, tasksFromDay, noteFromDay) {
         userNote: noteFromDay || "",
         pointsEarned: finalPointsEarned,
         percentageCompleted: finalPercentageCompleted,
-        totalTasksOnDate: totalTasksForDay
+        totalTasksOnDate: totalTasksForDay,
+        dailyTargetPoints: DAILY_TARGET_POINTS // Store the target for that day
     };
 
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
@@ -474,11 +487,6 @@ function handleMidnightReset() {
         if (domElements.todayPointsStat) domElements.todayPointsStat.classList.remove('progress-value-resetting');
         if (domElements.todayProgressFill) domElements.todayProgressFill.classList.remove('progress-value-resetting');
     }, 500); // Duration of the animation
-
-    // Alert user if tab is active (optional, can be intrusive)
-    // if (document.hasFocus()) {
-    //    alert("It's a new day! Tasks have been reset and yesterday's completed items are saved to history.");
-    // }
     
     scheduleMidnightTask(); // Reschedule for the next midnight
 }
@@ -1204,6 +1212,7 @@ function updateTodaysProgress() {
   
   if (domElements.todayProgressFill) {
       domElements.todayProgressFill.style.width = `${progress.percentage}%`;
+      domElements.todayProgressFill.style.backgroundColor = getProgressFillColor(progress.percentage);
       domElements.todayProgressFill.textContent = `${progress.percentage}%`;
       domElements.todayProgressFill.setAttribute('aria-valuenow', progress.percentage.toString());
   }
@@ -1264,6 +1273,7 @@ function updateCurrentWeekProgress() {
 
     if (domElements.currentWeekProgressFill) {
         domElements.currentWeekProgressFill.style.width = `${weeklyCyclePercentage}%`;
+        domElements.currentWeekProgressFill.style.backgroundColor = getProgressFillColor(weeklyCyclePercentage);
         domElements.currentWeekProgressFill.textContent = `${weeklyCyclePercentage}%`;
         domElements.currentWeekProgressFill.setAttribute('aria-valuenow', weeklyCyclePercentage.toString());
     }
@@ -1323,28 +1333,41 @@ function renderCalendar() {
     
     let percentageCompleted = 0;
     let hasHistoryData = false;
+    
+    // Default fill color (very subtle or transparent for future/empty days initially)
+    fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)'; // Very transparent cyan
 
     if (dateString === todayDateString) { 
         cell.classList.add('current-day');
         const progress = calculateProgress(); // Live progress for today
         percentageCompleted = progress.percentage;
+        fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; // Vibrant cyan for current day
         if (percentageCompleted > 40) { 
             cell.classList.add('high-fill'); 
         }
-        // Check if today has any completed tasks or a note for history indication
         const noteToday = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString);
         hasHistoryData = progress.completedCount > 0 || !!noteToday;
 
-    } else { // For past or future days, rely on stored history
+    } else { // For past or future days
         const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
         const historyDataString = localStorage.getItem(historyKey);
         if (historyDataString) {
             try {
                 const historyEntry = JSON.parse(historyDataString);
                 percentageCompleted = historyEntry.percentageCompleted || 0;
+                // Only apply specific past day fill if there's history and it's a past day
+                if (cellDate < today) {
+                   fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)'; // Muted cyan for past days with history
+                }
                 hasHistoryData = (historyEntry.completedTasks && Object.values(historyEntry.completedTasks).some(arr => arr.length > 0)) || !!historyEntry.userNote;
-            } catch(e) { console.warn("Error parsing history for calendar cell:", e); }
+            } catch(e) { 
+                console.warn("Error parsing history for calendar cell:", e); 
+                 if (cellDate < today) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; // Default to less prominent on error for past
+            }
+        } else {
+             if (cellDate < today) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; // Default for past day with no specific history
         }
+        
         if (cellDate < today) {
            cell.classList.add('calendar-day-past');
         }
@@ -1363,12 +1386,17 @@ function renderCalendar() {
 
 function showHistoryModal(dateString) {
   currentModalDate = dateString; 
-  if (!domElements.historyModal || !domElements.historyModalDate || !domElements.historyModalPoints || 
-      !domElements.historyModalPercentage || !domElements.historyTasksList || 
+  if (!domElements.historyModal || !domElements.historyModalDate || 
+      !domElements.historyModalPointsValue || !domElements.historyModalPointsTotal || 
+      !domElements.historyPercentageProgressFill ||
+      !domElements.historyTasksList || 
       !domElements.historyUserNoteDisplay || !domElements.historyUserNoteEdit ||
       !domElements.historicalNoteControls || !domElements.saveHistoricalNoteButton ||
       !domElements.clearHistoricalNoteButton || !domElements.historicalNoteStatus ||
-      !domElements.expandTasksButton || !domElements.expandReflectionButton) return;
+      !domElements.expandTasksButton || !domElements.expandReflectionButton) {
+        console.error("One or more history modal DOM elements are missing.");
+        return;
+      }
 
   const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
   const historyDataString = localStorage.getItem(historyKey);
@@ -1377,7 +1405,7 @@ function showHistoryModal(dateString) {
   const isPastDay = new Date(dateString + 'T23:59:59') < getNormalizedDate(new Date()) && !isToday;
 
 
-  if (isToday) { // For today, build a temporary "history" view from live data
+  if (isToday) { 
     const progress = calculateProgress();
     const completedTasksToday = {};
     currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
@@ -1395,9 +1423,10 @@ function showHistoryModal(dateString) {
         userNote: note,
         pointsEarned: progress.pointsEarned,
         percentageCompleted: progress.percentage,
-        totalTasksOnDate: progress.totalTasks 
+        totalTasksOnDate: progress.totalTasks,
+        dailyTargetPoints: DAILY_TARGET_POINTS
     };
-  } else if (historyDataString) { // For past days, use stored history
+  } else if (historyDataString) { 
       try {
           historyEntry = JSON.parse(historyDataString);
       } catch (e) {
@@ -1405,10 +1434,20 @@ function showHistoryModal(dateString) {
       }
   }
 
+  domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   if (historyEntry) {
-    domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    domElements.historyModalPoints.textContent = historyEntry.pointsEarned !== undefined ? historyEntry.pointsEarned.toString() : 'N/A';
-    domElements.historyModalPercentage.textContent = historyEntry.percentageCompleted !== undefined ? historyEntry.percentageCompleted.toString() : 'N/A';
+    const targetPointsForDay = historyEntry.dailyTargetPoints || DAILY_TARGET_POINTS;
+    
+    domElements.historyModalPointsValue.textContent = historyEntry.pointsEarned !== undefined ? historyEntry.pointsEarned.toString() : 'N/A';
+    domElements.historyModalPointsTotal.textContent = targetPointsForDay.toString();
+    
+    const completionPercentage = historyEntry.percentageCompleted !== undefined ? historyEntry.percentageCompleted : 0;
+    domElements.historyPercentageProgressFill.style.width = `${completionPercentage}%`;
+    domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(completionPercentage);
+    domElements.historyPercentageProgressFill.textContent = `${completionPercentage}%`;
+    domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', completionPercentage);
+
 
     domElements.historyTasksList.innerHTML = '';
     let hasCompletedTasks = false;
@@ -1453,7 +1492,6 @@ function showHistoryModal(dateString) {
     
     domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote);
 
-    // Allow editing note for past days or today
     if (isPastDay || isToday) { 
         domElements.historyUserNoteDisplay.ondblclick = () => {
             domElements.historyUserNoteDisplay.classList.add('hidden');
@@ -1461,13 +1499,18 @@ function showHistoryModal(dateString) {
             domElements.historicalNoteControls.classList.remove('hidden');
             domElements.historyUserNoteEdit.focus();
         };
-    } else { // Future day, no editing
+    } else { 
         domElements.historyUserNoteDisplay.ondblclick = null; 
     }
-  } else { // No historyEntry (e.g., future date with no data)
-    domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    domElements.historyModalPoints.textContent = 'N/A';
-    domElements.historyModalPercentage.textContent = 'N/A';
+  } else { 
+    domElements.historyModalPointsValue.textContent = 'N/A';
+    domElements.historyModalPointsTotal.textContent = DAILY_TARGET_POINTS.toString();
+    
+    domElements.historyPercentageProgressFill.style.width = `0%`;
+    domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(0);
+    domElements.historyPercentageProgressFill.textContent = `0%`;
+    domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', 0);
+    
     domElements.historyTasksList.innerHTML = '<p>No data available for this day.</p>';
     domElements.historyUserNoteDisplay.textContent = "No data available for this day.";
     domElements.historyUserNoteDisplay.classList.remove('hidden');
@@ -1521,8 +1564,9 @@ function saveHistoricalNote() {
             completedTasks: isToday ? completedTasksForEntry : {}, 
             userNote: "",
             pointsEarned: progress.pointsEarned,
-            percentageCompleted: progress.percentageCompleted,
-            totalTasksOnDate: progress.totalTasks 
+            percentageCompleted: progress.percentageCompleted, // Corrected from percentageCompleted
+            totalTasksOnDate: progress.totalTasks,
+            dailyTargetPoints: DAILY_TARGET_POINTS 
         };
          if(!isToday) currentCategories.forEach(cat => historyEntry.completedTasks[cat.id] = []);
     }
@@ -1912,11 +1956,15 @@ function initializeApp() {
   domElements.pickerYearsList = document.getElementById('picker-years-list');
   domElements.dailyNoteInput = document.getElementById('daily-note-input');
   domElements.saveNoteButton = document.getElementById('save-note-button');
+  
   domElements.historyModal = document.getElementById('history-modal');
   domElements.historyModalCloseButton = document.getElementById('history-modal-close-button');
   domElements.historyModalDate = document.getElementById('history-modal-date');
-  domElements.historyModalPoints = document.getElementById('history-modal-points');
-  domElements.historyModalPercentage = document.getElementById('history-modal-percentage');
+  domElements.historyModalPointsValue = document.getElementById('history-modal-points-value');
+  domElements.historyModalPointsTotal = document.getElementById('history-modal-points-total');
+  // domElements.historyPointsProgressFill = document.getElementById('history-points-progress-fill'); // Removed
+  // domElements.historyModalPercentageValue = document.getElementById('history-modal-percentage-value'); // Removed
+  domElements.historyPercentageProgressFill = document.getElementById('history-percentage-progress-fill');
   domElements.historyTasksList = document.getElementById('history-tasks-list');
   domElements.expandTasksButton = document.getElementById('expand-tasks-button');
   domElements.historicalReflectionWrapper = document.getElementById('historical-reflection-wrapper');
@@ -1927,6 +1975,7 @@ function initializeApp() {
   domElements.saveHistoricalNoteButton = document.getElementById('save-historical-note-button');
   domElements.clearHistoricalNoteButton = document.getElementById('clear-historical-note-button');
   domElements.historicalNoteStatus = document.getElementById('historical-note-status');
+  
   domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
   
   domElements.deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
