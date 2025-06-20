@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,10 +58,6 @@
                             <div id="calendar-grid">
                                 <!-- Calendar days will be populated by JS -->
                             </div>
-                        </div>
-
-                        <div id="save-progress-button-container">
-                            <button id="save-progress-button">Save Progress</button>
                         </div>
 
                         <div id="daily-note-container">
@@ -147,18 +144,6 @@
             <button id="fullscreen-modal-close-button" class="close-button" aria-label="Close fullscreen view">&times;</button>
             <h3 id="fullscreen-modal-title" class="fullscreen-modal-title-text"></h3>
             <div id="fullscreen-modal-area" class="fullscreen-modal-scrollable-area"></div>
-        </div>
-    </div>
-
-    <div id="save-progress-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="save-progress-modal-title">
-        <div id="save-progress-modal-content" class="modal-content save-progress-modal-content">
-            <button id="save-progress-close-button" class="close-button" aria-label="Close confirmation">&times;</button>
-            <h3 id="save-progress-modal-title">Confirm Save Progress</h3>
-            <p id="save-progress-message">You're saving progress before 8 PM. Are you sure you're done for today?</p>
-            <div id="save-progress-actions">
-                <button id="confirm-save-progress-button">Yes, it's completed</button>
-                <button id="cancel-save-progress-button">No, not yet</button>
-            </div>
         </div>
     </div>
 
