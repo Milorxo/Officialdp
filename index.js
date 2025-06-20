@@ -29,17 +29,18 @@ const CATEGORY_DISPLAY_NAMES = {
   routine: "Daily Routine",
 };
 
-const WEEKLY_TARGET_POINTS = 2700;
-const MONTHLY_TARGET_POINTS = 20000;
+const DAILY_TARGET_POINTS = 2700;
+const TARGET_POINTS_FOR_WEEKLY_VIEW = 20000; // Updated from 18900
 
 const STORAGE_KEY_TASK_PREFIX = 'lifeTrackerTask_';
 const STORAGE_KEY_LAST_VISIT_DATE = 'lifeTrackerLastVisitDate';
-const STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX = 'lifeTrackerDailyEarnedPoints_';
+const STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX = 'lifeTrackerDailyEarnedPoints_'; // Still used for daily actuals
 const STORAGE_KEY_LAST_MONTH_PROCESSED = 'lifeTrackerLastMonthProcessed';
 const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_';
 const STORAGE_KEY_DAILY_HISTORY_PREFIX = 'lifeTrackerHistory_';
 const STORAGE_KEY_LOCKED_TASKS_PREFIX = 'lifeTrackerLockedTasks_';
 const USER_TASKS_STORAGE_KEY = 'lifeTrackerUserDefinedTasks';
+const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate';
 
 
 let currentTasks = [];
@@ -88,10 +89,10 @@ const domElements = {
   undoCategoryButtons: {},
 
   dashboardSummariesContainer: null,
-  weeklyProgressFill: null,
-  weeklyPointsStat: null,
-  monthlyProgressFill: null,
-  monthlyPointsStat: null,
+  todayProgressFill: null, // Renamed from weeklyProgressFill
+  todayPointsStat: null,   // Renamed from weeklyPointsStat
+  currentWeekProgressFill: null, // Renamed from monthlyProgressFill
+  currentWeekPointsStat: null,   // Renamed from monthlyPointsStat
   calendarMonthYearButton: null,
   calendarMonthYear: null,
   calendarGrid: null,
@@ -268,7 +269,8 @@ function saveDailyNote() {
             }
         });
         const totalTasksForToday = currentTasks.length;
-        const pointsPerTask = totalTasksForToday > 0 ? WEEKLY_TARGET_POINTS / totalTasksForToday : 0;
+        // Use DAILY_TARGET_POINTS for calculating points per task for the daily total
+        const pointsPerTask = totalTasksForToday > 0 ? DAILY_TARGET_POINTS / totalTasksForToday : 0;
         const pointsEarnedToday = Math.round(tasksCompletedCount * pointsPerTask);
         const percentageToday = totalTasksForToday > 0 ? Math.round((tasksCompletedCount / totalTasksForToday) * 100) : 0;
 
@@ -319,7 +321,8 @@ function savePreviousDayHistory(previousDayDate, tasksForPreviousDay) {
     });
 
     const totalTasksForPreviousDay = tasksForPreviousDay.length;
-    const pointsPerTaskCalculation = totalTasksForPreviousDay > 0 ? WEEKLY_TARGET_POINTS / totalTasksForPreviousDay : 0;
+    // Use DAILY_TARGET_POINTS here as well, as this function records daily achievement
+    const pointsPerTaskCalculation = totalTasksForPreviousDay > 0 ? DAILY_TARGET_POINTS / totalTasksForPreviousDay : 0;
     const finalPointsEarned = Math.round(tasksCompletedCount * pointsPerTaskCalculation);
     const finalPercentageCompleted = totalTasksForPreviousDay > 0 ? Math.round((tasksCompletedCount / totalTasksForPreviousDay) * 100) : 0;
 
@@ -349,7 +352,7 @@ function savePreviousDayHistory(previousDayDate, tasksForPreviousDay) {
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
     
     localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + previousDayDate); 
-    localStorage.removeItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + previousDayDate);
+    localStorage.removeItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + previousDayDate); // This specific key might be redundant if history is primary
     localStorage.removeItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + previousDayDate);
     
     console.log(`History finalized and saved for ${previousDayDate}:`, historyEntry);
@@ -781,10 +784,9 @@ function renderAllTasks() {
 }
 
 function calculateProgress() {
-  const today = getTodayDateString();
   let completedCount = 0;
   currentTasks.forEach(task => {
-    if (task.completed && !lockedTaskIdsToday.includes(task.id)) { // Only count non-locked completed tasks
+    if (task.completed && !lockedTaskIdsToday.includes(task.id)) { 
       completedCount++;
     }
   });
@@ -792,10 +794,8 @@ function calculateProgress() {
   const unlockedTasksCount = currentTasks.filter(task => !lockedTaskIdsToday.includes(task.id)).length;
   
   const percentage = unlockedTasksCount > 0 ? Math.round((completedCount / unlockedTasksCount) * 100) : 0;
-  const pointsPerTask = unlockedTasksCount > 0 ? WEEKLY_TARGET_POINTS / unlockedTasksCount : 0;
+  const pointsPerTask = unlockedTasksCount > 0 ? DAILY_TARGET_POINTS / unlockedTasksCount : 0;
   const pointsEarned = Math.round(completedCount * pointsPerTask);
-
-  localStorage.setItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + today, pointsEarned.toString());
 
   return { percentage, pointsEarned, completedCount, totalTasks: unlockedTasksCount };
 }
@@ -807,114 +807,106 @@ function updateDashboardSummaries() {
 
   Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
     const categoryTasks = currentTasks.filter(task => task.category === category);
-    const completedTasks = categoryTasks.filter(task => task.completed && !lockedTaskIdsToday.includes(task.id));
     const unlockedTasksInCategory = categoryTasks.filter(task => !lockedTaskIdsToday.includes(task.id));
+    const completedTasksInUnlocked = unlockedTasksInCategory.filter(task => task.completed);
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'dashboard-category-summary';
     summaryDiv.innerHTML = `
       <h3>${CATEGORY_DISPLAY_NAMES[category]}</h3>
-      <p class="category-stats">Completed: ${completedTasks.length} / ${unlockedTasksInCategory.length}</p>
+      <p class="category-stats">Completed: ${completedTasksInUnlocked.length} / ${unlockedTasksInCategory.length}</p>
     `;
+    
+    const statsP = summaryDiv.querySelector('.category-stats');
+    if (unlockedTasksInCategory.length > 0 && completedTasksInUnlocked.length === unlockedTasksInCategory.length) {
+        statsP.classList.add('fully-completed');
+    } else {
+        statsP.classList.remove('fully-completed');
+    }
+
     domElements.dashboardSummariesContainer.appendChild(summaryDiv);
   });
 }
 
-function updateWeeklyProgress() {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // Sunday = 0, Monday = 1, ... Saturday = 6
-  let totalPointsThisWeek = 0;
-
-  for (let i = 0; i <= dayOfWeek; i++) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    
-    let pointsForDate = 0;
-    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
-    const historyDataString = localStorage.getItem(historyKey);
-
-    if (dateString === getTodayDateString()) { // For today, calculate from current progress
-        const currentProgress = calculateProgress();
-        pointsForDate = currentProgress.pointsEarned;
-    } else if (historyDataString) { // For past days, use saved history
-        try {
-            const historyEntry = JSON.parse(historyDataString);
-            pointsForDate = historyEntry.pointsEarned || 0;
-        } catch (e) {
-            console.warn(`Error parsing history for ${dateString}:`, e);
-            const storedPoints = localStorage.getItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + dateString);
-            if (storedPoints) pointsForDate = parseInt(storedPoints, 10) || 0;
-        }
-    } else { // Fallback for past days if no history entry (less accurate)
-        const storedPoints = localStorage.getItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + dateString);
-        if (storedPoints) pointsForDate = parseInt(storedPoints, 10) || 0;
-    }
-    totalPointsThisWeek += pointsForDate;
-  }
+function updateTodaysProgress() {
+  const progress = calculateProgress(); // Gets today's current progress
   
-  const weeklyPercentage = Math.min(100, Math.round((totalPointsThisWeek / WEEKLY_TARGET_POINTS) * 100));
-
-  if (domElements.weeklyProgressFill) {
-      domElements.weeklyProgressFill.style.width = `${weeklyPercentage}%`;
-      domElements.weeklyProgressFill.textContent = `${weeklyPercentage}%`;
-      domElements.weeklyProgressFill.setAttribute('aria-valuenow', weeklyPercentage.toString());
+  if (domElements.todayProgressFill) {
+      domElements.todayProgressFill.style.width = `${progress.percentage}%`;
+      domElements.todayProgressFill.textContent = `${progress.percentage}%`;
+      domElements.todayProgressFill.setAttribute('aria-valuenow', progress.percentage.toString());
   }
-  if (domElements.weeklyPointsStat) {
-      domElements.weeklyPointsStat.textContent = `${totalPointsThisWeek} / ${WEEKLY_TARGET_POINTS} points`;
+  if (domElements.todayPointsStat) {
+      domElements.todayPointsStat.textContent = `${progress.pointsEarned} / ${DAILY_TARGET_POINTS} points`;
   }
 }
 
-function updateMonthlyProgress() {
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  let totalPointsThisMonth = 0;
+function updateCurrentWeekProgress() {
+    const today = getNormalizedDate(new Date());
+    let currentWeekStartDateString = localStorage.getItem(STORAGE_KEY_CURRENT_WEEK_START_DATE);
+    let currentWeekStartDate;
 
-  for (let day = 1; day <= today.getDate(); day++) {
-    const date = new Date(currentYear, currentMonth, day);
-    const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    
-    let pointsForDate = 0;
-    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
-    const historyDataString = localStorage.getItem(historyKey);
+    if (!currentWeekStartDateString) {
+        currentWeekStartDate = today;
+        localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
+    } else {
+        currentWeekStartDate = getNormalizedDate(new Date(currentWeekStartDateString));
+        const daysPassed = (today.getTime() - currentWeekStartDate.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysPassed >= 7) {
+            currentWeekStartDate = today; // Start new week from today
+             // Adjust start date to be the Monday of the current week if preferred fixed week cycle
+            let dayOfWeek = today.getDay(); // Sunday is 0, Monday is 1
+            let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // if Sunday, go back 6 days, else go back to Monday
+            currentWeekStartDate = new Date(today);
+            currentWeekStartDate.setDate(today.getDate() + diffToMonday);
+            currentWeekStartDate = getNormalizedDate(currentWeekStartDate);
 
-    if (dateString === getTodayDateString()) { // For today
-        const currentProgress = calculateProgress();
-        pointsForDate = currentProgress.pointsEarned;
-    } else if (historyDataString) { // For past days with history
-        try {
-            const historyEntry = JSON.parse(historyDataString);
-            pointsForDate = historyEntry.pointsEarned || 0;
-        } catch (e) {
-            console.warn(`Error parsing history for ${dateString}:`, e);
-            const storedPoints = localStorage.getItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + dateString);
-            if (storedPoints) pointsForDate = parseInt(storedPoints, 10) || 0;
+            localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
         }
-    } else { // Fallback for past days
-        const storedPoints = localStorage.getItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + dateString);
-        if (storedPoints) pointsForDate = parseInt(storedPoints, 10) || 0;
     }
-    totalPointsThisMonth += pointsForDate;
-  }
+    
+    let totalPointsThisWeekCycle = 0;
+    let currentDateIter = new Date(currentWeekStartDate);
 
-  const monthlyPercentage = Math.min(100, Math.round((totalPointsThisMonth / MONTHLY_TARGET_POINTS) * 100));
+    while (currentDateIter <= today) {
+        const dateStringForIter = `${currentDateIter.getFullYear()}-${(currentDateIter.getMonth() + 1).toString().padStart(2, '0')}-${currentDateIter.getDate().toString().padStart(2, '0')}`;
+        let pointsForDay = 0;
 
-  if (domElements.monthlyProgressFill) {
-      domElements.monthlyProgressFill.style.width = `${monthlyPercentage}%`;
-      domElements.monthlyProgressFill.textContent = `${monthlyPercentage}%`;
-      domElements.monthlyProgressFill.setAttribute('aria-valuenow', monthlyPercentage.toString());
-  }
-  if (domElements.monthlyPointsStat) {
-      domElements.monthlyPointsStat.textContent = `${totalPointsThisMonth} / ${MONTHLY_TARGET_POINTS} points`;
-  }
+        if (dateStringForIter === getTodayDateString()) {
+            pointsForDay = calculateProgress().pointsEarned;
+        } else {
+            const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateStringForIter;
+            const historyDataString = localStorage.getItem(historyKey);
+            if (historyDataString) {
+                try {
+                    const historyEntry = JSON.parse(historyDataString);
+                    pointsForDay = historyEntry.pointsEarned || 0;
+                } catch (e) {
+                    console.warn(`Error parsing history for ${dateStringForIter} in weekly progress:`, e);
+                }
+            }
+        }
+        totalPointsThisWeekCycle += pointsForDay;
+        currentDateIter.setDate(currentDateIter.getDate() + 1);
+    }
+
+    const weeklyCyclePercentage = TARGET_POINTS_FOR_WEEKLY_VIEW > 0 ? Math.min(100, Math.round((totalPointsThisWeekCycle / TARGET_POINTS_FOR_WEEKLY_VIEW) * 100)) : 0;
+
+    if (domElements.currentWeekProgressFill) {
+        domElements.currentWeekProgressFill.style.width = `${weeklyCyclePercentage}%`;
+        domElements.currentWeekProgressFill.textContent = `${weeklyCyclePercentage}%`;
+        domElements.currentWeekProgressFill.setAttribute('aria-valuenow', weeklyCyclePercentage.toString());
+    }
+    if (domElements.currentWeekPointsStat) {
+        domElements.currentWeekPointsStat.textContent = `${totalPointsThisWeekCycle} / ${TARGET_POINTS_FOR_WEEKLY_VIEW} points`;
+    }
 }
 
 
 function renderCalendar() {
   if (!domElements.calendarGrid || !domElements.calendarMonthYear) return;
 
-  domElements.calendarGrid.innerHTML = ''; // Clear previous days
+  domElements.calendarGrid.innerHTML = ''; 
 
   const month = calendarDisplayDate.getMonth();
   const year = calendarDisplayDate.getFullYear();
@@ -923,11 +915,10 @@ function renderCalendar() {
 
   const firstDayOfMonth = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startingDayOfWeek = firstDayOfMonth.getDay(); // 0 for Sunday, 1 for Monday...
+  const startingDayOfWeek = firstDayOfMonth.getDay(); 
 
   const today = getNormalizedDate(new Date());
 
-  // Day headers
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   dayNames.forEach(dayName => {
     const dayHeader = document.createElement('div');
@@ -936,14 +927,12 @@ function renderCalendar() {
     domElements.calendarGrid.appendChild(dayHeader);
   });
 
-  // Empty cells for days before the first of the month
   for (let i = 0; i < startingDayOfWeek; i++) {
     const emptyCell = document.createElement('div');
     emptyCell.className = 'calendar-day-cell empty';
     domElements.calendarGrid.appendChild(emptyCell);
   }
 
-  // Populate days of the month
   for (let day = 1; day <= daysInMonth; day++) {
     const cellDate = getNormalizedDate(new Date(year, month, day));
     const dateString = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
@@ -964,12 +953,15 @@ function renderCalendar() {
     let percentageCompleted = 0;
     let hasHistoryData = false;
 
-    if (cellDate.getTime() === today.getTime()) { // Current actual day
+    if (cellDate.getTime() === today.getTime()) { 
         cell.classList.add('current-day');
         const progress = calculateProgress();
         percentageCompleted = progress.percentage;
+        if (percentageCompleted > 40) { // Threshold for changing text color
+            cell.classList.add('high-fill'); 
+        }
         hasHistoryData = progress.completedCount > 0 || (localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) !== null);
-    } else { // Past or future day
+    } else { 
         const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
         const historyDataString = localStorage.getItem(historyKey);
         if (historyDataString) {
@@ -990,17 +982,13 @@ function renderCalendar() {
     
     fillDiv.style.height = `${percentageCompleted}%`;
     
-    if (percentageCompleted === 0 && !hasHistoryData && cellDate >= today) {
-        // No fill if 0% and no other history for current or future dates
-    }
-
     cell.addEventListener('click', () => showHistoryModal(dateString));
     domElements.calendarGrid.appendChild(cell);
   }
 }
 
 function showHistoryModal(dateString) {
-  currentModalDate = dateString; // Store the date for which the modal is shown
+  currentModalDate = dateString; 
   if (!domElements.historyModal || !domElements.historyModalDate || !domElements.historyModalPoints || 
       !domElements.historyModalPercentage || !domElements.historyTasksList || 
       !domElements.historyUserNoteDisplay || !domElements.historyUserNoteEdit ||
@@ -1015,12 +1003,11 @@ function showHistoryModal(dateString) {
   const isPastDay = new Date(dateString) < getNormalizedDate(new Date()) && !isToday;
 
   if (isToday) {
-    // For today, generate "history" on the fly from current state
     const progress = calculateProgress();
     const completedTasksToday = { health: [], god: [], personal: [], routine: [] };
     currentTasks.forEach(task => {
         if (task.completed) {
-             if (!completedTasksToday[task.category]) completedTasksToday[task.category] = []; // Ensure array exists
+             if (!completedTasksToday[task.category]) completedTasksToday[task.category] = []; 
              completedTasksToday[task.category].push(task.text);
         }
     });
@@ -1038,7 +1025,6 @@ function showHistoryModal(dateString) {
           historyEntry = JSON.parse(historyDataString);
       } catch (e) {
           console.error("Error parsing history data for modal:", e);
-          // Potentially show an error in the modal or default values
       }
   }
 
@@ -1065,7 +1051,7 @@ function showHistoryModal(dateString) {
                 const ul = document.createElement('ul');
                 tasksInCategory.forEach(taskText => {
                     const li = document.createElement('li');
-                    const span = document.createElement('span'); // To apply line-through
+                    const span = document.createElement('span'); 
                     span.textContent = taskText;
                     li.appendChild(span);
                     ul.appendChild(li);
@@ -1084,17 +1070,15 @@ function showHistoryModal(dateString) {
     domElements.historyUserNoteDisplay.textContent = historyEntry.userNote || "No reflection recorded for this day.";
     domElements.historyUserNoteDisplay.classList.remove('hidden');
     domElements.historyUserNoteEdit.value = historyEntry.userNote || "";
-    domElements.historyUserNoteEdit.classList.add('hidden'); // Start in display mode
+    domElements.historyUserNoteEdit.classList.add('hidden'); 
     domElements.historicalNoteControls.classList.add('hidden');
     domElements.historicalNoteStatus.textContent = '';
     
     domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote);
 
-
-    // Allow editing only for past days or today (if we allow editing today's note via history for consistency)
-    if (isPastDay || isToday) { // Check if this day is editable. For now, assume all historical notes are.
+    if (isPastDay || isToday) { 
         domElements.historyUserNoteDisplay.ondblclick = () => {
-             if (isPastDay || isToday) { // Double check within handler
+             if (isPastDay || isToday) { 
                 domElements.historyUserNoteDisplay.classList.add('hidden');
                 domElements.historyUserNoteEdit.classList.remove('hidden');
                 domElements.historicalNoteControls.classList.remove('hidden');
@@ -1102,7 +1086,7 @@ function showHistoryModal(dateString) {
             }
         };
     } else {
-        domElements.historyUserNoteDisplay.ondblclick = null; // Disable editing for future dates
+        domElements.historyUserNoteDisplay.ondblclick = null; 
     }
   } else {
     domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -1126,7 +1110,7 @@ function closeHistoryModal() {
   if (domElements.historyModal) {
     domElements.historyModal.classList.add('hidden');
   }
-  currentModalDate = null; // Reset the current modal date context
+  currentModalDate = null; 
 }
 
 
@@ -1140,23 +1124,21 @@ function saveHistoricalNote() {
     const existingHistoryStr = localStorage.getItem(historyKey);
     if (existingHistoryStr) {
         historyEntry = JSON.parse(existingHistoryStr);
-    } else { // If no history entry exists, create a basic one
+    } else { 
         historyEntry = {
             date: currentModalDate,
-            completedTasks: {}, // Assume no task data if creating new
+            completedTasks: {}, 
             userNote: "",
             pointsEarned: 0,
             percentageCompleted: 0,
-            totalTasksOnDate: 0 // May need to infer this if relevant
+            totalTasksOnDate: 0 
         };
     }
     historyEntry.userNote = noteContent;
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
 
-    // If it's today's note being edited via history, also update the daily note input if visible
     if (currentModalDate === getTodayDateString() && domElements.dailyNoteInput) {
         domElements.dailyNoteInput.value = noteContent;
-        // Also update the separate daily note storage for today
         localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent);
     }
 
@@ -1170,14 +1152,12 @@ function saveHistoricalNote() {
     
     domElements.expandReflectionButton.classList.toggle('hidden', !noteContent);
 
-    renderCalendar(); // Re-render calendar to update fill/styles if note affects "has-history"
+    renderCalendar(); 
 }
 
 function clearHistoricalNote() {
      if (!domElements.historyUserNoteEdit) return;
     domElements.historyUserNoteEdit.value = "";
-    // Optionally, could immediately save this cleared state, or wait for explicit save.
-    // For now, just clears the textarea, user needs to click "Save Reflection"
 }
 
 
@@ -1198,7 +1178,7 @@ function populateMonthYearPicker() {
             pickerSelectedMonth = index;
             calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1);
             renderCalendar();
-            populateMonthYearPicker(); // Re-populate to update selection
+            populateMonthYearPicker(); 
         };
         domElements.pickerMonthsGrid.appendChild(monthButton);
     });
@@ -1219,11 +1199,11 @@ function populateMonthYearPicker() {
             pickerSelectedYear = year;
             calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1);
             renderCalendar();
-            populateMonthYearPicker(); // Re-populate to update selection
+            populateMonthYearPicker(); 
         };
         domElements.pickerYearsList.appendChild(yearButton);
     }
-    if (yearToScrollTo) { // Scroll the selected year into view
+    if (yearToScrollTo) { 
         yearToScrollTo.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
 }
@@ -1247,10 +1227,35 @@ function closeMonthYearPicker() {
     domElements.monthYearPickerModal.classList.add('hidden');
 }
 
+function updateCategoryTabCompletionStates() {
+    Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
+        const tabButton = domElements.tabButtons[category];
+        if (!tabButton) return;
+
+        const categoryTasks = currentTasks.filter(task => task.category === category);
+        const unlockedTasksInCategory = categoryTasks.filter(task => !lockedTaskIdsToday.includes(task.id));
+        
+        if (unlockedTasksInCategory.length === 0 && categoryTasks.length > 0) { // All tasks are locked, consider it "done" for the day in terms of interaction
+            tabButton.classList.add('category-complete-indicator');
+            return;
+        }
+        
+        const completedTasksCount = unlockedTasksInCategory.filter(task => task.completed).length;
+        const isFullyCompleted = unlockedTasksInCategory.length > 0 && completedTasksCount === unlockedTasksInCategory.length;
+
+        if (isFullyCompleted) {
+            tabButton.classList.add('category-complete-indicator');
+        } else {
+            tabButton.classList.remove('category-complete-indicator');
+        }
+    });
+}
+
 function updateAllProgress() {
   updateDashboardSummaries();
-  updateWeeklyProgress();
-  updateMonthlyProgress();
+  updateTodaysProgress();
+  updateCurrentWeekProgress();
+  updateCategoryTabCompletionStates();
   renderCalendar(); 
 }
 
@@ -1261,9 +1266,8 @@ function saveLockedTasksForToday() {
 
 function handleSaveProgress() {
   const now = new Date();
-  const today = getTodayDateString();
   
-  if (now.getHours() < 20) { // Before 8 PM
+  if (now.getHours() < 20) { 
       if(domElements.saveProgressMessage) domElements.saveProgressMessage.textContent = `You're saving progress at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Are you sure you're done for today?`;
       if(domElements.saveProgressModal) domElements.saveProgressModal.classList.remove('hidden');
   } else {
@@ -1273,14 +1277,10 @@ function handleSaveProgress() {
 
 function finalizeDayProgress() {
     const today = getTodayDateString();
-    // Lock all current tasks
     lockedTaskIdsToday = currentTasks.map(task => task.id);
     saveLockedTasksForToday();
+    savePreviousDayHistory(today, currentTasks); 
 
-    // Save final history entry for the day
-    savePreviousDayHistory(today, currentTasks); // Using this function as it captures all necessary data
-
-    // Update UI elements to reflect locked state
     renderAllTasks();
     updateAllProgress(); 
     updateSaveProgressButtonState();
@@ -1297,12 +1297,9 @@ function updateSaveProgressButtonState() {
   if (storedLockedTasks) {
       try {
           const lockedIds = JSON.parse(storedLockedTasks);
-          // Check if all current tasks are in the locked list.
-          // This logic might need refinement if tasks can be added/removed after initial lock.
-          // A simpler check: if *any* tasks are locked, consider the day locked for simplicity for now.
           if (lockedIds.length > 0 && currentTasks.every(task => lockedIds.includes(task.id))) {
              isLockedForToday = true;
-          } else if (lockedIds.length > 0 && lockedIds.length === currentTasks.length) { // Alternative check
+          } else if (lockedIds.length > 0 && lockedIds.length === currentTasks.length && currentTasks.length > 0) { 
              isLockedForToday = true;
           }
       } catch (e) {
@@ -1310,9 +1307,7 @@ function updateSaveProgressButtonState() {
       }
   }
 
-  // A more robust check might be if a "day_finalized_flag_YYYY-MM-DD" exists in history or a specific flag.
-  // For now, let's assume if the lockedTaskIdsToday array (from loadAppData) covers all tasks, it's locked.
-  if (lockedTaskIdsToday.length > 0 && currentTasks.every(task => lockedTaskIdsToday.includes(task.id))) {
+  if (lockedTaskIdsToday.length > 0 && currentTasks.length > 0 && currentTasks.every(task => lockedTaskIdsToday.includes(task.id))) {
      isLockedForToday = true;
   }
 
@@ -1334,7 +1329,7 @@ function openFullscreenContentModal(type, date) {
     const historyDataString = localStorage.getItem(historyKey);
     let historyEntry = null;
 
-    if (date === getTodayDateString()) { // For today, generate "history" on the fly
+    if (date === getTodayDateString()) { 
         const progress = calculateProgress();
         const completedTasksToday = { health: [], god: [], personal: [], routine: [] };
         currentTasks.forEach(task => {
@@ -1363,7 +1358,7 @@ function openFullscreenContentModal(type, date) {
     }
 
     const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    domElements.fullscreenModalArea.innerHTML = ''; // Clear previous content
+    domElements.fullscreenModalArea.innerHTML = ''; 
 
     if (type === 'tasks') {
         domElements.fullscreenModalTitle.textContent = `Completed Tasks for ${formattedDate}`;
@@ -1376,7 +1371,7 @@ function openFullscreenContentModal(type, date) {
                     const categoryGroup = document.createElement('div');
                     categoryGroup.className = 'history-category-group';
                     
-                    const categoryTitle = document.createElement('h4'); // Use h4 for semantic structure
+                    const categoryTitle = document.createElement('h4'); 
                     categoryTitle.className = 'history-category-title';
                     categoryTitle.textContent = CATEGORY_DISPLAY_NAMES[categoryKey] || categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1);
                     categoryGroup.appendChild(categoryTitle);
@@ -1424,10 +1419,12 @@ function initializeApp() {
   domElements.tabsContainer = document.getElementById('tabs');
   domElements.tabContents.dashboard = document.getElementById('dashboard-content');
   domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
-  domElements.weeklyProgressFill = document.getElementById('weekly-progress-fill');
-  domElements.weeklyPointsStat = document.getElementById('weekly-points-stat');
-  domElements.monthlyProgressFill = document.getElementById('monthly-progress-fill');
-  domElements.monthlyPointsStat = document.getElementById('monthly-points-stat');
+  
+  domElements.todayProgressFill = document.getElementById('today-progress-fill');
+  domElements.todayPointsStat = document.getElementById('today-points-stat');
+  domElements.currentWeekProgressFill = document.getElementById('current-week-progress-fill');
+  domElements.currentWeekPointsStat = document.getElementById('current-week-points-stat');
+  
   domElements.calendarMonthYearButton = document.getElementById('calendar-month-year-button');
   domElements.calendarMonthYear = document.getElementById('calendar-month-year');
   domElements.calendarGrid = document.getElementById('calendar-grid');
@@ -1478,18 +1475,16 @@ function initializeApp() {
     domElements.tabButtons[category] = document.getElementById(`${category}-tab-button`);
     domElements.tabContents[category] = document.getElementById(`${category}-content`);
     domElements.categoryTaskLists[category] = document.getElementById(`${category}-task-list`);
-    domElements.categorySections[category] = document.getElementById(`${category}-content`); // Assuming section ID matches content ID
+    domElements.categorySections[category] = document.getElementById(`${category}-content`); 
     domElements.editModeToggleButtons[category] = document.getElementById(`edit-mode-toggle-${category}`);
     domElements.undoCategoryButtons[category] = document.getElementById(`undo-category-${category}`);
     
-    // Top Add Task Form
     domElements.addItemTriggerButtonsTop[category] = document.getElementById(`add-item-trigger-button-top-${category}`);
     domElements.newTempTaskFormsTop[category] = document.getElementById(`new-temp-task-form-top-${category}`);
     domElements.newTempTaskInputsTop[category] = document.getElementById(`new-temp-task-input-top-${category}`);
     domElements.newTempTaskSaveButtonsTop[category] = document.getElementById(`new-temp-task-save-button-top-${category}`);
     domElements.newTempTaskCancelButtonsTop[category] = document.getElementById(`new-temp-task-cancel-button-top-${category}`);
 
-    // Bottom Add Task Form
     domElements.addItemTriggerButtonsBottom[category] = document.getElementById(`add-item-trigger-button-bottom-${category}`);
     domElements.newTempTaskFormsBottom[category] = document.getElementById(`new-temp-task-form-bottom-${category}`);
     domElements.newTempTaskInputsBottom[category] = document.getElementById(`new-temp-task-input-bottom-${category}`);
@@ -1504,16 +1499,14 @@ function initializeApp() {
   renderAllTasks();
   updateAllProgress();
 
-  // Tab switching logic
   if (domElements.tabsContainer) {
       domElements.tabsContainer.addEventListener('click', (e) => {
         const targetButton = e.target.closest('.tab-button');
         if (!targetButton) return;
 
-        const category = targetButton.id.split('-')[0]; // e.g., 'health' from 'health-tab-button' or 'dashboard'
+        const category = targetButton.id.split('-')[0]; 
         activeTab = category;
 
-        // Update button states
         Object.values(domElements.tabButtons).forEach(button => {
           if(button) {
             button.classList.remove('active');
@@ -1523,27 +1516,23 @@ function initializeApp() {
         targetButton.classList.add('active');
         targetButton.setAttribute('aria-selected', 'true');
 
-        // Update content visibility
         Object.values(domElements.tabContents).forEach(content => {
           if(content) content.classList.add('hidden');
         });
         const activeContent = domElements.tabContents[category];
         if (activeContent) {
           activeContent.classList.remove('hidden');
-          // If switching to a category tab, ensure edit mode specific UIs are correctly shown/hidden
           if (category !== 'dashboard') {
-            renderCategoryTasks(category); // Re-render to apply edit mode styles/elements
+            renderCategoryTasks(category); 
           }
         }
         
-        // Hide all add task forms when switching tabs
         if (activeAddTaskForm) {
             hideTempAddTaskForm(activeAddTaskForm.category, activeAddTaskForm.position);
         }
       });
   }
 
-  // Edit mode toggles and undo buttons
   Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
     if (domElements.editModeToggleButtons[category]) {
         domElements.editModeToggleButtons[category].addEventListener('click', () => toggleCategoryEditMode(category));
@@ -1560,9 +1549,8 @@ function initializeApp() {
             updateAllProgress();
             updateSaveProgressButtonState();
 
-            // Animate points reset if on dashboard
             if (activeTab === 'dashboard') {
-                const pointsElements = [domElements.weeklyPointsStat, domElements.monthlyPointsStat];
+                const pointsElements = [domElements.todayPointsStat, domElements.currentWeekPointsStat];
                 pointsElements.forEach(el => {
                     if (el) {
                         el.classList.add('progress-value-resetting');
@@ -1573,7 +1561,6 @@ function initializeApp() {
         });
     }
 
-    // Add task form triggers and handlers (Top)
     if (domElements.addItemTriggerButtonsTop[category]) {
         domElements.addItemTriggerButtonsTop[category].addEventListener('click', () => showTempAddTaskForm(category, 'top'));
     }
@@ -1592,7 +1579,6 @@ function initializeApp() {
         });
     }
 
-    // Add task form triggers and handlers (Bottom)
     if (domElements.addItemTriggerButtonsBottom[category]) {
         domElements.addItemTriggerButtonsBottom[category].addEventListener('click', () => showTempAddTaskForm(category, 'bottom'));
     }
@@ -1611,29 +1597,24 @@ function initializeApp() {
         });
     }
 
-
-    // Drag and Drop for task lists
     const taskListElement = domElements.categoryTaskLists[category];
     if (taskListElement) {
         taskListElement.addEventListener('dragover', (e) => {
             if (!editModes[category] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
             e.preventDefault();
             
-            // Clear previous indicators
             taskListElement.querySelectorAll('.task-item').forEach(item => {
                 item.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
             });
 
             const afterElement = getDragAfterElement(taskListElement, e.clientY);
             if (afterElement) {
-                afterElement.classList.add('drag-over-indicator-task'); // Default: insert above this element
+                afterElement.classList.add('drag-over-indicator-task'); 
             } else {
-                // If no element to insert before (i.e., dragging to the end), mark the last item for bottom insertion
                 const lastItem = taskListElement.querySelector('.task-item:last-child:not(.dragging)');
                 if (lastItem) {
                     lastItem.classList.add('drag-over-indicator-task-bottom');
                 } else if (!taskListElement.querySelector('.task-item:not(.dragging)')) {
-                    // List is empty or only contains the dragging item - no visual indicator needed or special handling
                 }
             }
             e.dataTransfer.dropEffect = 'move';
@@ -1647,7 +1628,6 @@ function initializeApp() {
             } else {
                 taskListElement.appendChild(draggedTaskElement);
             }
-            // Indicator removal will happen in dragend to cover cases where drop is outside a valid target
         });
     }
   });
@@ -1686,7 +1666,7 @@ function initializeApp() {
   }
   if (domElements.monthYearPickerModal) {
     domElements.monthYearPickerModal.addEventListener('click', (e) => {
-        if (e.target === domElements.monthYearPickerModal) { // Click on overlay
+        if (e.target === domElements.monthYearPickerModal) { 
             closeMonthYearPicker();
         }
     });
@@ -1733,8 +1713,6 @@ function initializeApp() {
       domElements.fullscreenModalCloseButton.addEventListener('click', closeFullscreenContentModal);
   }
 
-
-  // Global listeners
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (!domElements.historyModal?.classList.contains('hidden')) {
@@ -1748,22 +1726,18 @@ function initializeApp() {
         } else if (!domElements.fullscreenContentModal?.classList.contains('hidden')) {
             closeFullscreenContentModal();
         }
-        // If an add task form is active, Escape should cancel it
         else if (activeAddTaskForm) {
             hideTempAddTaskForm(activeAddTaskForm.category, activeAddTaskForm.position);
         }
     }
   });
 
-  // Set initial active tab (dashboard)
   if (domElements.tabButtons.dashboard) {
       domElements.tabButtons.dashboard.click(); 
   }
 
-  // Ensure initial save progress button state is correct
   updateSaveProgressButtonState();
 
-  // Register Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('/sw.js')
@@ -1777,10 +1751,4 @@ function initializeApp() {
   }
 }
 
-// Start the app
 document.addEventListener('DOMContentLoaded', initializeApp);
-
-// Export functions if needed for module context, though for simple browser script they are global.
-// For type="module", they are scoped to this module. If access from console is needed for debugging,
-// explicitly attach to window:
-// window.myApp = { toggleTask, renderTasks, ... };
