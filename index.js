@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -29,11 +30,11 @@ const TARGET_POINTS_FOR_WEEKLY_VIEW = 20000;
 
 const STORAGE_KEY_TASK_PREFIX = 'lifeTrackerTask_';
 const STORAGE_KEY_LAST_VISIT_DATE = 'lifeTrackerLastVisitDate';
-const STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX = 'lifeTrackerDailyEarnedPoints_';
+const STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX = 'lifeTrackerDailyEarnedPoints_'; // May be deprecated by history
 const STORAGE_KEY_LAST_MONTH_PROCESSED = 'lifeTrackerLastMonthProcessed';
 const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_';
 const STORAGE_KEY_DAILY_HISTORY_PREFIX = 'lifeTrackerHistory_';
-const STORAGE_KEY_LOCKED_TASKS_PREFIX = 'lifeTrackerLockedTasks_';
+const STORAGE_KEY_LOCKED_TASKS_PREFIX = 'lifeTrackerLockedTasks_'; // Behavior changes with auto-reset
 const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate'; 
 
 const USER_DEFINED_TASKS_KEY = 'lifeTrackerUserDefinedTasks_v2'; 
@@ -45,7 +46,7 @@ let currentTasks = [];
 
 let activeTabId = 'dashboard'; 
 let currentModalDate = null; 
-let lockedTaskIdsToday = [];
+let lockedTaskIdsToday = []; // This will be empty at the start of each day due to auto-reset
 let draggedTaskElement = null;
 let itemToDelete = null; // { type: 'task' | 'category', id: string, nameForConfirmation?: string }
 let editModes = {}; // { categoryId: boolean }
@@ -58,6 +59,7 @@ let currentFullscreenContent = null;
 let longPressTimer = null;
 const LONG_PRESS_DURATION = 700; // ms
 let currentContextMenuTargetTab = null;
+let midnightTimer = null;
 
 
 // DOM Elements
@@ -102,14 +104,6 @@ const domElements = {
   saveHistoricalNoteButton: null,
   clearHistoricalNoteButton: null,
   historicalNoteStatus: null,
-  saveProgressButtonContainer: null,
-  saveProgressButton: null,
-  saveProgressModal: null,
-  saveProgressModalContent: null,
-  saveProgressMessage: null,
-  confirmSaveProgressButton: null,
-  cancelSaveProgressButton: null,
-  saveProgressCloseButton: null,
   taskEditControlsTemplate: null,
   deleteConfirmationModal: null,
   deleteConfirmationTitle: null,
@@ -173,7 +167,7 @@ function saveUserCategories(categories) {
     localStorage.setItem(USER_CATEGORIES_KEY, JSON.stringify(categories.sort((a,b) => a.order - b.order)));
 }
 
-function loadUserTasks() {
+function loadUserTasksDefinitions() {
     const storedTasks = localStorage.getItem(USER_DEFINED_TASKS_KEY);
     if (storedTasks) {
         try {
@@ -193,14 +187,14 @@ function loadUserTasks() {
     return initialTasks;
 }
 
-function saveUserTasks(tasksByCategoryId) {
+function saveUserTasksDefinitions(tasksByCategoryId) {
     localStorage.setItem(USER_DEFINED_TASKS_KEY, JSON.stringify(tasksByCategoryId));
 }
 
 
 function seedInitialDataIfNeeded() {
     let categories = loadUserCategories();
-    let tasksByCatId = loadUserTasks();
+    let tasksByCatId = loadUserTasksDefinitions();
     let categoriesUpdated = false;
     let tasksUpdated = false;
 
@@ -234,7 +228,7 @@ function seedInitialDataIfNeeded() {
 
 
     if (categoriesUpdated) saveUserCategories(categories);
-    if (tasksUpdated) saveUserTasks(tasksByCatId);
+    if (tasksUpdated) saveUserTasksDefinitions(tasksByCatId);
 
     currentCategories = categories;
     currentCategories.forEach(cat => {
@@ -245,8 +239,8 @@ function seedInitialDataIfNeeded() {
 }
 
 
-function loadTasksForDate(date) {
-    const tasksByCategoryId = loadUserTasks(); 
+function loadTasksForSpecificDate(date) { // For loading historical completion or specific day's state
+    const tasksByCategoryId = loadUserTasksDefinitions(); 
     const loadedTasks = [];
 
     currentCategories.forEach(category => {
@@ -264,9 +258,27 @@ function loadTasksForDate(date) {
     return loadedTasks;
 }
 
+function initializeTasksForNewDay() {
+    const tasksByCatId = loadUserTasksDefinitions();
+    currentTasks = [];
+    currentCategories.forEach(category => {
+        const categoryTaskDefs = tasksByCatId[category.id] || [];
+        categoryTaskDefs.forEach(userTaskDef => {
+            currentTasks.push({
+                id: userTaskDef.id,
+                text: userTaskDef.text,
+                categoryId: category.id,
+                completed: false, // Always false for a new day
+            });
+        });
+    });
+    lockedTaskIdsToday = []; // Ensure locked tasks are cleared for the new day
+    saveLockedTasksForToday(); // Persist empty locked tasks
+}
+
 
 function saveTaskStatus(task) {
-  const today = getTodayDateString();
+  const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
   localStorage.setItem(getTaskStorageKey(task.id, today), task.completed.toString());
 }
 
@@ -275,48 +287,25 @@ function getCategoryNameById(categoryId) {
     return category ? category.name : "Unknown Category";
 }
 
-function saveDailyNote() {
+function saveDailyNote() { // This saves the note for the current active day
     if (!domElements.dailyNoteInput) return;
-    const today = getTodayDateString();
+    const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
     const noteContent = domElements.dailyNoteInput.value;
+    localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentActiveDate, noteContent);
 
-    localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + today, noteContent);
-
-    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + today;
-    const historyDataString = localStorage.getItem(historyKey);
-    let historyEntry;
-
-    if (historyDataString) {
-        historyEntry = JSON.parse(historyDataString);
-    } else {
-        const completedTasksToday = {};
-        currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
-
-        let tasksCompletedCount = 0;
-        
-        currentTasks.forEach(task => {
-            if (task.completed) {
-                if (!completedTasksToday[task.categoryId]) completedTasksToday[task.categoryId] = [];
-                completedTasksToday[task.categoryId].push(task.text);
-                tasksCompletedCount++;
-            }
-        });
-        const totalTasksForToday = currentTasks.length;
-        const pointsPerTask = totalTasksForToday > 0 ? DAILY_TARGET_POINTS / totalTasksForToday : 0;
-        const pointsEarnedToday = Math.round(tasksCompletedCount * pointsPerTask);
-        const percentageToday = totalTasksForToday > 0 ? Math.round((tasksCompletedCount / totalTasksForToday) * 100) : 0;
-
-        historyEntry = {
-            date: today,
-            completedTasks: completedTasksToday,
-            userNote: "", 
-            pointsEarned: pointsEarnedToday,
-            percentageCompleted: percentageToday,
-            totalTasksOnDate: totalTasksForToday
-        };
+    // Minor update to history if it's today and history modal is open (live update)
+    if (currentActiveDate === getTodayDateString() && currentModalDate === currentActiveDate) {
+        const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentActiveDate;
+        const historyDataString = localStorage.getItem(historyKey);
+        if (historyDataString) {
+            try {
+                let historyEntry = JSON.parse(historyDataString);
+                historyEntry.userNote = noteContent;
+                localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+            } catch (e) { console.warn("Could not live update history note", e); }
+        }
     }
-    historyEntry.userNote = noteContent; 
-    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+
 
     if (domElements.saveNoteButton) {
         domElements.saveNoteButton.textContent = 'Note Saved!';
@@ -329,67 +318,52 @@ function saveDailyNote() {
 
 function loadCurrentDayNote() {
     if (!domElements.dailyNoteInput) return;
-    const today = getTodayDateString();
-    const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + today);
-    if (note) {
-        domElements.dailyNoteInput.value = note;
-    } else {
-        domElements.dailyNoteInput.value = '';
-    }
+    const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentActiveDate);
+    domElements.dailyNoteInput.value = note || '';
 }
 
-function savePreviousDayHistory(previousDayDate, tasksForPreviousDay) {
-    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + previousDayDate;
-    let historyEntry;
+function saveDayToHistory(dateToSave, tasksFromDay, noteFromDay) {
+    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateToSave;
 
     const completedTasksHistory = {};
     currentCategories.forEach(cat => completedTasksHistory[cat.id] = []);
     
     let tasksCompletedCount = 0;
     
-    tasksForPreviousDay.forEach(task => {
+    tasksFromDay.forEach(task => { 
         if (task.completed) {
             if (!completedTasksHistory[task.categoryId]) completedTasksHistory[task.categoryId] = [];
-            completedTasksHistory[task.categoryId].push(task.text);
+            completedTasksHistory[task.categoryId].push(task.text); 
             tasksCompletedCount++;
         }
     });
 
-    const totalTasksForPreviousDay = tasksForPreviousDay.length;
-    const pointsPerTaskCalculation = totalTasksForPreviousDay > 0 ? DAILY_TARGET_POINTS / totalTasksForPreviousDay : 0;
+    const totalTasksForDay = tasksFromDay.length; 
+    const pointsPerTaskCalculation = totalTasksForDay > 0 ? DAILY_TARGET_POINTS / totalTasksForDay : 0;
     const finalPointsEarned = Math.round(tasksCompletedCount * pointsPerTaskCalculation);
-    const finalPercentageCompleted = totalTasksForPreviousDay > 0 ? Math.round((tasksCompletedCount / totalTasksForPreviousDay) * 100) : 0;
+    const finalPercentageCompleted = totalTasksForDay > 0 ? Math.round((tasksCompletedCount / totalTasksForDay) * 100) : 0;
 
-    const existingHistoryStr = localStorage.getItem(historyKey);
-    let userNoteFromExisting = "";
-    if (existingHistoryStr) {
-        try {
-            const existingEntry = JSON.parse(existingHistoryStr);
-            userNoteFromExisting = existingEntry.userNote || "";
-        } catch (e) { console.warn("Could not parse existing history to retain note", e); }
-    }
-    const noteFromDailyStore = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + previousDayDate);
-    if (noteFromDailyStore) { 
-        userNoteFromExisting = noteFromDailyStore;
-    }
-
-
-    historyEntry = {
-        date: previousDayDate,
+    const historyEntry = {
+        date: dateToSave,
         completedTasks: completedTasksHistory,
-        userNote: userNoteFromExisting,
+        userNote: noteFromDay || "",
         pointsEarned: finalPointsEarned,
         percentageCompleted: finalPercentageCompleted,
-        totalTasksOnDate: totalTasksForPreviousDay
+        totalTasksOnDate: totalTasksForDay
     };
 
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
     
-    localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + previousDayDate); 
-    localStorage.removeItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + previousDayDate);
-    localStorage.removeItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + previousDayDate);
+    localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave); 
+    localStorage.removeItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + dateToSave); 
+    localStorage.removeItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + dateToSave); 
     
-    console.log(`History finalized and saved for ${previousDayDate}:`, historyEntry);
+    tasksFromDay.forEach(task => {
+        localStorage.removeItem(getTaskStorageKey(task.id, dateToSave));
+    });
+
+    console.log(`History finalized and saved for ${dateToSave}:`, historyEntry);
 }
 
 
@@ -398,9 +372,10 @@ function checkAndClearOldMonthlyData() {
   const lastProcessedMonthYear = localStorage.getItem(STORAGE_KEY_LAST_MONTH_PROCESSED);
 
   if (lastProcessedMonthYear && lastProcessedMonthYear !== currentMonthYear) {
+    // Only remove task completion status, history is kept.
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX) || key.startsWith(STORAGE_KEY_TASK_PREFIX))) {
+      if (key && key.startsWith(STORAGE_KEY_TASK_PREFIX)) {
         const datePart = key.substring(key.indexOf('_') + 1); 
          if (datePart.length >= 7) { 
           const monthYearOfKey = datePart.substring(0, 7); 
@@ -418,44 +393,110 @@ function checkAndClearOldMonthlyData() {
 function loadAppData() {
   seedInitialDataIfNeeded(); 
 
-  const storedDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE);
-  const todayDate = getTodayDateString();
+  let lastVisitDateStr = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE);
+  const currentDateStr = getTodayDateString();
 
-  if (storedDate && storedDate !== todayDate) {
-    const previousDayTasks = loadTasksForDate(storedDate); 
-    savePreviousDayHistory(storedDate, previousDayTasks);
-    localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, todayDate);
-    lockedTaskIdsToday = []; 
-  } else if (!storedDate) {
-    localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, todayDate);
-    lockedTaskIdsToday = [];
+  if (lastVisitDateStr && lastVisitDateStr !== currentDateStr) {
+    console.log(`Date changed from ${lastVisitDateStr} to ${currentDateStr}. Processing previous day.`);
+    const tasksForLastVisitDay = loadTasksForSpecificDate(lastVisitDateStr); 
+    const noteForLastVisitDay = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + lastVisitDateStr) || "";
+    saveDayToHistory(lastVisitDateStr, tasksForLastVisitDay, noteForLastVisitDay);
+    
+    initializeTasksForNewDay(); // Sets currentTasks for the new day (all incomplete)
+  } else if (!lastVisitDateStr) {
+    console.log("First visit or no last visit date found. Initializing for today.");
+    initializeTasksForNewDay();
+  } else { // lastVisitDateStr === currentDateStr
+    console.log("Resuming session for today:", currentDateStr);
+    currentTasks = loadTasksForSpecificDate(currentDateStr); // Load today's potentially in-progress tasks
+    const lockedTasksStorageKey = STORAGE_KEY_LOCKED_TASKS_PREFIX + currentDateStr;
+    const storedLockedTasks = localStorage.getItem(lockedTasksStorageKey);
+    if (storedLockedTasks) { // This case should be rare with auto midnight reset.
+        try {
+            lockedTaskIdsToday = JSON.parse(storedLockedTasks);
+        } catch (e) {
+            console.error("Error parsing locked tasks for today:", e);
+            lockedTaskIdsToday = [];
+        }
+    } else {
+        lockedTaskIdsToday = [];
+    }
   }
   
-  const lockedTasksStorageKey = STORAGE_KEY_LOCKED_TASKS_PREFIX + todayDate;
-  const storedLockedTasks = localStorage.getItem(lockedTasksStorageKey);
-  if (storedLockedTasks) {
-      try {
-          lockedTaskIdsToday = JSON.parse(storedLockedTasks);
-      } catch (e) {
-          console.error("Error parsing locked tasks for today:", e);
-          lockedTaskIdsToday = [];
-          localStorage.removeItem(lockedTasksStorageKey);
-      }
-  } else {
-      lockedTaskIdsToday = [];
-  }
-
-  currentTasks = loadTasksForDate(todayDate);
+  localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, currentDateStr);
+  
   checkAndClearOldMonthlyData();
   loadCurrentDayNote();
-  updateSaveProgressButtonState();
   
   calendarDisplayDate = new Date();
   calendarDisplayDate.setDate(1); 
   calendarDisplayDate.setHours(0,0,0,0); 
   pickerSelectedMonth = calendarDisplayDate.getMonth();
   pickerSelectedYear = calendarDisplayDate.getFullYear();
+  scheduleMidnightTask(); // Schedule the automatic daily reset
 }
+
+
+function handleMidnightReset() {
+    console.log("Midnight reset triggered.");
+    const dateThatJustEnded = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE); // This should be "yesterday"
+    
+    if (!dateThatJustEnded) {
+        console.error("Cannot perform midnight reset: last visit date unknown.");
+        scheduleMidnightTask(); // Reschedule and hope for the best next time
+        return;
+    }
+
+    // Capture tasks and note for the day that just ended
+    // currentTasks and dailyNoteInput should reflect the state of dateThatJustEnded
+    const tasksAtEndOfDay = [...currentTasks]; 
+    const noteAtEndOfDay = domElements.dailyNoteInput ? domElements.dailyNoteInput.value : "";
+
+    saveDayToHistory(dateThatJustEnded, tasksAtEndOfDay, noteAtEndOfDay);
+
+    // Prepare for the new day
+    const newCurrentDate = getTodayDateString();
+    localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, newCurrentDate);
+    
+    initializeTasksForNewDay(); // Resets currentTasks to incomplete, clears lockedTaskIdsToday
+
+    if (domElements.dailyNoteInput) domElements.dailyNoteInput.value = ''; // Clear note for new day
+    loadCurrentDayNote(); // This will effectively ensure it's blank or loads a pre-existing note for the *new* day if any (unlikely)
+
+
+    // Animate points reset visually
+    if (domElements.todayPointsStat) domElements.todayPointsStat.classList.add('progress-value-resetting');
+    if (domElements.todayProgressFill) domElements.todayProgressFill.classList.add('progress-value-resetting');
+    
+    updateAllProgress(); // Re-render everything for the new day state
+
+    setTimeout(() => {
+        if (domElements.todayPointsStat) domElements.todayPointsStat.classList.remove('progress-value-resetting');
+        if (domElements.todayProgressFill) domElements.todayProgressFill.classList.remove('progress-value-resetting');
+    }, 500); // Duration of the animation
+
+    // Alert user if tab is active (optional, can be intrusive)
+    // if (document.hasFocus()) {
+    //    alert("It's a new day! Tasks have been reset and yesterday's completed items are saved to history.");
+    // }
+    
+    scheduleMidnightTask(); // Reschedule for the next midnight
+}
+
+function scheduleMidnightTask() {
+    if (midnightTimer) {
+        clearTimeout(midnightTimer);
+    }
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 1, 0); // 00:00:01 of the next day to be safe
+
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    console.log(`Next midnight reset scheduled in ${msUntilMidnight / 1000 / 60} minutes.`);
+    midnightTimer = setTimeout(handleMidnightReset, msUntilMidnight);
+}
+
 
 function getDragAfterElement(container, y) {
     const draggableElements = Array.from(container.querySelectorAll('.task-item:not(.dragging):not(.editing)'));
@@ -551,7 +592,7 @@ function handleSaveTempTask(categoryId, position) {
             categoryId: categoryId,
         };
         
-        let tasksByCatId = loadUserTasks();
+        let tasksByCatId = loadUserTasksDefinitions();
         if (!tasksByCatId[categoryId]) {
             tasksByCatId[categoryId] = [];
         }
@@ -561,18 +602,48 @@ function handleSaveTempTask(categoryId, position) {
         } else {
             tasksByCatId[categoryId].push(newTaskDefinition);
         }
-        saveUserTasks(tasksByCatId);
+        saveUserTasksDefinitions(tasksByCatId);
         
         const newTaskForToday = { ...newTaskDefinition, completed: false };
         if (position === 'top') {
              const firstIndexOfCategory = currentTasks.findIndex(t => t.categoryId === categoryId);
              if (firstIndexOfCategory !== -1) {
                 currentTasks.splice(firstIndexOfCategory, 0, newTaskForToday);
-             } else {
-                currentTasks.push(newTaskForToday); 
+             } else { // Category might be empty
+                // Find where this category's tasks *should* go based on category order
+                const categoryOrder = currentCategories.find(c => c.id === categoryId).order;
+                let insertAtIndex = currentTasks.length;
+                for(let i=0; i < currentTasks.length; i++) {
+                    const taskCatOrder = currentCategories.find(c => c.id === currentTasks[i].categoryId).order;
+                    if (taskCatOrder > categoryOrder) {
+                        insertAtIndex = i;
+                        break;
+                    }
+                }
+                currentTasks.splice(insertAtIndex, 0, newTaskForToday);
              }
-        } else {
-            currentTasks.push(newTaskForToday);
+        } else { // Add to bottom of category
+            let lastIndexOfCategory = -1;
+            for(let i = currentTasks.length - 1; i >=0; i--) {
+                if (currentTasks[i].categoryId === categoryId) {
+                    lastIndexOfCategory = i;
+                    break;
+                }
+            }
+            if (lastIndexOfCategory !== -1) {
+                 currentTasks.splice(lastIndexOfCategory + 1, 0, newTaskForToday);
+            } else { // Category was empty, same as 'top' logic for finding insertion point
+                const categoryOrder = currentCategories.find(c => c.id === categoryId).order;
+                let insertAtIndex = currentTasks.length;
+                for(let i=0; i < currentTasks.length; i++) {
+                    const taskCatOrder = currentCategories.find(c => c.id === currentTasks[i].categoryId).order;
+                    if (taskCatOrder > categoryOrder) {
+                        insertAtIndex = i;
+                        break;
+                    }
+                }
+                currentTasks.splice(insertAtIndex, 0, newTaskForToday);
+            }
         }
         
         renderCategoryTasks(categoryId);
@@ -588,7 +659,7 @@ function getTaskById(taskId) {
 }
 
 function startTaskEdit(taskItemElement, task) {
-    if (task.locked || taskItemElement.classList.contains('editing')) return;
+    if (task.locked || taskItemElement.classList.contains('editing')) return; // 'locked' concept is mostly removed for daily use
 
     taskItemElement.classList.add('editing');
     
@@ -634,13 +705,13 @@ function saveTaskEdit(taskId, newText, taskItemElement, editControls) {
     if (task) {
         task.text = newText;
         
-        let tasksByCatId = loadUserTasks();
+        let tasksByCatId = loadUserTasksDefinitions();
         const taskCategoryArray = tasksByCatId[task.categoryId];
         if (taskCategoryArray) {
             const taskIndex = taskCategoryArray.findIndex(t => t.id === taskId);
             if (taskIndex !== -1) {
                 taskCategoryArray[taskIndex].text = newText;
-                saveUserTasks(tasksByCatId);
+                saveUserTasksDefinitions(tasksByCatId);
             }
         }
     }
@@ -667,21 +738,28 @@ function renderTaskItem(task) {
   item.dataset.taskId = task.id;
   item.setAttribute('role', 'listitem');
   item.setAttribute('tabindex', '0'); 
-  item.setAttribute('aria-label', `${task.text}, ${task.completed ? 'completed' : 'not completed'}`);
-
+  // Aria-label updated dynamically on click/state change
 
   const textSpan = document.createElement('span');
   textSpan.className = 'task-text';
   textSpan.textContent = task.text;
   item.appendChild(textSpan);
 
+  const updateAriaLabel = () => {
+    const isCompleted = item.classList.contains('completed');
+    // const isLocked = item.classList.contains('locked'); // 'locked' class is less relevant now for daily interaction
+    item.setAttribute('aria-label', `${task.text}, ${isCompleted ? 'completed' : 'not completed'}`);
+  };
+
+
   if (task.completed) {
     item.classList.add('completed');
   }
-  if (lockedTaskIdsToday.includes(task.id)) {
-    item.classList.add('locked');
-    item.setAttribute('aria-disabled', 'true');
-  }
+  // item.classList.toggle('locked', lockedTaskIdsToday.includes(task.id)); // 'locked' state is transient now
+  // if (lockedTaskIdsToday.includes(task.id)) item.setAttribute('aria-disabled', 'true');
+
+  updateAriaLabel();
+
 
   if (editModes[task.categoryId]) {
       const deleteButton = document.createElement('button');
@@ -697,7 +775,8 @@ function renderTaskItem(task) {
   }
 
   item.addEventListener('click', (e) => {
-    if (item.classList.contains('locked') || item.classList.contains('editing')) return;
+    // if (item.classList.contains('locked') || item.classList.contains('editing')) return;
+    if (item.classList.contains('editing')) return;
     
     if (editModes[task.categoryId] && e.target === textSpan) {
         startTaskEdit(item, task);
@@ -705,19 +784,20 @@ function renderTaskItem(task) {
     }
     if (!editModes[task.categoryId]) {
         task.completed = !task.completed;
-        saveTaskStatus(task);
+        saveTaskStatus(task); // Saves with current active day
         item.classList.toggle('completed');
-        item.setAttribute('aria-label', `${task.text}, ${task.completed ? 'completed' : 'not completed'}`);
+        updateAriaLabel();
         item.classList.remove('animate-task-complete', 'animate-task-uncomplete');
         void item.offsetWidth; 
         item.classList.add(task.completed ? 'animate-task-complete' : 'animate-task-uncomplete');
         updateAllProgress();
-        updateSaveProgressButtonState();
     }
   });
 
    item.addEventListener('keydown', (e) => {
-        if (item.classList.contains('locked') || item.classList.contains('editing')) return;
+        // if (item.classList.contains('locked') || item.classList.contains('editing')) return;
+        if (item.classList.contains('editing')) return;
+
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             if (!editModes[task.categoryId]) { 
@@ -728,10 +808,10 @@ function renderTaskItem(task) {
         }
     });
 
-    if (editModes[task.categoryId] && !task.locked && !item.classList.contains('editing')) {
+    if (editModes[task.categoryId] && !item.classList.contains('editing')) { // No 'locked' check needed here for draggable
         item.draggable = true;
         item.addEventListener('dragstart', (e) => {
-            if (!editModes[task.categoryId] || task.locked || item.classList.contains('editing')) {
+            if (!editModes[task.categoryId] || item.classList.contains('editing')) { // No 'locked' check
                 e.preventDefault();
                 return;
             }
@@ -751,18 +831,24 @@ function renderTaskItem(task) {
                 const categoryId = taskListElement.dataset.categoryId;
                 const newTaskOrderIds = Array.from(taskListElement.querySelectorAll('.task-item')).map(el => el.dataset.taskId);
                 
-                let tasksByCatId = loadUserTasks();
+                let tasksByCatId = loadUserTasksDefinitions();
                 tasksByCatId[categoryId] = newTaskOrderIds.map(id => tasksByCatId[categoryId].find(t => t.id === id)).filter(Boolean);
-                saveUserTasks(tasksByCatId);
+                saveUserTasksDefinitions(tasksByCatId);
 
-                const otherCategoryTasks = currentTasks.filter(t => t.categoryId !== categoryId);
-                const reorderedCategoryTasks = newTaskOrderIds.map(id => currentTasks.find(t => t.id === id)).filter(Boolean);
-                currentTasks = [...otherCategoryTasks, ...reorderedCategoryTasks].sort((a,b) => {
+                // Reorder currentTasks as well to match the new definition order
+                const tasksForThisCategory = currentTasks.filter(t => t.categoryId === categoryId);
+                const otherTasks = currentTasks.filter(t => t.categoryId !== categoryId);
+                const reorderedCategoryTasks = newTaskOrderIds
+                    .map(id => tasksForThisCategory.find(t => t.id === id))
+                    .filter(Boolean);
+                
+                currentTasks = [...otherTasks, ...reorderedCategoryTasks].sort((a,b) => {
                     const catAOrder = currentCategories.find(c => c.id === a.categoryId).order;
                     const catBOrder = currentCategories.find(c => c.id === b.categoryId).order;
                     if(catAOrder !== catBOrder) return catAOrder - catBOrder;
-                    const tasksInCat = tasksByCatId[a.categoryId];
-                    return tasksInCat.findIndex(t => t.id === a.id) - tasksInCat.findIndex(t => t.id === b.id);
+                    
+                    const tasksInCatAOrder = (tasksByCatId[a.categoryId] || []).map(t => t.id);
+                    return tasksInCatAOrder.indexOf(a.id) - tasksInCatAOrder.indexOf(b.id);
                 });
             }
         });
@@ -783,6 +869,7 @@ function showDeleteConfirmation(type, id, message, nameForConfirmation = '') {
 
 function confirmDeletion() {
     if (!itemToDelete) return;
+    const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
 
     if (itemToDelete.type === 'task') {
         const task = getTaskById(itemToDelete.id); 
@@ -790,13 +877,17 @@ function confirmDeletion() {
 
         currentTasks = currentTasks.filter(t => t.id !== itemToDelete.id);
 
-        let tasksByCatId = loadUserTasks();
+        let tasksByCatId = loadUserTasksDefinitions();
         if (tasksByCatId[task.categoryId]) {
             tasksByCatId[task.categoryId] = tasksByCatId[task.categoryId].filter(t => t.id !== itemToDelete.id);
-            saveUserTasks(tasksByCatId);
+            saveUserTasksDefinitions(tasksByCatId);
         }
-        localStorage.removeItem(getTaskStorageKey(itemToDelete.id, getTodayDateString()));
-        lockedTaskIdsToday = lockedTaskIdsToday.filter(id => id !== itemToDelete.id);
+        // Remove task status for potentially multiple days if it existed
+        // This is complex, for now, just remove for current active day.
+        // A more robust cleanup would iterate known history dates or be part of monthly cleanup.
+        localStorage.removeItem(getTaskStorageKey(itemToDelete.id, currentActiveDate));
+        
+        lockedTaskIdsToday = lockedTaskIdsToday.filter(id => id !== itemToDelete.id); // Should be empty anyway now
         saveLockedTasksForToday();
         renderCategoryTasks(task.categoryId);
 
@@ -813,9 +904,9 @@ function confirmDeletion() {
         currentCategories = currentCategories.filter(cat => cat.id !== categoryId);
         saveUserCategories(currentCategories);
 
-        let tasksByCatId = loadUserTasks();
+        let tasksByCatId = loadUserTasksDefinitions();
         delete tasksByCatId[categoryId];
-        saveUserTasks(tasksByCatId);
+        saveUserTasksDefinitions(tasksByCatId);
 
         currentTasks = currentTasks.filter(t => t.categoryId !== categoryId);
         
@@ -831,7 +922,6 @@ function confirmDeletion() {
     }
 
     updateAllProgress();
-    updateSaveProgressButtonState();
     hideDeleteConfirmation();
 }
 
@@ -849,10 +939,13 @@ function renderCategoryTasks(categoryId) {
   taskListElement.innerHTML = '';
   taskListElement.dataset.categoryId = categoryId; 
 
-  const categoryTasks = currentTasks.filter(task => task.categoryId === categoryId);
-  const userDefinedOrder = (loadUserTasks()[categoryId] || []).map(t => t.id);
+  const categoryTasksFromCurrent = currentTasks.filter(task => task.categoryId === categoryId);
+  
+  // Get the defined order from user task definitions
+  const userDefinedOrder = (loadUserTasksDefinitions()[categoryId] || []).map(t => t.id);
 
-  categoryTasks.sort((a, b) => {
+  // Sort the tasks for display based on the defined order
+  categoryTasksFromCurrent.sort((a, b) => {
     const indexA = userDefinedOrder.indexOf(a.id);
     const indexB = userDefinedOrder.indexOf(b.id);
     if (indexA === -1 && indexB === -1) return 0; 
@@ -862,7 +955,7 @@ function renderCategoryTasks(categoryId) {
   });
 
 
-  if (categoryTasks.length === 0) {
+  if (categoryTasksFromCurrent.length === 0) {
     const emptyMessage = document.createElement('p');
     emptyMessage.textContent = editModes[categoryId] ? 'No tasks defined. Click "Add Item" to create new tasks.' : 'No tasks for today in this category.';
     emptyMessage.className = 'empty-tasks-message';
@@ -871,7 +964,7 @@ function renderCategoryTasks(categoryId) {
     }
     taskListElement.appendChild(emptyMessage);
   } else {
-    categoryTasks.forEach(task => {
+    categoryTasksFromCurrent.forEach(task => {
       const taskItem = renderTaskItem(task);
       taskListElement.appendChild(taskItem);
     });
@@ -908,14 +1001,13 @@ function renderAllCategorySections() {
 
         sectionElement.querySelector('.undo-category-button').onclick = () => {
             currentTasks.forEach(task => {
-                if (task.categoryId === category.id && !lockedTaskIdsToday.includes(task.id)) {
+                if (task.categoryId === category.id) { // No locked check needed
                     task.completed = false;
                     saveTaskStatus(task);
                 }
             });
             renderCategoryTasks(category.id);
             updateAllProgress();
-            updateSaveProgressButtonState();
         };
 
         ['top', 'bottom'].forEach(position => {
@@ -940,15 +1032,13 @@ function clearLongPressTimer(tabButton) {
         clearTimeout(longPressTimer);
         longPressTimer = null;
     }
-    if (tabButton) { // Ensure tabButton is passed to remove specific listener
+    if (tabButton) { 
       tabButton.removeEventListener('touchmove', preventScrollDuringLongPress);
       tabButton.removeEventListener('touchend', () => clearLongPressTimer(tabButton));
       tabButton.removeEventListener('touchcancel', () => clearLongPressTimer(tabButton));
     }
 }
 function preventScrollDuringLongPress(e) {
-    // This function can be used to prevent default scroll if long press is active
-    // For now, just clearing timer is enough, but could be expanded.
     clearLongPressTimer(e.currentTarget);
 }
 
@@ -981,7 +1071,7 @@ function renderTabs() {
         tabButton.appendChild(optionsIcon);
         
         optionsIcon.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent tab switch
+            e.stopPropagation(); 
             showCategoryContextMenu(category.id, tabButton);
         });
          optionsIcon.addEventListener('keydown', (e) => {
@@ -992,29 +1082,24 @@ function renderTabs() {
             }
         });
 
-
-        // Long press for touch devices
         tabButton.addEventListener('touchstart', (e) => {
-            clearLongPressTimer(tabButton); // Clear any existing timer
-            // Attach move listener to cancel long press if user scrolls
+            clearLongPressTimer(tabButton); 
             tabButton.addEventListener('touchmove', preventScrollDuringLongPress);
 
             longPressTimer = setTimeout(() => {
-                e.preventDefault(); // Prevent click/other events after long press
-                optionsIcon.classList.add('visible'); // Make dots visible for context
+                e.preventDefault(); 
+                optionsIcon.classList.add('visible'); 
                 showCategoryContextMenu(category.id, tabButton);
                 clearLongPressTimer(tabButton); 
             }, LONG_PRESS_DURATION);
             
-            // Listen for touchend and touchcancel on this specific tabButton instance
             tabButton.addEventListener('touchend', () => clearLongPressTimer(tabButton));
             tabButton.addEventListener('touchcancel', () => clearLongPressTimer(tabButton));
         });
 
 
         tabButton.addEventListener('click', (e) => {
-            // Highlight badge on tap (for mobile)
-            if (e.target === tabButton && !optionsIcon.contains(e.target)) { // Ensure click is not on options icon itself
+            if (e.target === tabButton && !optionsIcon.contains(e.target)) { 
                 tabButton.classList.add('show-badge-highlight');
                 setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300);
             }
@@ -1041,7 +1126,6 @@ function switchTab(categoryIdToActivate) {
         }
     });
     
-    // Manage scrollbar visibility for main#tab-content (domElements.tabContentsContainer)
     if (domElements.tabContentsContainer) {
         if (categoryIdToActivate === 'dashboard') {
             domElements.tabContentsContainer.classList.add('main-area-scroll-hidden');
@@ -1068,21 +1152,22 @@ function switchTab(categoryIdToActivate) {
 }
 
 
-function calculateProgress() {
+function calculateProgress() { // Calculates for currentTasks (assumed to be for the active day)
   let completedCount = 0;
-  currentTasks.forEach(task => {
-    if (task.completed && !lockedTaskIdsToday.includes(task.id)) { 
+  // Tasks are never "locked" in the middle of the day with auto-reset
+  currentTasks.forEach(task => { 
+    if (task.completed) { 
       completedCount++;
     }
   });
 
-  const unlockedTasksCount = currentTasks.filter(task => !lockedTaskIdsToday.includes(task.id)).length;
+  const totalTasksToday = currentTasks.length;
   
-  const percentage = unlockedTasksCount > 0 ? Math.round((completedCount / unlockedTasksCount) * 100) : 0;
-  const pointsPerTask = unlockedTasksCount > 0 ? DAILY_TARGET_POINTS / unlockedTasksCount : 0;
+  const percentage = totalTasksToday > 0 ? Math.round((completedCount / totalTasksToday) * 100) : 0;
+  const pointsPerTask = totalTasksToday > 0 ? DAILY_TARGET_POINTS / totalTasksToday : 0;
   const pointsEarned = Math.round(completedCount * pointsPerTask);
 
-  return { percentage, pointsEarned, completedCount, totalTasks: unlockedTasksCount };
+  return { percentage, pointsEarned, completedCount, totalTasks: totalTasksToday };
 }
 
 
@@ -1094,18 +1179,17 @@ function updateDashboardSummaries() {
     if (category.id === 'dashboard') return; 
 
     const categoryTasks = currentTasks.filter(task => task.categoryId === category.id);
-    const unlockedTasksInCategory = categoryTasks.filter(task => !lockedTaskIdsToday.includes(task.id));
-    const completedTasksInUnlocked = unlockedTasksInCategory.filter(task => task.completed);
+    const completedTasksInCategory = categoryTasks.filter(task => task.completed);
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'dashboard-category-summary';
     summaryDiv.innerHTML = `
       <h3>${category.name}</h3>
-      <p class="category-stats">${completedTasksInUnlocked.length} / ${unlockedTasksInCategory.length}</p>
+      <p class="category-stats">${completedTasksInCategory.length} / ${categoryTasks.length}</p>
     `;
     
     const statsP = summaryDiv.querySelector('.category-stats');
-    if (unlockedTasksInCategory.length > 0 && completedTasksInUnlocked.length === unlockedTasksInCategory.length) {
+    if (categoryTasks.length > 0 && completedTasksInCategory.length === categoryTasks.length) {
         statsP.classList.add('fully-completed');
     } else {
         statsP.classList.remove('fully-completed');
@@ -1152,14 +1236,15 @@ function updateCurrentWeekProgress() {
     
     let totalPointsThisWeekCycle = 0;
     let currentDateIter = new Date(currentWeekStartDate); 
+    const todayDateString = getTodayDateString();
 
     while (currentDateIter <= today) {
         const dateStringForIter = `${currentDateIter.getFullYear()}-${(currentDateIter.getMonth() + 1).toString().padStart(2, '0')}-${currentDateIter.getDate().toString().padStart(2, '0')}`;
         let pointsForDay = 0;
 
-        if (dateStringForIter === getTodayDateString()) {
+        if (dateStringForIter === todayDateString) { // Use live calculation for today
             pointsForDay = calculateProgress().pointsEarned;
-        } else {
+        } else { // Use history for past days
             const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateStringForIter;
             const historyDataString = localStorage.getItem(historyKey);
             if (historyDataString) {
@@ -1203,6 +1288,7 @@ function renderCalendar() {
   const startingDayOfWeek = firstDayOfMonth.getDay(); 
 
   const today = getNormalizedDate(new Date());
+  const todayDateString = getTodayDateString();
 
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   dayNames.forEach(dayName => {
@@ -1238,15 +1324,18 @@ function renderCalendar() {
     let percentageCompleted = 0;
     let hasHistoryData = false;
 
-    if (cellDate.getTime() === today.getTime()) { 
+    if (dateString === todayDateString) { 
         cell.classList.add('current-day');
-        const progress = calculateProgress();
+        const progress = calculateProgress(); // Live progress for today
         percentageCompleted = progress.percentage;
         if (percentageCompleted > 40) { 
             cell.classList.add('high-fill'); 
         }
-        hasHistoryData = progress.completedCount > 0 || (localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) !== null);
-    } else { 
+        // Check if today has any completed tasks or a note for history indication
+        const noteToday = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString);
+        hasHistoryData = progress.completedCount > 0 || !!noteToday;
+
+    } else { // For past or future days, rely on stored history
         const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
         const historyDataString = localStorage.getItem(historyKey);
         if (historyDataString) {
@@ -1285,9 +1374,10 @@ function showHistoryModal(dateString) {
   const historyDataString = localStorage.getItem(historyKey);
   let historyEntry = null;
   const isToday = dateString === getTodayDateString();
-  const isPastDay = new Date(dateString) < getNormalizedDate(new Date()) && !isToday;
+  const isPastDay = new Date(dateString + 'T23:59:59') < getNormalizedDate(new Date()) && !isToday;
 
-  if (isToday) {
+
+  if (isToday) { // For today, build a temporary "history" view from live data
     const progress = calculateProgress();
     const completedTasksToday = {};
     currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
@@ -1298,7 +1388,7 @@ function showHistoryModal(dateString) {
              completedTasksToday[task.categoryId].push(task.text);
         }
     });
-    const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || "";
+    const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || (domElements.dailyNoteInput ? domElements.dailyNoteInput.value : "");
     historyEntry = {
         date: dateString,
         completedTasks: completedTasksToday,
@@ -1307,7 +1397,7 @@ function showHistoryModal(dateString) {
         percentageCompleted: progress.percentage,
         totalTasksOnDate: progress.totalTasks 
     };
-  } else if (historyDataString) {
+  } else if (historyDataString) { // For past days, use stored history
       try {
           historyEntry = JSON.parse(historyDataString);
       } catch (e) {
@@ -1363,19 +1453,18 @@ function showHistoryModal(dateString) {
     
     domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote);
 
+    // Allow editing note for past days or today
     if (isPastDay || isToday) { 
         domElements.historyUserNoteDisplay.ondblclick = () => {
-             if (isPastDay || isToday) { 
-                domElements.historyUserNoteDisplay.classList.add('hidden');
-                domElements.historyUserNoteEdit.classList.remove('hidden');
-                domElements.historicalNoteControls.classList.remove('hidden');
-                domElements.historyUserNoteEdit.focus();
-            }
+            domElements.historyUserNoteDisplay.classList.add('hidden');
+            domElements.historyUserNoteEdit.classList.remove('hidden');
+            domElements.historicalNoteControls.classList.remove('hidden');
+            domElements.historyUserNoteEdit.focus();
         };
-    } else {
+    } else { // Future day, no editing
         domElements.historyUserNoteDisplay.ondblclick = null; 
     }
-  } else {
+  } else { // No historyEntry (e.g., future date with no data)
     domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     domElements.historyModalPoints.textContent = 'N/A';
     domElements.historyModalPercentage.textContent = 'N/A';
@@ -1408,24 +1497,40 @@ function saveHistoricalNote() {
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentModalDate;
     let historyEntry;
 
+    const isToday = currentModalDate === getTodayDateString();
+
     const existingHistoryStr = localStorage.getItem(historyKey);
     if (existingHistoryStr) {
         historyEntry = JSON.parse(existingHistoryStr);
     } else { 
+        // If saving note for today and no history entry exists yet, create one
+        const progress = isToday ? calculateProgress() : { pointsEarned: 0, percentageCompleted: 0, totalTasks: 0, completedTasks: {} };
+        const completedTasksForEntry = isToday ? {} : {};
+        if (isToday) {
+            currentCategories.forEach(cat => completedTasksForEntry[cat.id] = []);
+            currentTasks.forEach(task => {
+                if(task.completed) {
+                     if (!completedTasksForEntry[task.categoryId]) completedTasksForEntry[task.categoryId] = [];
+                     completedTasksForEntry[task.categoryId].push(task.text);
+                }
+            });
+        }
+
         historyEntry = {
             date: currentModalDate,
-            completedTasks: {}, 
+            completedTasks: isToday ? completedTasksForEntry : {}, 
             userNote: "",
-            pointsEarned: 0,
-            percentageCompleted: 0,
-            totalTasksOnDate: 0 
+            pointsEarned: progress.pointsEarned,
+            percentageCompleted: progress.percentageCompleted,
+            totalTasksOnDate: progress.totalTasks 
         };
-         currentCategories.forEach(cat => historyEntry.completedTasks[cat.id] = []);
+         if(!isToday) currentCategories.forEach(cat => historyEntry.completedTasks[cat.id] = []);
     }
     historyEntry.userNote = noteContent;
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
 
-    if (currentModalDate === getTodayDateString() && domElements.dailyNoteInput) {
+    // If saving for today, also update the main daily note input and its storage
+    if (isToday && domElements.dailyNoteInput) {
         domElements.dailyNoteInput.value = noteContent;
         localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent);
     }
@@ -1440,7 +1545,7 @@ function saveHistoricalNote() {
     
     domElements.expandReflectionButton.classList.toggle('hidden', !noteContent);
 
-    renderCalendar(); 
+    renderCalendar(); // Update calendar fill/indicators
 }
 
 function clearHistoricalNote() {
@@ -1525,16 +1630,16 @@ function updateCategoryTabIndicators() {
         tabButton.classList.remove('category-complete-indicator');
 
         const categoryTasks = currentTasks.filter(task => task.categoryId === category.id);
-        const unlockedTasksInCategory = categoryTasks.filter(task => !lockedTaskIdsToday.includes(task.id));
+        // No 'locked' check for indicators, reflects all tasks for the day
         
-        if (unlockedTasksInCategory.length === 0 && categoryTasks.length > 0) { 
-            tabButton.classList.add('category-complete-indicator');
+        if (categoryTasks.length === 0) { 
+            // No indicator for empty category, or could be a checkmark if preferred
             return;
         }
         
-        const completedTasksCount = unlockedTasksInCategory.filter(task => task.completed).length;
-        const isFullyCompleted = unlockedTasksInCategory.length > 0 && completedTasksCount === unlockedTasksInCategory.length;
-        const incompleteTasksCount = unlockedTasksInCategory.length - completedTasksCount;
+        const completedTasksCount = categoryTasks.filter(task => task.completed).length;
+        const isFullyCompleted = completedTasksCount === categoryTasks.length;
+        const incompleteTasksCount = categoryTasks.length - completedTasksCount;
 
         if (isFullyCompleted) {
             tabButton.classList.add('category-complete-indicator');
@@ -1556,68 +1661,9 @@ function updateAllProgress() {
   renderCalendar(); 
 }
 
-function saveLockedTasksForToday() {
-    const today = getTodayDateString();
-    localStorage.setItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + today, JSON.stringify(lockedTaskIdsToday));
-}
-
-function handleSaveProgress() {
-  const now = new Date();
-  
-  if (now.getHours() < 20) { 
-      if(domElements.saveProgressMessage) domElements.saveProgressMessage.textContent = `You're saving progress at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. Are you sure you're done for today?`;
-      if(domElements.saveProgressModal) domElements.saveProgressModal.classList.remove('hidden');
-  } else {
-    finalizeDayProgress();
-  }
-}
-
-function finalizeDayProgress() {
-    const today = getTodayDateString();
-    lockedTaskIdsToday = currentTasks.map(task => task.id);
-    saveLockedTasksForToday();
-    savePreviousDayHistory(today, currentTasks); 
-
-    currentCategories.forEach(cat => {
-      if (cat.id !== 'dashboard') renderCategoryTasks(cat.id);
-    });
-    updateAllProgress(); 
-    updateSaveProgressButtonState();
-    if(domElements.saveProgressModal) domElements.saveProgressModal.classList.add('hidden');
-    alert(`Progress for ${new Date(today+'T00:00:00').toLocaleDateString()} has been saved and tasks are now locked.`);
-}
-
-function updateSaveProgressButtonState() {
-  if (!domElements.saveProgressButton) return;
-  const today = getTodayDateString();
-  const lockedTasksStorageKey = STORAGE_KEY_LOCKED_TASKS_PREFIX + today;
-  const storedLockedTasks = localStorage.getItem(lockedTasksStorageKey);
-  let isLockedForToday = false;
-  if (storedLockedTasks) {
-      try {
-          const lockedIds = JSON.parse(storedLockedTasks);
-          if (lockedIds.length > 0 && currentTasks.every(task => lockedIds.includes(task.id))) {
-             isLockedForToday = true;
-          } else if (lockedIds.length > 0 && lockedIds.length === currentTasks.length && currentTasks.length > 0) { 
-             isLockedForToday = true;
-          }
-      } catch (e) {
-          console.error("Error parsing locked tasks for button state:", e);
-      }
-  }
-
-  if (lockedTaskIdsToday.length > 0 && currentTasks.length > 0 && currentTasks.every(task => lockedTaskIdsToday.includes(task.id))) {
-     isLockedForToday = true;
-  }
-
-
-  if (isLockedForToday) {
-    domElements.saveProgressButton.disabled = true;
-    domElements.saveProgressButton.textContent = 'Progress Saved';
-  } else {
-    domElements.saveProgressButton.disabled = false;
-    domElements.saveProgressButton.textContent = 'Save Progress';
-  }
+function saveLockedTasksForToday() { // Saves the current state of lockedTaskIdsToday
+    const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    localStorage.setItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + currentActiveDate, JSON.stringify(lockedTaskIdsToday));
 }
 
 
@@ -1627,8 +1673,10 @@ function openFullscreenContentModal(type, date) {
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + date;
     const historyDataString = localStorage.getItem(historyKey);
     let historyEntry = null;
+    const isToday = date === getTodayDateString();
 
-    if (date === getTodayDateString()) { 
+
+    if (isToday) { // Build from live data for today
         const progress = calculateProgress();
         const completedTasksToday = {};
         currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
@@ -1638,7 +1686,7 @@ function openFullscreenContentModal(type, date) {
                  completedTasksToday[task.categoryId].push(task.text);
             }
         });
-        const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || "";
+        const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || (domElements.dailyNoteInput ? domElements.dailyNoteInput.value : "");
         historyEntry = { completedTasks: completedTasksToday, userNote: note };
     } else if (historyDataString) {
         try {
@@ -1727,9 +1775,9 @@ function handleAddCategory() {
         currentCategories.push(newCategory);
         saveUserCategories(currentCategories);
 
-        let tasksByCatId = loadUserTasks();
+        let tasksByCatId = loadUserTasksDefinitions();
         tasksByCatId[newCategoryId] = []; 
-        saveUserTasks(tasksByCatId);
+        saveUserTasksDefinitions(tasksByCatId);
 
         if (editModes[newCategoryId] === undefined) {
             editModes[newCategoryId] = false; 
@@ -1766,7 +1814,7 @@ function handleDeleteCategory(categoryId) {
         return;
     }
 
-    const tasksInCategory = (loadUserTasks()[categoryId] || []);
+    const tasksInCategory = (loadUserTasksDefinitions()[categoryId] || []);
     if (tasksInCategory.length > 0) {
         showDeleteConfirmation('category', categoryId, `Category "${category.name}" contains ${tasksInCategory.length} task(s). Are you sure you want to delete this category and all its tasks?`, category.name);
     } else {
@@ -1776,8 +1824,8 @@ function handleDeleteCategory(categoryId) {
 
 
 function showCategoryContextMenu(categoryId, targetTabElement) {
-    hideCategoryContextMenu(); // Hide any existing one
-    currentContextMenuTargetTab = targetTabElement; // Store for positioning or style
+    hideCategoryContextMenu(); 
+    currentContextMenuTargetTab = targetTabElement; 
 
     const menu = domElements.categoryTabContextMenu;
     if (!menu) return;
@@ -1785,21 +1833,19 @@ function showCategoryContextMenu(categoryId, targetTabElement) {
     menu.dataset.categoryId = categoryId;
     const rect = targetTabElement.getBoundingClientRect();
     
-    // Position menu below and slightly to the right of the tab's dots icon, or default if icon not found
     const optionsIcon = targetTabElement.querySelector('.tab-options-icon');
     let topPosition, leftPosition;
 
     if (optionsIcon) {
         const iconRect = optionsIcon.getBoundingClientRect();
         topPosition = iconRect.bottom + window.scrollY + 2;
-        leftPosition = iconRect.left + window.scrollX - (menu.offsetWidth / 2) + (iconRect.width / 2) ; // Center under icon
-    } else { // Fallback if icon not present (e.g., during long press if icon isn't made visible yet)
+        leftPosition = iconRect.left + window.scrollX - (menu.offsetWidth / 2) + (iconRect.width / 2) ; 
+    } else { 
         topPosition = rect.bottom + window.scrollY + 5;
         leftPosition = rect.left + window.scrollX;
     }
     
-    // Adjust if menu goes off-screen
-    const menuWidth = menu.offsetWidth || 120; // Use default or actual
+    const menuWidth = menu.offsetWidth || 120; 
     const menuHeight = menu.offsetHeight || 80;
     
     if (leftPosition + menuWidth > window.innerWidth) {
@@ -1816,7 +1862,6 @@ function showCategoryContextMenu(categoryId, targetTabElement) {
     menu.style.left = `${leftPosition}px`;
     menu.classList.remove('hidden');
     
-    // Make dots visible if this was triggered by long press and dots weren't already visible
     if (optionsIcon && !optionsIcon.classList.contains('visible')) {
         optionsIcon.classList.add('visible');
     }
@@ -1830,7 +1875,7 @@ function hideCategoryContextMenu() {
     if (currentContextMenuTargetTab) {
         const optionsIcon = currentContextMenuTargetTab.querySelector('.tab-options-icon');
         if (optionsIcon) {
-            optionsIcon.classList.remove('visible'); // Hide dots if they were made visible for the menu
+            optionsIcon.classList.remove('visible'); 
         }
         currentContextMenuTargetTab = null;
     }
@@ -1882,14 +1927,6 @@ function initializeApp() {
   domElements.saveHistoricalNoteButton = document.getElementById('save-historical-note-button');
   domElements.clearHistoricalNoteButton = document.getElementById('clear-historical-note-button');
   domElements.historicalNoteStatus = document.getElementById('historical-note-status');
-  domElements.saveProgressButtonContainer = document.getElementById('save-progress-button-container');
-  domElements.saveProgressButton = document.getElementById('save-progress-button');
-  domElements.saveProgressModal = document.getElementById('save-progress-modal');
-  domElements.saveProgressModalContent = document.getElementById('save-progress-modal-content');
-  domElements.saveProgressMessage = document.getElementById('save-progress-message');
-  domElements.confirmSaveProgressButton = document.getElementById('confirm-save-progress-button');
-  domElements.cancelSaveProgressButton = document.getElementById('cancel-save-progress-button');
-  domElements.saveProgressCloseButton = document.getElementById('save-progress-close-button');
   domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
   
   domElements.deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
@@ -1939,7 +1976,6 @@ function initializeApp() {
         hideCategoryContextMenu();
     });
   }
-  // Close context menu on outside click
   document.addEventListener('click', (event) => {
     if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden')) {
         if (!domElements.categoryTabContextMenu.contains(event.target) && 
@@ -2028,23 +2064,6 @@ function initializeApp() {
     });
   }
   
-  if (domElements.saveProgressButton) {
-    domElements.saveProgressButton.addEventListener('click', handleSaveProgress);
-  }
-  if (domElements.confirmSaveProgressButton) {
-    domElements.confirmSaveProgressButton.addEventListener('click', finalizeDayProgress);
-  }
-  if (domElements.cancelSaveProgressButton) {
-    domElements.cancelSaveProgressButton.addEventListener('click', () => {
-        if(domElements.saveProgressModal) domElements.saveProgressModal.classList.add('hidden');
-    });
-  }
-  if (domElements.saveProgressCloseButton) {
-     domElements.saveProgressCloseButton.addEventListener('click', () => {
-        if(domElements.saveProgressModal) domElements.saveProgressModal.classList.add('hidden');
-    });
-  }
-
   if (domElements.deleteConfirmationCloseButton) {
     domElements.deleteConfirmationCloseButton.addEventListener('click', hideDeleteConfirmation);
   }
@@ -2077,8 +2096,6 @@ function initializeApp() {
             closeHistoryModal();
         } else if (isMonthYearPickerOpen) {
             closeMonthYearPicker();
-        } else if (!domElements.saveProgressModal?.classList.contains('hidden')) {
-            if(domElements.saveProgressModal) domElements.saveProgressModal.classList.add('hidden');
         } else if (!domElements.deleteConfirmationModal?.classList.contains('hidden')) {
             hideDeleteConfirmation();
         } else if (!domElements.fullscreenContentModal?.classList.contains('hidden')) {
@@ -2090,8 +2107,6 @@ function initializeApp() {
     }
   });
 
-
-  updateSaveProgressButtonState();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
