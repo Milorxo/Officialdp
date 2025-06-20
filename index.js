@@ -3,96 +3,78 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-const INITIAL_TASKS_CONFIG = {
-  health: [
+// Default categories and tasks if nothing in localStorage
+const DEFAULT_CATEGORIES_CONFIG = [
+  { id: 'routine', name: 'Routine', order: 0, deletable: false, tasks: [
+    "Wake up at 5:30 AM", "Pray", "Shower", "Read Daily Text", "Clean bed",
+    "Prepare solar", "Put back solar", "Take 5-min break every 25 mins",
+    "Pray again", "Erase temptation", "Read 1 Bible chapter", "Sleep at 9:10–9:30 PM"
+  ]},
+  { id: 'health', name: 'Health', order: 1, deletable: false, tasks: [
     "Ice facing", "Run 30 mins", "100 jumping jacks", "Stretch 5 mins",
     "100 push-ups", "20 sit-ups", "Dumbbell: 10 reps × 2 sets",
     "Sunlight: 15–20 mins", "Drink 4.5L water", "Self-reprogram",
     "Shower consistently", "Social media < 1 hour"
-  ],
-  god: [
+  ]},
+  { id: 'god', name: 'God', order: 2, deletable: false, tasks: [
     "Self-Bible Study", "Thursday congregation", "Sunday congregation",
     "Be the person God expects"
-  ],
-  personal: ["Content creation"],
-  routine: [
-    "Wake up at 5:30 AM", "Pray", "Shower", "Read Daily Text", "Clean bed",
-    "Prepare solar", "Put back solar", "Take 5-min break every 25 mins",
-    "Pray again", "Erase temptation", "Read 1 Bible chapter", "Sleep at 9:10–9:30 PM"
-  ],
-};
+  ]},
+  { id: 'personal', name: 'Personal', order: 3, deletable: false, tasks: ["Content creation"] },
+];
 
-const CATEGORY_DISPLAY_NAMES = {
-  health: "Health",
-  god: "God",
-  personal: "Personal Growth",
-  routine: "Daily Routine",
-};
 
 const DAILY_TARGET_POINTS = 2700;
-const TARGET_POINTS_FOR_WEEKLY_VIEW = 20000; // Updated from 18900
+const TARGET_POINTS_FOR_WEEKLY_VIEW = 20000;
 
 const STORAGE_KEY_TASK_PREFIX = 'lifeTrackerTask_';
 const STORAGE_KEY_LAST_VISIT_DATE = 'lifeTrackerLastVisitDate';
-const STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX = 'lifeTrackerDailyEarnedPoints_'; // Still used for daily actuals
+const STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX = 'lifeTrackerDailyEarnedPoints_';
 const STORAGE_KEY_LAST_MONTH_PROCESSED = 'lifeTrackerLastMonthProcessed';
 const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_';
 const STORAGE_KEY_DAILY_HISTORY_PREFIX = 'lifeTrackerHistory_';
 const STORAGE_KEY_LOCKED_TASKS_PREFIX = 'lifeTrackerLockedTasks_';
-const USER_TASKS_STORAGE_KEY = 'lifeTrackerUserDefinedTasks';
-const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate';
+const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate'; 
+
+const USER_DEFINED_TASKS_KEY = 'lifeTrackerUserDefinedTasks_v2'; 
+const USER_CATEGORIES_KEY = 'lifeTrackerUserCategories_v2'; 
 
 
-let currentTasks = [];
-let activeTab = 'dashboard';
+let currentCategories = []; 
+let currentTasks = []; 
+
+let activeTabId = 'dashboard'; 
 let currentModalDate = null; 
 let lockedTaskIdsToday = [];
 let draggedTaskElement = null;
-let draggedTabElement = null;
-let taskToDeleteId = null;
-let editModes = {
-    health: false,
-    god: false,
-    personal: false,
-    routine: false,
-};
-let activeAddTaskForm = null;
+let itemToDelete = null; // { type: 'task' | 'category', id: string, nameForConfirmation?: string }
+let editModes = {}; // { categoryId: boolean }
+let activeAddTaskForm = null; // { categoryId, position }
 let calendarDisplayDate = new Date();
 let isMonthYearPickerOpen = false;
 let pickerSelectedMonth = new Date().getMonth();
 let pickerSelectedYear = new Date().getFullYear();
 let currentFullscreenContent = null;
+let longPressTimer = null;
+const LONG_PRESS_DURATION = 700; // ms
+let currentContextMenuTargetTab = null;
 
 
 // DOM Elements
 const domElements = {
   tabsContainer: null,
-  tabButtons: {},
-  tabContents: {},
-  categorySections: {},
-  categoryTaskLists: {},
+  tabContentsContainer: null, 
+  addCategoryButton: null,
+  categorySectionTemplate: null, 
+  categoryTabContextMenu: null,
+  ctxRenameCategoryButton: null,
+  ctxDeleteCategoryButton: null,
   
-  addItemTriggerButtonsTop: {},
-  addItemTriggerButtonsBottom: {},
-
-  newTempTaskFormsTop: {},
-  newTempTaskInputsTop: {},
-  newTempTaskSaveButtonsTop: {},
-  newTempTaskCancelButtonsTop: {},
-  
-  newTempTaskFormsBottom: {},
-  newTempTaskInputsBottom: {},
-  newTempTaskSaveButtonsBottom: {},
-  newTempTaskCancelButtonsBottom: {},
-
-  editModeToggleButtons: {},
-  undoCategoryButtons: {},
-
   dashboardSummariesContainer: null,
-  todayProgressFill: null, // Renamed from weeklyProgressFill
-  todayPointsStat: null,   // Renamed from weeklyPointsStat
-  currentWeekProgressFill: null, // Renamed from monthlyProgressFill
-  currentWeekPointsStat: null,   // Renamed from monthlyPointsStat
+  todayProgressFill: null,
+  todayPointsStat: null,
+  currentWeekProgressFill: null,
+  currentWeekPointsStat: null,
   calendarMonthYearButton: null,
   calendarMonthYear: null,
   calendarGrid: null,
@@ -129,10 +111,12 @@ const domElements = {
   cancelSaveProgressButton: null,
   saveProgressCloseButton: null,
   taskEditControlsTemplate: null,
-  deleteTaskConfirmationModal: null,
-  deleteTaskModalCloseButton: null,
-  confirmDeleteTaskButton: null,
-  cancelDeleteTaskButton: null,
+  deleteConfirmationModal: null,
+  deleteConfirmationTitle: null,
+  deleteConfirmationMessage: null,
+  deleteConfirmationCloseButton: null,
+  confirmDeleteButton: null,
+  cancelDeleteButton: null,
   fullscreenContentModal: null,
   fullscreenModalTitle: null,
   fullscreenModalArea: null,
@@ -159,90 +143,136 @@ function getCurrentMonthYearString() {
   return `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 }
 
-function createUniqueTaskId(category) {
-  return `${category}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+function createUniqueId(prefix = 'id') {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
 function getTaskStorageKey(taskId, date) {
   return `${STORAGE_KEY_TASK_PREFIX}${taskId}_${date}`;
 }
 
-// User-defined tasks management
-function loadUserDefinedTasks() {
-  const stored = localStorage.getItem(USER_TASKS_STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error("Error parsing user-defined tasks:", e);
+// Category and Task Data Management
+function loadUserCategories() {
+    const storedCategories = localStorage.getItem(USER_CATEGORIES_KEY);
+    if (storedCategories) {
+        try {
+            return JSON.parse(storedCategories);
+        } catch (e) {
+            console.error("Error parsing stored categories:", e);
+        }
     }
-  }
-  // Initialize if not present or error
-  const initialUserTasks = {
-    health: [], god: [], personal: [], routine: []
-  };
-  Object.keys(INITIAL_TASKS_CONFIG).forEach(category => {
-    initialUserTasks[category] = INITIAL_TASKS_CONFIG[category].map(text => ({
-      id: createUniqueTaskId(category),
-      text: text,
-      category: category,
+    return DEFAULT_CATEGORIES_CONFIG.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        order: cat.order,
+        deletable: cat.deletable !== undefined ? cat.deletable : true, 
     }));
-  });
-  localStorage.setItem(USER_TASKS_STORAGE_KEY, JSON.stringify(initialUserTasks));
-  return initialUserTasks;
 }
 
-function saveUserDefinedTasks(tasks) {
-  localStorage.setItem(USER_TASKS_STORAGE_KEY, JSON.stringify(tasks));
+function saveUserCategories(categories) {
+    localStorage.setItem(USER_CATEGORIES_KEY, JSON.stringify(categories.sort((a,b) => a.order - b.order)));
 }
 
-function seedInitialTasksFromConfigIfNeeded() {
-  let userTasks = loadUserDefinedTasks(); 
-  let updated = false;
-
-  Object.keys(INITIAL_TASKS_CONFIG).forEach(category => {
-    if (!userTasks[category] || userTasks[category].length === 0) { 
-      userTasks[category] = INITIAL_TASKS_CONFIG[category].map(text => ({
-        id: createUniqueTaskId(category),
-        text: text,
-        category: category,
-      }));
-      updated = true;
-    } else { 
-        userTasks[category].forEach(task => {
-            if (!task.id) task.id = createUniqueTaskId(category);
-            if (!task.category) task.category = category;
-        });
+function loadUserTasks() {
+    const storedTasks = localStorage.getItem(USER_DEFINED_TASKS_KEY);
+    if (storedTasks) {
+        try {
+            return JSON.parse(storedTasks); 
+        } catch (e) {
+            console.error("Error parsing stored tasks:", e);
+        }
     }
-  });
+    const initialTasks = {};
+    DEFAULT_CATEGORIES_CONFIG.forEach(catConfig => {
+        initialTasks[catConfig.id] = catConfig.tasks.map(taskText => ({
+            id: createUniqueId('task'),
+            text: taskText,
+            categoryId: catConfig.id, 
+        }));
+    });
+    return initialTasks;
+}
 
-  if (updated) {
-    saveUserDefinedTasks(userTasks);
-  }
+function saveUserTasks(tasksByCategoryId) {
+    localStorage.setItem(USER_DEFINED_TASKS_KEY, JSON.stringify(tasksByCategoryId));
+}
+
+
+function seedInitialDataIfNeeded() {
+    let categories = loadUserCategories();
+    let tasksByCatId = loadUserTasks();
+    let categoriesUpdated = false;
+    let tasksUpdated = false;
+
+    if (!categories || categories.length === 0) {
+        categories = DEFAULT_CATEGORIES_CONFIG.map(cat => ({
+            id: cat.id, name: cat.name, order: cat.order, deletable: cat.deletable !== undefined ? cat.deletable : true,
+        }));
+        categoriesUpdated = true;
+    }
+
+    categories.forEach(cat => {
+        if (!tasksByCatId[cat.id]) {
+            const defaultConfigCat = DEFAULT_CATEGORIES_CONFIG.find(dc => dc.id === cat.id);
+            tasksByCatId[cat.id] = defaultConfigCat ? defaultConfigCat.tasks.map(text => ({
+                id: createUniqueId('task'), text: text, categoryId: cat.id
+            })) : [];
+            tasksUpdated = true;
+        } else {
+            tasksByCatId[cat.id].forEach(task => {
+                if (!task.categoryId) {
+                    task.categoryId = cat.id;
+                    tasksUpdated = true;
+                }
+                 if (!task.id) { 
+                    task.id = createUniqueId('task');
+                    tasksUpdated = true;
+                }
+            });
+        }
+    });
+
+
+    if (categoriesUpdated) saveUserCategories(categories);
+    if (tasksUpdated) saveUserTasks(tasksByCatId);
+
+    currentCategories = categories;
+    currentCategories.forEach(cat => {
+        if (editModes[cat.id] === undefined) {
+            editModes[cat.id] = false;
+        }
+    });
 }
 
 
 function loadTasksForDate(date) {
-  const userDefinedTaskMap = loadUserDefinedTasks();
-  const loadedTasks = [];
-  Object.keys(userDefinedTaskMap).forEach(category => {
-    userDefinedTaskMap[category].forEach(userTask => {
-      const storedCompleted = localStorage.getItem(getTaskStorageKey(userTask.id, date));
-      loadedTasks.push({
-        id: userTask.id,
-        text: userTask.text,
-        category: userTask.category,
-        completed: storedCompleted === 'true',
-      });
+    const tasksByCategoryId = loadUserTasks(); 
+    const loadedTasks = [];
+
+    currentCategories.forEach(category => {
+        const categoryTasks = tasksByCategoryId[category.id] || [];
+        categoryTasks.forEach(userTaskDef => {
+            const storedCompleted = localStorage.getItem(getTaskStorageKey(userTaskDef.id, date));
+            loadedTasks.push({
+                id: userTaskDef.id,
+                text: userTaskDef.text,
+                categoryId: category.id, 
+                completed: storedCompleted === 'true',
+            });
+        });
     });
-  });
-  return loadedTasks;
+    return loadedTasks;
 }
 
 
 function saveTaskStatus(task) {
   const today = getTodayDateString();
   localStorage.setItem(getTaskStorageKey(task.id, today), task.completed.toString());
+}
+
+function getCategoryNameById(categoryId) {
+    const category = currentCategories.find(cat => cat.id === categoryId);
+    return category ? category.name : "Unknown Category";
 }
 
 function saveDailyNote() {
@@ -259,17 +289,19 @@ function saveDailyNote() {
     if (historyDataString) {
         historyEntry = JSON.parse(historyDataString);
     } else {
-        const completedTasksToday = { health: [], god: [], personal: [], routine: [] };
+        const completedTasksToday = {};
+        currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
+
         let tasksCompletedCount = 0;
         
         currentTasks.forEach(task => {
             if (task.completed) {
-                completedTasksToday[task.category].push(task.text);
+                if (!completedTasksToday[task.categoryId]) completedTasksToday[task.categoryId] = [];
+                completedTasksToday[task.categoryId].push(task.text);
                 tasksCompletedCount++;
             }
         });
         const totalTasksForToday = currentTasks.length;
-        // Use DAILY_TARGET_POINTS for calculating points per task for the daily total
         const pointsPerTask = totalTasksForToday > 0 ? DAILY_TARGET_POINTS / totalTasksForToday : 0;
         const pointsEarnedToday = Math.round(tasksCompletedCount * pointsPerTask);
         const percentageToday = totalTasksForToday > 0 ? Math.round((tasksCompletedCount / totalTasksForToday) * 100) : 0;
@@ -310,18 +342,20 @@ function savePreviousDayHistory(previousDayDate, tasksForPreviousDay) {
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + previousDayDate;
     let historyEntry;
 
-    const completedTasksHistory = { health: [], god: [], personal: [], routine: [] };
+    const completedTasksHistory = {};
+    currentCategories.forEach(cat => completedTasksHistory[cat.id] = []);
+    
     let tasksCompletedCount = 0;
     
     tasksForPreviousDay.forEach(task => {
         if (task.completed) {
-            completedTasksHistory[task.category].push(task.text);
+            if (!completedTasksHistory[task.categoryId]) completedTasksHistory[task.categoryId] = [];
+            completedTasksHistory[task.categoryId].push(task.text);
             tasksCompletedCount++;
         }
     });
 
     const totalTasksForPreviousDay = tasksForPreviousDay.length;
-    // Use DAILY_TARGET_POINTS here as well, as this function records daily achievement
     const pointsPerTaskCalculation = totalTasksForPreviousDay > 0 ? DAILY_TARGET_POINTS / totalTasksForPreviousDay : 0;
     const finalPointsEarned = Math.round(tasksCompletedCount * pointsPerTaskCalculation);
     const finalPercentageCompleted = totalTasksForPreviousDay > 0 ? Math.round((tasksCompletedCount / totalTasksForPreviousDay) * 100) : 0;
@@ -352,7 +386,7 @@ function savePreviousDayHistory(previousDayDate, tasksForPreviousDay) {
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
     
     localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + previousDayDate); 
-    localStorage.removeItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + previousDayDate); // This specific key might be redundant if history is primary
+    localStorage.removeItem(STORAGE_KEY_DAILY_EARNED_POINTS_PREFIX + previousDayDate);
     localStorage.removeItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + previousDayDate);
     
     console.log(`History finalized and saved for ${previousDayDate}:`, historyEntry);
@@ -382,13 +416,13 @@ function checkAndClearOldMonthlyData() {
 
 
 function loadAppData() {
-  seedInitialTasksFromConfigIfNeeded();
+  seedInitialDataIfNeeded(); 
 
   const storedDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE);
   const todayDate = getTodayDateString();
 
   if (storedDate && storedDate !== todayDate) {
-    const previousDayTasks = loadTasksForDate(storedDate);
+    const previousDayTasks = loadTasksForDate(storedDate); 
     savePreviousDayHistory(storedDate, previousDayTasks);
     localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, todayDate);
     lockedTaskIdsToday = []; 
@@ -436,13 +470,13 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
 }
 
-function toggleCategoryEditMode(category) {
-    editModes[category] = !editModes[category];
-    const categorySection = domElements.categorySections[category];
-    const toggleButton = domElements.editModeToggleButtons[category];
+function toggleCategoryEditMode(categoryId) {
+    editModes[categoryId] = !editModes[categoryId];
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    const toggleButton = categorySection?.querySelector('.edit-mode-toggle-button');
 
     if (categorySection && toggleButton) {
-        if (editModes[category]) {
+        if (editModes[categoryId]) {
             categorySection.classList.add('edit-mode-active');
             toggleButton.classList.add('active-glow');
             toggleButton.setAttribute('aria-pressed', 'true');
@@ -450,33 +484,48 @@ function toggleCategoryEditMode(category) {
             categorySection.classList.remove('edit-mode-active');
             toggleButton.classList.remove('active-glow');
             toggleButton.setAttribute('aria-pressed', 'false');
-            if (activeAddTaskForm && activeAddTaskForm.category === category) {
-                hideTempAddTaskForm(activeAddTaskForm.category, activeAddTaskForm.position);
+            if (activeAddTaskForm && activeAddTaskForm.categoryId === categoryId) {
+                hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.position);
             }
         }
     }
-    renderCategoryTasks(category);
+    renderCategoryTasks(categoryId); 
 }
 
-function showTempAddTaskForm(category, position) {
+
+function showTempAddTaskForm(categoryId, position) {
     if (activeAddTaskForm) {
-        hideTempAddTaskForm(activeAddTaskForm.category, activeAddTaskForm.position, false);
+        hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.position, false);
     }
 
-    activeAddTaskForm = { category, position };
-    const triggerButton = position === 'top' ? domElements.addItemTriggerButtonsTop[category] : domElements.addItemTriggerButtonsBottom[category];
-    const form = position === 'top' ? domElements.newTempTaskFormsTop[category] : domElements.newTempTaskFormsBottom[category];
-    const input = position === 'top' ? domElements.newTempTaskInputsTop[category] : domElements.newTempTaskInputsBottom[category];
+    activeAddTaskForm = { categoryId, position };
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    if (!categorySection) return;
+
+    const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
+    const formContainer = categorySection.querySelector(formContainerClass);
+    if (!formContainer) return;
+    
+    const triggerButton = formContainer.querySelector('.add-item-trigger-button');
+    const form = formContainer.querySelector('.new-temp-task-form');
+    const input = formContainer.querySelector('.new-task-temp-input');
 
     if (triggerButton) triggerButton.classList.add('hidden');
     if (form) form.classList.remove('hidden');
     if (input) input.focus();
 }
 
-function hideTempAddTaskForm(category, position, resetActiveForm = true) {
-    const triggerButton = position === 'top' ? domElements.addItemTriggerButtonsTop[category] : domElements.addItemTriggerButtonsBottom[category];
-    const form = position === 'top' ? domElements.newTempTaskFormsTop[category] : domElements.newTempTaskFormsBottom[category];
-    const input = position === 'top' ? domElements.newTempTaskInputsTop[category] : domElements.newTempTaskInputsBottom[category];
+function hideTempAddTaskForm(categoryId, position, resetActiveForm = true) {
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    if (!categorySection) return;
+
+    const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
+    const formContainer = categorySection.querySelector(formContainerClass);
+    if (!formContainer) return;
+
+    const triggerButton = formContainer.querySelector('.add-item-trigger-button');
+    const form = formContainer.querySelector('.new-temp-task-form');
+    const input = formContainer.querySelector('.new-task-temp-input');
 
     if (triggerButton) triggerButton.classList.remove('hidden');
     if (form) form.classList.add('hidden');
@@ -487,35 +536,48 @@ function hideTempAddTaskForm(category, position, resetActiveForm = true) {
     }
 }
 
-function handleSaveTempTask(category, position) {
-    const input = position === 'top' ? domElements.newTempTaskInputsTop[category] : domElements.newTempTaskInputsBottom[category];
+
+function handleSaveTempTask(categoryId, position) {
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    if (!categorySection) return;
+    const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
+    const input = categorySection.querySelector(`${formContainerClass} .new-task-temp-input`);
     const taskText = input.value.trim();
 
     if (taskText) {
-        const newTask = {
-            id: createUniqueTaskId(category),
+        const newTaskDefinition = {
+            id: createUniqueId('task'),
             text: taskText,
-            category: category,
-            completed: false,
+            categoryId: categoryId,
         };
         
-        let userTasks = loadUserDefinedTasks();
-        if (!userTasks[category]) {
-            userTasks[category] = [];
+        let tasksByCatId = loadUserTasks();
+        if (!tasksByCatId[categoryId]) {
+            tasksByCatId[categoryId] = [];
         }
 
         if (position === 'top') {
-            userTasks[category].unshift(newTask); // Add to the beginning for 'top'
+            tasksByCatId[categoryId].unshift(newTaskDefinition);
         } else {
-            userTasks[category].push(newTask); // Add to the end for 'bottom'
+            tasksByCatId[categoryId].push(newTaskDefinition);
         }
-        saveUserDefinedTasks(userTasks);
+        saveUserTasks(tasksByCatId);
         
-        currentTasks = loadTasksForDate(getTodayDateString()); // Reload all tasks
-        renderCategoryTasks(category); // Re-render this category
+        const newTaskForToday = { ...newTaskDefinition, completed: false };
+        if (position === 'top') {
+             const firstIndexOfCategory = currentTasks.findIndex(t => t.categoryId === categoryId);
+             if (firstIndexOfCategory !== -1) {
+                currentTasks.splice(firstIndexOfCategory, 0, newTaskForToday);
+             } else {
+                currentTasks.push(newTaskForToday); 
+             }
+        } else {
+            currentTasks.push(newTaskForToday);
+        }
+        
+        renderCategoryTasks(categoryId);
         updateAllProgress();
-
-        hideTempAddTaskForm(category, position);
+        hideTempAddTaskForm(categoryId, position);
     } else {
         alert('Task text cannot be empty.');
     }
@@ -531,7 +593,7 @@ function startTaskEdit(taskItemElement, task) {
     taskItemElement.classList.add('editing');
     
     const taskTextSpan = taskItemElement.querySelector('.task-text');
-    if (taskTextSpan) taskTextSpan.style.display = 'none'; // Hide original text span
+    if (taskTextSpan) taskTextSpan.style.display = 'none';
 
     const editControlsTemplate = domElements.taskEditControlsTemplate;
     if (!editControlsTemplate) {
@@ -539,8 +601,8 @@ function startTaskEdit(taskItemElement, task) {
         return;
     }
     const editControls = editControlsTemplate.cloneNode(true);
-    editControls.removeAttribute('id'); // Remove ID from clone
-    editControls.style.display = 'flex'; // Ensure it's visible
+    editControls.removeAttribute('id'); 
+    editControls.style.display = 'flex'; 
 
     const input = editControls.querySelector('.task-edit-input');
     const saveButton = editControls.querySelector('.task-edit-save');
@@ -551,7 +613,6 @@ function startTaskEdit(taskItemElement, task) {
     saveButton.onclick = () => saveTaskEdit(task.id, input.value, taskItemElement, editControls);
     cancelButton.onclick = () => cancelTaskEdit(taskItemElement, editControls, taskTextSpan);
     
-    // Insert controls. If task-delete-button exists, insert before it, otherwise append.
     const deleteButton = taskItemElement.querySelector('.task-delete-button-editmode');
     if (deleteButton) {
         taskItemElement.insertBefore(editControls, deleteButton);
@@ -573,31 +634,28 @@ function saveTaskEdit(taskId, newText, taskItemElement, editControls) {
     if (task) {
         task.text = newText;
         
-        let userTasks = loadUserDefinedTasks();
-        const taskCategory = userTasks[task.category];
-        if (taskCategory) {
-            const taskIndex = taskCategory.findIndex(t => t.id === taskId);
+        let tasksByCatId = loadUserTasks();
+        const taskCategoryArray = tasksByCatId[task.categoryId];
+        if (taskCategoryArray) {
+            const taskIndex = taskCategoryArray.findIndex(t => t.id === taskId);
             if (taskIndex !== -1) {
-                taskCategory[taskIndex].text = newText;
-                saveUserDefinedTasks(userTasks);
+                taskCategoryArray[taskIndex].text = newText;
+                saveUserTasks(tasksByCatId);
             }
         }
-        
-        currentTasks = loadTasksForDate(getTodayDateString());
-        renderCategoryTasks(task.category); // Re-render the whole category
     }
 
     const taskTextSpan = taskItemElement.querySelector('.task-text');
     if(taskTextSpan) {
-        taskTextSpan.textContent = newText; // Update the span for immediate visual feedback if re-render is slow
-        taskTextSpan.style.display = ''; // Show original text span
+        taskTextSpan.textContent = newText; 
+        taskTextSpan.style.display = ''; 
     }
     taskItemElement.classList.remove('editing');
     editControls.remove();
 }
 
 function cancelTaskEdit(taskItemElement, editControls, taskTextSpan) {
-    if (taskTextSpan) taskTextSpan.style.display = ''; // Show original text span
+    if (taskTextSpan) taskTextSpan.style.display = ''; 
     taskItemElement.classList.remove('editing');
     editControls.remove();
 }
@@ -608,7 +666,7 @@ function renderTaskItem(task) {
   item.className = 'task-item';
   item.dataset.taskId = task.id;
   item.setAttribute('role', 'listitem');
-  item.setAttribute('tabindex', '0'); // Make focusable
+  item.setAttribute('tabindex', '0'); 
   item.setAttribute('aria-label', `${task.text}, ${task.completed ? 'completed' : 'not completed'}`);
 
 
@@ -625,16 +683,15 @@ function renderTaskItem(task) {
     item.setAttribute('aria-disabled', 'true');
   }
 
-  // Edit mode specific elements
-  if (editModes[task.category]) {
+  if (editModes[task.categoryId]) {
       const deleteButton = document.createElement('button');
       deleteButton.className = 'task-delete-button-editmode icon-button';
       deleteButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
       deleteButton.setAttribute('aria-label', `Delete task: ${task.text}`);
       deleteButton.title = "Delete Task";
       deleteButton.onclick = (e) => {
-          e.stopPropagation(); // Prevent task toggle if item is also clickable
-          showDeleteTaskConfirmation(task.id);
+          e.stopPropagation(); 
+          showDeleteConfirmation('task', task.id, `Are you sure you want to delete the task "${task.text}"?`);
       };
       item.appendChild(deleteButton);
   }
@@ -642,19 +699,17 @@ function renderTaskItem(task) {
   item.addEventListener('click', (e) => {
     if (item.classList.contains('locked') || item.classList.contains('editing')) return;
     
-    // If in edit mode, and the click is on the textSpan, initiate edit.
-    if (editModes[task.category] && e.target === textSpan) {
+    if (editModes[task.categoryId] && e.target === textSpan) {
         startTaskEdit(item, task);
         return;
     }
-    // If not in edit mode, or click is not on textSpan (e.g., checkbox area or general item), toggle completion.
-    if (!editModes[task.category]) {
+    if (!editModes[task.categoryId]) {
         task.completed = !task.completed;
         saveTaskStatus(task);
         item.classList.toggle('completed');
         item.setAttribute('aria-label', `${task.text}, ${task.completed ? 'completed' : 'not completed'}`);
         item.classList.remove('animate-task-complete', 'animate-task-uncomplete');
-        void item.offsetWidth; // Trigger reflow
+        void item.offsetWidth; 
         item.classList.add(task.completed ? 'animate-task-complete' : 'animate-task-uncomplete');
         updateAllProgress();
         updateSaveProgressButtonState();
@@ -665,20 +720,18 @@ function renderTaskItem(task) {
         if (item.classList.contains('locked') || item.classList.contains('editing')) return;
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            if (!editModes[task.category]) { // Only toggle if not in edit mode
-                item.click(); // Simulate click to toggle
-            } else if (editModes[task.category] && document.activeElement === item) {
-                // If in edit mode and the item itself is focused (not an inner button), edit task text.
+            if (!editModes[task.categoryId]) { 
+                item.click(); 
+            } else if (editModes[task.categoryId] && document.activeElement === item) {
                  startTaskEdit(item, task);
             }
         }
     });
 
-  // Drag and drop for reordering (only in edit mode, not locked, not editing)
-    if (editModes[task.category] && !task.locked && !item.classList.contains('editing')) {
+    if (editModes[task.categoryId] && !task.locked && !item.classList.contains('editing')) {
         item.draggable = true;
         item.addEventListener('dragstart', (e) => {
-            if (!editModes[task.category] || task.locked || item.classList.contains('editing')) {
+            if (!editModes[task.categoryId] || task.locked || item.classList.contains('editing')) {
                 e.preventDefault();
                 return;
             }
@@ -689,83 +742,131 @@ function renderTaskItem(task) {
         item.addEventListener('dragend', () => {
             item.classList.remove('dragging');
             draggedTaskElement = null;
-            // Clear any lingering indicators
             document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
                 el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
             });
-            // Persist order
-            const taskListElement = domElements.categoryTaskLists[task.category];
+            
+            const taskListElement = item.closest('.task-list');
             if (taskListElement) {
+                const categoryId = taskListElement.dataset.categoryId;
                 const newTaskOrderIds = Array.from(taskListElement.querySelectorAll('.task-item')).map(el => el.dataset.taskId);
-                let userTasks = loadUserDefinedTasks();
-                userTasks[task.category] = newTaskOrderIds.map(id => userTasks[task.category].find(t => t.id === id)).filter(Boolean);
-                saveUserDefinedTasks(userTasks);
-                currentTasks = loadTasksForDate(getTodayDateString()); // Refresh currentTasks based on new order
+                
+                let tasksByCatId = loadUserTasks();
+                tasksByCatId[categoryId] = newTaskOrderIds.map(id => tasksByCatId[categoryId].find(t => t.id === id)).filter(Boolean);
+                saveUserTasks(tasksByCatId);
+
+                const otherCategoryTasks = currentTasks.filter(t => t.categoryId !== categoryId);
+                const reorderedCategoryTasks = newTaskOrderIds.map(id => currentTasks.find(t => t.id === id)).filter(Boolean);
+                currentTasks = [...otherCategoryTasks, ...reorderedCategoryTasks].sort((a,b) => {
+                    const catAOrder = currentCategories.find(c => c.id === a.categoryId).order;
+                    const catBOrder = currentCategories.find(c => c.id === b.categoryId).order;
+                    if(catAOrder !== catBOrder) return catAOrder - catBOrder;
+                    const tasksInCat = tasksByCatId[a.categoryId];
+                    return tasksInCat.findIndex(t => t.id === a.id) - tasksInCat.findIndex(t => t.id === b.id);
+                });
             }
         });
     } else {
         item.draggable = false;
     }
-
-
   return item;
 }
 
-function showDeleteTaskConfirmation(taskId) {
-    taskToDeleteId = taskId;
-    if (domElements.deleteTaskConfirmationModal) {
-        domElements.deleteTaskConfirmationModal.classList.remove('hidden');
+function showDeleteConfirmation(type, id, message, nameForConfirmation = '') {
+    itemToDelete = { type, id, nameForConfirmation };
+    if (domElements.deleteConfirmationModal) {
+        if(domElements.deleteConfirmationMessage) domElements.deleteConfirmationMessage.textContent = message;
+        domElements.deleteConfirmationModal.classList.remove('hidden');
+        domElements.confirmDeleteButton.focus();
     }
 }
 
-function confirmDeleteTask() {
-    if (!taskToDeleteId) return;
+function confirmDeletion() {
+    if (!itemToDelete) return;
 
-    const task = getTaskById(taskToDeleteId);
-    if (!task) return;
+    if (itemToDelete.type === 'task') {
+        const task = getTaskById(itemToDelete.id); 
+        if (!task) return;
 
-    // Remove from currentTasks (local state for today)
-    currentTasks = currentTasks.filter(t => t.id !== taskToDeleteId);
+        currentTasks = currentTasks.filter(t => t.id !== itemToDelete.id);
 
-    // Remove from userDefinedTasks (persistent storage)
-    let userTasks = loadUserDefinedTasks();
-    if (userTasks[task.category]) {
-        userTasks[task.category] = userTasks[task.category].filter(t => t.id !== taskToDeleteId);
-        saveUserDefinedTasks(userTasks);
+        let tasksByCatId = loadUserTasks();
+        if (tasksByCatId[task.categoryId]) {
+            tasksByCatId[task.categoryId] = tasksByCatId[task.categoryId].filter(t => t.id !== itemToDelete.id);
+            saveUserTasks(tasksByCatId);
+        }
+        localStorage.removeItem(getTaskStorageKey(itemToDelete.id, getTodayDateString()));
+        lockedTaskIdsToday = lockedTaskIdsToday.filter(id => id !== itemToDelete.id);
+        saveLockedTasksForToday();
+        renderCategoryTasks(task.categoryId);
+
+    } else if (itemToDelete.type === 'category') {
+        const categoryId = itemToDelete.id;
+        
+        const category = currentCategories.find(c => c.id === categoryId);
+        if (category && category.deletable === false) {
+            alert(`Category "${category.name}" is a default category and cannot be deleted.`);
+            hideDeleteConfirmation();
+            return;
+        }
+
+        currentCategories = currentCategories.filter(cat => cat.id !== categoryId);
+        saveUserCategories(currentCategories);
+
+        let tasksByCatId = loadUserTasks();
+        delete tasksByCatId[categoryId];
+        saveUserTasks(tasksByCatId);
+
+        currentTasks = currentTasks.filter(t => t.categoryId !== categoryId);
+        
+        const tabButton = document.getElementById(`tab-button-${categoryId}`);
+        if (tabButton) tabButton.remove();
+        const categorySection = document.getElementById(`category-section-${categoryId}`);
+        if (categorySection) categorySection.remove();
+
+        if (activeTabId === categoryId) {
+            const dashboardTabButton = document.getElementById('dashboard-tab-button');
+            if (dashboardTabButton) dashboardTabButton.click(); else activeTabId = null;
+        }
     }
 
-    // Remove any specific saved status for this task for today (if any)
-    localStorage.removeItem(getTaskStorageKey(taskToDeleteId, getTodayDateString()));
-    // Remove from locked tasks if present
-    lockedTaskIdsToday = lockedTaskIdsToday.filter(id => id !== taskToDeleteId);
-    saveLockedTasksForToday();
-
-
-    renderCategoryTasks(task.category);
     updateAllProgress();
     updateSaveProgressButtonState();
-    hideDeleteTaskConfirmation();
+    hideDeleteConfirmation();
 }
 
-function hideDeleteTaskConfirmation() {
-    if (domElements.deleteTaskConfirmationModal) {
-        domElements.deleteTaskConfirmationModal.classList.add('hidden');
+function hideDeleteConfirmation() {
+    if (domElements.deleteConfirmationModal) {
+        domElements.deleteConfirmationModal.classList.add('hidden');
     }
-    taskToDeleteId = null;
+    itemToDelete = null;
 }
 
-function renderCategoryTasks(category) {
-  const taskListElement = domElements.categoryTaskLists[category];
+function renderCategoryTasks(categoryId) {
+  const taskListElement = document.querySelector(`#category-section-${categoryId} .task-list`);
   if (!taskListElement) return;
 
   taskListElement.innerHTML = '';
-  const categoryTasks = currentTasks.filter(task => task.category === category);
+  taskListElement.dataset.categoryId = categoryId; 
+
+  const categoryTasks = currentTasks.filter(task => task.categoryId === categoryId);
+  const userDefinedOrder = (loadUserTasks()[categoryId] || []).map(t => t.id);
+
+  categoryTasks.sort((a, b) => {
+    const indexA = userDefinedOrder.indexOf(a.id);
+    const indexB = userDefinedOrder.indexOf(b.id);
+    if (indexA === -1 && indexB === -1) return 0; 
+    if (indexA === -1) return 1; 
+    if (indexB === -1) return -1; 
+    return indexA - indexB;
+  });
+
 
   if (categoryTasks.length === 0) {
     const emptyMessage = document.createElement('p');
-    emptyMessage.textContent = editModes[category] ? 'No tasks defined. Click "Add Item" to create new tasks.' : 'No tasks for today in this category.';
+    emptyMessage.textContent = editModes[categoryId] ? 'No tasks defined. Click "Add Item" to create new tasks.' : 'No tasks for today in this category.';
     emptyMessage.className = 'empty-tasks-message';
-    if (editModes[category]) {
+    if (editModes[categoryId]) {
         emptyMessage.classList.add('edit-mode-empty');
     }
     taskListElement.appendChild(emptyMessage);
@@ -777,11 +878,195 @@ function renderCategoryTasks(category) {
   }
 }
 
-function renderAllTasks() {
-  Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
-    renderCategoryTasks(category);
-  });
+function renderAllCategorySections() {
+    if (!domElements.tabContentsContainer || !domElements.categorySectionTemplate) return;
+    
+    domElements.tabContentsContainer.querySelectorAll('.category-section:not(#dashboard-content)').forEach(sec => sec.remove());
+
+    currentCategories.forEach(category => {
+        if (category.id === 'dashboard') return; 
+
+        const sectionClone = domElements.categorySectionTemplate.content.cloneNode(true);
+        const sectionElement = sectionClone.querySelector('.category-section');
+        
+        sectionElement.id = `category-section-${category.id}`;
+        sectionElement.setAttribute('aria-labelledby', `tab-button-${category.id}`);
+        if (activeTabId !== category.id) {
+            sectionElement.classList.add('hidden');
+        }
+
+        sectionElement.querySelector('.category-title-text').textContent = category.name;
+        
+        const editModeButton = sectionElement.querySelector('.edit-mode-toggle-button');
+        editModeButton.onclick = () => toggleCategoryEditMode(category.id);
+        if (editModes[category.id]) {
+            sectionElement.classList.add('edit-mode-active');
+            editModeButton.classList.add('active-glow');
+            editModeButton.setAttribute('aria-pressed', 'true');
+        }
+
+
+        sectionElement.querySelector('.undo-category-button').onclick = () => {
+            currentTasks.forEach(task => {
+                if (task.categoryId === category.id && !lockedTaskIdsToday.includes(task.id)) {
+                    task.completed = false;
+                    saveTaskStatus(task);
+                }
+            });
+            renderCategoryTasks(category.id);
+            updateAllProgress();
+            updateSaveProgressButtonState();
+        };
+
+        ['top', 'bottom'].forEach(position => {
+            const formContainer = sectionElement.querySelector(position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom');
+            if (formContainer) {
+                formContainer.querySelector('.add-item-trigger-button').onclick = () => showTempAddTaskForm(category.id, position);
+                formContainer.querySelector('.new-task-temp-save').onclick = () => handleSaveTempTask(category.id, position);
+                formContainer.querySelector('.new-task-temp-cancel').onclick = () => hideTempAddTaskForm(category.id, position);
+                formContainer.querySelector('.new-task-temp-input').addEventListener('keypress', (e) => {
+                     if (e.key === 'Enter') { e.preventDefault(); handleSaveTempTask(category.id, position); }
+                });
+            }
+        });
+
+        domElements.tabContentsContainer.appendChild(sectionElement);
+        renderCategoryTasks(category.id); 
+    });
 }
+
+function clearLongPressTimer(tabButton) {
+    if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+    }
+    if (tabButton) { // Ensure tabButton is passed to remove specific listener
+      tabButton.removeEventListener('touchmove', preventScrollDuringLongPress);
+      tabButton.removeEventListener('touchend', () => clearLongPressTimer(tabButton));
+      tabButton.removeEventListener('touchcancel', () => clearLongPressTimer(tabButton));
+    }
+}
+function preventScrollDuringLongPress(e) {
+    // This function can be used to prevent default scroll if long press is active
+    // For now, just clearing timer is enough, but could be expanded.
+    clearLongPressTimer(e.currentTarget);
+}
+
+function renderTabs() {
+    if (!domElements.tabsContainer) return;
+    
+    domElements.tabsContainer.querySelectorAll('.tab-button[data-category-id]').forEach(btn => btn.remove());
+
+    const addCatButton = domElements.addCategoryButton;
+
+    currentCategories.sort((a, b) => a.order - b.order).forEach(category => {
+        const tabButton = document.createElement('button');
+        tabButton.className = 'tab-button';
+        tabButton.id = `tab-button-${category.id}`;
+        tabButton.dataset.categoryId = category.id;
+        tabButton.textContent = category.name;
+        tabButton.setAttribute('role', 'tab');
+        tabButton.setAttribute('aria-selected', activeTabId === category.id ? 'true' : 'false');
+        if (activeTabId === category.id) {
+            tabButton.classList.add('active');
+        }
+
+        const optionsIcon = document.createElement('div');
+        optionsIcon.className = 'tab-options-icon';
+        optionsIcon.innerHTML = `<span></span><span></span><span></span>`;
+        optionsIcon.setAttribute('aria-label', `Options for ${category.name}`);
+        optionsIcon.setAttribute('role', 'button');
+        optionsIcon.setAttribute('tabindex', '0'); 
+        
+        tabButton.appendChild(optionsIcon);
+        
+        optionsIcon.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent tab switch
+            showCategoryContextMenu(category.id, tabButton);
+        });
+         optionsIcon.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                showCategoryContextMenu(category.id, tabButton);
+            }
+        });
+
+
+        // Long press for touch devices
+        tabButton.addEventListener('touchstart', (e) => {
+            clearLongPressTimer(tabButton); // Clear any existing timer
+            // Attach move listener to cancel long press if user scrolls
+            tabButton.addEventListener('touchmove', preventScrollDuringLongPress);
+
+            longPressTimer = setTimeout(() => {
+                e.preventDefault(); // Prevent click/other events after long press
+                optionsIcon.classList.add('visible'); // Make dots visible for context
+                showCategoryContextMenu(category.id, tabButton);
+                clearLongPressTimer(tabButton); 
+            }, LONG_PRESS_DURATION);
+            
+            // Listen for touchend and touchcancel on this specific tabButton instance
+            tabButton.addEventListener('touchend', () => clearLongPressTimer(tabButton));
+            tabButton.addEventListener('touchcancel', () => clearLongPressTimer(tabButton));
+        });
+
+
+        tabButton.addEventListener('click', (e) => {
+            // Highlight badge on tap (for mobile)
+            if (e.target === tabButton && !optionsIcon.contains(e.target)) { // Ensure click is not on options icon itself
+                tabButton.classList.add('show-badge-highlight');
+                setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300);
+            }
+            switchTab(category.id)
+        });
+        
+        domElements.tabsContainer.insertBefore(tabButton, addCatButton);
+    });
+    updateCategoryTabIndicators();
+}
+
+
+function switchTab(categoryIdToActivate) {
+    activeTabId = categoryIdToActivate;
+    hideCategoryContextMenu();
+
+    domElements.tabsContainer.querySelectorAll('.tab-button').forEach(button => {
+        if (button.id === `tab-button-${activeTabId}` || (activeTabId === 'dashboard' && button.id === 'dashboard-tab-button')) {
+            button.classList.add('active');
+            button.setAttribute('aria-selected', 'true');
+        } else {
+            button.classList.remove('active');
+            button.setAttribute('aria-selected', 'false');
+        }
+    });
+    
+    // Manage scrollbar visibility for main#tab-content (domElements.tabContentsContainer)
+    if (domElements.tabContentsContainer) {
+        if (categoryIdToActivate === 'dashboard') {
+            domElements.tabContentsContainer.classList.add('main-area-scroll-hidden');
+        } else {
+            domElements.tabContentsContainer.classList.remove('main-area-scroll-hidden');
+        }
+    }
+
+    domElements.tabContentsContainer.querySelectorAll('section[role="tabpanel"]').forEach(section => {
+        if (section.id === `category-section-${activeTabId}` || (activeTabId === 'dashboard' && section.id === 'dashboard-content')) {
+            section.classList.remove('hidden');
+        } else {
+            section.classList.add('hidden');
+        }
+    });
+    
+    if (activeTabId !== 'dashboard') {
+        renderCategoryTasks(activeTabId); 
+    }
+
+    if (activeAddTaskForm) {
+        hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.position);
+    }
+}
+
 
 function calculateProgress() {
   let completedCount = 0;
@@ -805,16 +1090,18 @@ function updateDashboardSummaries() {
   if (!domElements.dashboardSummariesContainer) return;
   domElements.dashboardSummariesContainer.innerHTML = '';
 
-  Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
-    const categoryTasks = currentTasks.filter(task => task.category === category);
+  currentCategories.forEach(category => {
+    if (category.id === 'dashboard') return; 
+
+    const categoryTasks = currentTasks.filter(task => task.categoryId === category.id);
     const unlockedTasksInCategory = categoryTasks.filter(task => !lockedTaskIdsToday.includes(task.id));
     const completedTasksInUnlocked = unlockedTasksInCategory.filter(task => task.completed);
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'dashboard-category-summary';
     summaryDiv.innerHTML = `
-      <h3>${CATEGORY_DISPLAY_NAMES[category]}</h3>
-      <p class="category-stats">Completed: ${completedTasksInUnlocked.length} / ${unlockedTasksInCategory.length}</p>
+      <h3>${category.name}</h3>
+      <p class="category-stats">${completedTasksInUnlocked.length} / ${unlockedTasksInCategory.length}</p>
     `;
     
     const statsP = summaryDiv.querySelector('.category-stats');
@@ -829,7 +1116,7 @@ function updateDashboardSummaries() {
 }
 
 function updateTodaysProgress() {
-  const progress = calculateProgress(); // Gets today's current progress
+  const progress = calculateProgress(); 
   
   if (domElements.todayProgressFill) {
       domElements.todayProgressFill.style.width = `${progress.percentage}%`;
@@ -847,26 +1134,24 @@ function updateCurrentWeekProgress() {
     let currentWeekStartDate;
 
     if (!currentWeekStartDateString) {
-        currentWeekStartDate = today;
+        currentWeekStartDate = new Date(today); 
         localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
     } else {
         currentWeekStartDate = getNormalizedDate(new Date(currentWeekStartDateString));
         const daysPassed = (today.getTime() - currentWeekStartDate.getTime()) / (1000 * 60 * 60 * 24);
         if (daysPassed >= 7) {
-            currentWeekStartDate = today; // Start new week from today
-             // Adjust start date to be the Monday of the current week if preferred fixed week cycle
-            let dayOfWeek = today.getDay(); // Sunday is 0, Monday is 1
-            let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // if Sunday, go back 6 days, else go back to Monday
-            currentWeekStartDate = new Date(today);
+            currentWeekStartDate = new Date(today); 
+            let dayOfWeek = today.getDay(); 
+            let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; 
             currentWeekStartDate.setDate(today.getDate() + diffToMonday);
-            currentWeekStartDate = getNormalizedDate(currentWeekStartDate);
+            currentWeekStartDate = getNormalizedDate(currentWeekStartDate); 
 
             localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
         }
     }
     
     let totalPointsThisWeekCycle = 0;
-    let currentDateIter = new Date(currentWeekStartDate);
+    let currentDateIter = new Date(currentWeekStartDate); 
 
     while (currentDateIter <= today) {
         const dateStringForIter = `${currentDateIter.getFullYear()}-${(currentDateIter.getMonth() + 1).toString().padStart(2, '0')}-${currentDateIter.getDate().toString().padStart(2, '0')}`;
@@ -957,7 +1242,7 @@ function renderCalendar() {
         cell.classList.add('current-day');
         const progress = calculateProgress();
         percentageCompleted = progress.percentage;
-        if (percentageCompleted > 40) { // Threshold for changing text color
+        if (percentageCompleted > 40) { 
             cell.classList.add('high-fill'); 
         }
         hasHistoryData = progress.completedCount > 0 || (localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) !== null);
@@ -1004,11 +1289,13 @@ function showHistoryModal(dateString) {
 
   if (isToday) {
     const progress = calculateProgress();
-    const completedTasksToday = { health: [], god: [], personal: [], routine: [] };
+    const completedTasksToday = {};
+    currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
+
     currentTasks.forEach(task => {
         if (task.completed) {
-             if (!completedTasksToday[task.category]) completedTasksToday[task.category] = []; 
-             completedTasksToday[task.category].push(task.text);
+             if (!completedTasksToday[task.categoryId]) completedTasksToday[task.categoryId] = []; 
+             completedTasksToday[task.categoryId].push(task.text);
         }
     });
     const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || "";
@@ -1036,8 +1323,8 @@ function showHistoryModal(dateString) {
     domElements.historyTasksList.innerHTML = '';
     let hasCompletedTasks = false;
     if (historyEntry.completedTasks) {
-        Object.keys(historyEntry.completedTasks).forEach(categoryKey => {
-            const tasksInCategory = historyEntry.completedTasks[categoryKey];
+        Object.keys(historyEntry.completedTasks).forEach(categoryId => {
+            const tasksInCategory = historyEntry.completedTasks[categoryId];
             if (tasksInCategory && tasksInCategory.length > 0) {
                 hasCompletedTasks = true;
                 const categoryGroup = document.createElement('div');
@@ -1045,7 +1332,7 @@ function showHistoryModal(dateString) {
                 
                 const categoryTitle = document.createElement('h5');
                 categoryTitle.className = 'history-category-title';
-                categoryTitle.textContent = CATEGORY_DISPLAY_NAMES[categoryKey] || categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1);
+                categoryTitle.textContent = getCategoryNameById(categoryId);
                 categoryGroup.appendChild(categoryTitle);
 
                 const ul = document.createElement('ul');
@@ -1133,6 +1420,7 @@ function saveHistoricalNote() {
             percentageCompleted: 0,
             totalTasksOnDate: 0 
         };
+         currentCategories.forEach(cat => historyEntry.completedTasks[cat.id] = []);
     }
     historyEntry.userNote = noteContent;
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
@@ -1227,35 +1515,44 @@ function closeMonthYearPicker() {
     domElements.monthYearPickerModal.classList.add('hidden');
 }
 
-function updateCategoryTabCompletionStates() {
-    Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
-        const tabButton = domElements.tabButtons[category];
+function updateCategoryTabIndicators() {
+    currentCategories.forEach(category => {
+        const tabButton = document.getElementById(`tab-button-${category.id}`);
         if (!tabButton) return;
 
-        const categoryTasks = currentTasks.filter(task => task.category === category);
+        const existingBadge = tabButton.querySelector('.notification-badge');
+        if (existingBadge) existingBadge.remove();
+        tabButton.classList.remove('category-complete-indicator');
+
+        const categoryTasks = currentTasks.filter(task => task.categoryId === category.id);
         const unlockedTasksInCategory = categoryTasks.filter(task => !lockedTaskIdsToday.includes(task.id));
         
-        if (unlockedTasksInCategory.length === 0 && categoryTasks.length > 0) { // All tasks are locked, consider it "done" for the day in terms of interaction
+        if (unlockedTasksInCategory.length === 0 && categoryTasks.length > 0) { 
             tabButton.classList.add('category-complete-indicator');
             return;
         }
         
         const completedTasksCount = unlockedTasksInCategory.filter(task => task.completed).length;
         const isFullyCompleted = unlockedTasksInCategory.length > 0 && completedTasksCount === unlockedTasksInCategory.length;
+        const incompleteTasksCount = unlockedTasksInCategory.length - completedTasksCount;
 
         if (isFullyCompleted) {
             tabButton.classList.add('category-complete-indicator');
-        } else {
-            tabButton.classList.remove('category-complete-indicator');
+        } else if (incompleteTasksCount > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'notification-badge';
+            badge.textContent = incompleteTasksCount.toString();
+            tabButton.appendChild(badge);
         }
     });
 }
+
 
 function updateAllProgress() {
   updateDashboardSummaries();
   updateTodaysProgress();
   updateCurrentWeekProgress();
-  updateCategoryTabCompletionStates();
+  updateCategoryTabIndicators();
   renderCalendar(); 
 }
 
@@ -1281,7 +1578,9 @@ function finalizeDayProgress() {
     saveLockedTasksForToday();
     savePreviousDayHistory(today, currentTasks); 
 
-    renderAllTasks();
+    currentCategories.forEach(cat => {
+      if (cat.id !== 'dashboard') renderCategoryTasks(cat.id);
+    });
     updateAllProgress(); 
     updateSaveProgressButtonState();
     if(domElements.saveProgressModal) domElements.saveProgressModal.classList.add('hidden');
@@ -1331,11 +1630,12 @@ function openFullscreenContentModal(type, date) {
 
     if (date === getTodayDateString()) { 
         const progress = calculateProgress();
-        const completedTasksToday = { health: [], god: [], personal: [], routine: [] };
+        const completedTasksToday = {};
+        currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
         currentTasks.forEach(task => {
             if (task.completed) {
-                 if (!completedTasksToday[task.category]) completedTasksToday[task.category] = [];
-                 completedTasksToday[task.category].push(task.text);
+                 if (!completedTasksToday[task.categoryId]) completedTasksToday[task.categoryId] = [];
+                 completedTasksToday[task.categoryId].push(task.text);
             }
         });
         const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || "";
@@ -1364,8 +1664,8 @@ function openFullscreenContentModal(type, date) {
         domElements.fullscreenModalTitle.textContent = `Completed Tasks for ${formattedDate}`;
         let hasContent = false;
         if (historyEntry.completedTasks) {
-            Object.keys(historyEntry.completedTasks).forEach(categoryKey => {
-                const tasksInCategory = historyEntry.completedTasks[categoryKey];
+            Object.keys(historyEntry.completedTasks).forEach(categoryId => {
+                const tasksInCategory = historyEntry.completedTasks[categoryId];
                 if (tasksInCategory && tasksInCategory.length > 0) {
                     hasContent = true;
                     const categoryGroup = document.createElement('div');
@@ -1373,7 +1673,7 @@ function openFullscreenContentModal(type, date) {
                     
                     const categoryTitle = document.createElement('h4'); 
                     categoryTitle.className = 'history-category-title';
-                    categoryTitle.textContent = CATEGORY_DISPLAY_NAMES[categoryKey] || categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1);
+                    categoryTitle.textContent = getCategoryNameById(categoryId);
                     categoryGroup.appendChild(categoryTitle);
 
                     const ul = document.createElement('ul');
@@ -1413,11 +1713,141 @@ function closeFullscreenContentModal() {
     currentFullscreenContent = null;
 }
 
+// Category Management Functions
+function handleAddCategory() {
+    const categoryName = prompt("Enter name for the new category:");
+    if (categoryName && categoryName.trim() !== "") {
+        const newCategoryId = createUniqueId('cat');
+        const newCategory = {
+            id: newCategoryId,
+            name: categoryName.trim(),
+            order: currentCategories.length, 
+            deletable: true,
+        };
+        currentCategories.push(newCategory);
+        saveUserCategories(currentCategories);
 
+        let tasksByCatId = loadUserTasks();
+        tasksByCatId[newCategoryId] = []; 
+        saveUserTasks(tasksByCatId);
+
+        if (editModes[newCategoryId] === undefined) {
+            editModes[newCategoryId] = false; 
+        }
+        
+        renderTabs();
+        renderAllCategorySections(); 
+        switchTab(newCategoryId); 
+        updateAllProgress();
+    }
+}
+
+function handleRenameCategory(categoryId) {
+    const category = currentCategories.find(cat => cat.id === categoryId);
+    if (!category) return;
+
+    const newName = prompt(`Enter new name for category "${category.name}":`, category.name);
+    if (newName && newName.trim() !== "" && newName.trim() !== category.name) {
+        category.name = newName.trim();
+        saveUserCategories(currentCategories);
+        renderTabs(); 
+        const sectionTitle = document.querySelector(`#category-section-${categoryId} .category-title-text`);
+        if (sectionTitle) sectionTitle.textContent = category.name;
+        updateDashboardSummaries(); 
+    }
+}
+
+function handleDeleteCategory(categoryId) {
+    const category = currentCategories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    if (category.deletable === false) {
+        alert(`Category "${category.name}" is a default category and cannot be deleted.`);
+        return;
+    }
+
+    const tasksInCategory = (loadUserTasks()[categoryId] || []);
+    if (tasksInCategory.length > 0) {
+        showDeleteConfirmation('category', categoryId, `Category "${category.name}" contains ${tasksInCategory.length} task(s). Are you sure you want to delete this category and all its tasks?`, category.name);
+    } else {
+         showDeleteConfirmation('category', categoryId, `Are you sure you want to delete the empty category "${category.name}"?`, category.name);
+    }
+}
+
+
+function showCategoryContextMenu(categoryId, targetTabElement) {
+    hideCategoryContextMenu(); // Hide any existing one
+    currentContextMenuTargetTab = targetTabElement; // Store for positioning or style
+
+    const menu = domElements.categoryTabContextMenu;
+    if (!menu) return;
+
+    menu.dataset.categoryId = categoryId;
+    const rect = targetTabElement.getBoundingClientRect();
+    
+    // Position menu below and slightly to the right of the tab's dots icon, or default if icon not found
+    const optionsIcon = targetTabElement.querySelector('.tab-options-icon');
+    let topPosition, leftPosition;
+
+    if (optionsIcon) {
+        const iconRect = optionsIcon.getBoundingClientRect();
+        topPosition = iconRect.bottom + window.scrollY + 2;
+        leftPosition = iconRect.left + window.scrollX - (menu.offsetWidth / 2) + (iconRect.width / 2) ; // Center under icon
+    } else { // Fallback if icon not present (e.g., during long press if icon isn't made visible yet)
+        topPosition = rect.bottom + window.scrollY + 5;
+        leftPosition = rect.left + window.scrollX;
+    }
+    
+    // Adjust if menu goes off-screen
+    const menuWidth = menu.offsetWidth || 120; // Use default or actual
+    const menuHeight = menu.offsetHeight || 80;
+    
+    if (leftPosition + menuWidth > window.innerWidth) {
+        leftPosition = window.innerWidth - menuWidth - 10;
+    }
+    if (topPosition + menuHeight > window.innerHeight) {
+        topPosition = rect.top + window.scrollY - menuHeight - 5;
+    }
+    if (leftPosition < 0) leftPosition = 10;
+    if (topPosition < 0) topPosition = 10;
+
+
+    menu.style.top = `${topPosition}px`;
+    menu.style.left = `${leftPosition}px`;
+    menu.classList.remove('hidden');
+    
+    // Make dots visible if this was triggered by long press and dots weren't already visible
+    if (optionsIcon && !optionsIcon.classList.contains('visible')) {
+        optionsIcon.classList.add('visible');
+    }
+}
+
+function hideCategoryContextMenu() {
+    if (domElements.categoryTabContextMenu) {
+        domElements.categoryTabContextMenu.classList.add('hidden');
+        domElements.categoryTabContextMenu.removeAttribute('data-category-id');
+    }
+    if (currentContextMenuTargetTab) {
+        const optionsIcon = currentContextMenuTargetTab.querySelector('.tab-options-icon');
+        if (optionsIcon) {
+            optionsIcon.classList.remove('visible'); // Hide dots if they were made visible for the menu
+        }
+        currentContextMenuTargetTab = null;
+    }
+}
+
+
+// initializeApp is called at the end
 function initializeApp() {
   // DOM Element Querying
   domElements.tabsContainer = document.getElementById('tabs');
-  domElements.tabContents.dashboard = document.getElementById('dashboard-content');
+  domElements.tabContentsContainer = document.getElementById('tab-content');
+  domElements.addCategoryButton = document.getElementById('add-category-button');
+  domElements.categorySectionTemplate = document.getElementById('category-section-template');
+  domElements.categoryTabContextMenu = document.getElementById('category-tab-context-menu');
+  domElements.ctxRenameCategoryButton = document.getElementById('ctx-rename-category');
+  domElements.ctxDeleteCategoryButton = document.getElementById('ctx-delete-category');
+  
   domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
   
   domElements.todayProgressFill = document.getElementById('today-progress-fill');
@@ -1461,176 +1891,102 @@ function initializeApp() {
   domElements.cancelSaveProgressButton = document.getElementById('cancel-save-progress-button');
   domElements.saveProgressCloseButton = document.getElementById('save-progress-close-button');
   domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
-  domElements.deleteTaskConfirmationModal = document.getElementById('delete-task-confirmation-modal');
-  domElements.deleteTaskModalCloseButton = document.getElementById('delete-task-modal-close-button');
-  domElements.confirmDeleteTaskButton = document.getElementById('confirm-delete-task-button');
-  domElements.cancelDeleteTaskButton = document.getElementById('cancel-delete-task-button');
+  
+  domElements.deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
+  domElements.deleteConfirmationTitle = document.getElementById('delete-confirmation-title');
+  domElements.deleteConfirmationMessage = document.getElementById('delete-confirmation-message');
+  domElements.deleteConfirmationCloseButton = document.getElementById('delete-confirmation-close-button');
+  domElements.confirmDeleteButton = document.getElementById('confirm-delete-button');
+  domElements.cancelDeleteButton = document.getElementById('cancel-delete-button');
+
   domElements.fullscreenContentModal = document.getElementById('fullscreen-content-modal');
   domElements.fullscreenModalTitle = document.getElementById('fullscreen-modal-title');
   domElements.fullscreenModalArea = document.getElementById('fullscreen-modal-area');
   domElements.fullscreenModalCloseButton = document.getElementById('fullscreen-modal-close-button');
 
 
-  Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
-    domElements.tabButtons[category] = document.getElementById(`${category}-tab-button`);
-    domElements.tabContents[category] = document.getElementById(`${category}-content`);
-    domElements.categoryTaskLists[category] = document.getElementById(`${category}-task-list`);
-    domElements.categorySections[category] = document.getElementById(`${category}-content`); 
-    domElements.editModeToggleButtons[category] = document.getElementById(`edit-mode-toggle-${category}`);
-    domElements.undoCategoryButtons[category] = document.getElementById(`undo-category-${category}`);
-    
-    domElements.addItemTriggerButtonsTop[category] = document.getElementById(`add-item-trigger-button-top-${category}`);
-    domElements.newTempTaskFormsTop[category] = document.getElementById(`new-temp-task-form-top-${category}`);
-    domElements.newTempTaskInputsTop[category] = document.getElementById(`new-temp-task-input-top-${category}`);
-    domElements.newTempTaskSaveButtonsTop[category] = document.getElementById(`new-temp-task-save-button-top-${category}`);
-    domElements.newTempTaskCancelButtonsTop[category] = document.getElementById(`new-temp-task-cancel-button-top-${category}`);
-
-    domElements.addItemTriggerButtonsBottom[category] = document.getElementById(`add-item-trigger-button-bottom-${category}`);
-    domElements.newTempTaskFormsBottom[category] = document.getElementById(`new-temp-task-form-bottom-${category}`);
-    domElements.newTempTaskInputsBottom[category] = document.getElementById(`new-temp-task-input-bottom-${category}`);
-    domElements.newTempTaskSaveButtonsBottom[category] = document.getElementById(`new-temp-task-save-button-bottom-${category}`);
-    domElements.newTempTaskCancelButtonsBottom[category] = document.getElementById(`new-temp-task-cancel-button-bottom-${category}`);
-
-  });
-  domElements.tabButtons.dashboard = document.getElementById('dashboard-tab-button');
-
-
-  loadAppData();
-  renderAllTasks();
+  loadAppData(); 
+  renderTabs();
+  renderAllCategorySections(); 
   updateAllProgress();
 
-  if (domElements.tabsContainer) {
-      domElements.tabsContainer.addEventListener('click', (e) => {
-        const targetButton = e.target.closest('.tab-button');
-        if (!targetButton) return;
-
-        const category = targetButton.id.split('-')[0]; 
-        activeTab = category;
-
-        Object.values(domElements.tabButtons).forEach(button => {
-          if(button) {
-            button.classList.remove('active');
-            button.setAttribute('aria-selected', 'false');
-          }
-        });
-        targetButton.classList.add('active');
-        targetButton.setAttribute('aria-selected', 'true');
-
-        Object.values(domElements.tabContents).forEach(content => {
-          if(content) content.classList.add('hidden');
-        });
-        const activeContent = domElements.tabContents[category];
-        if (activeContent) {
-          activeContent.classList.remove('hidden');
-          if (category !== 'dashboard') {
-            renderCategoryTasks(category); 
-          }
-        }
-        
-        if (activeAddTaskForm) {
-            hideTempAddTaskForm(activeAddTaskForm.category, activeAddTaskForm.position);
-        }
-      });
+  const dashboardTabButton = document.getElementById('dashboard-tab-button');
+  if (dashboardTabButton) {
+      dashboardTabButton.addEventListener('click', () => switchTab('dashboard'));
+      if (activeTabId === 'dashboard' || !currentCategories.find(c => c.id === activeTabId)) { 
+          switchTab('dashboard');
+      } else {
+          switchTab(activeTabId); 
+      }
   }
 
-  Object.keys(CATEGORY_DISPLAY_NAMES).forEach(category => {
-    if (domElements.editModeToggleButtons[category]) {
-        domElements.editModeToggleButtons[category].addEventListener('click', () => toggleCategoryEditMode(category));
-    }
-    if (domElements.undoCategoryButtons[category]) {
-        domElements.undoCategoryButtons[category].addEventListener('click', () => {
-            currentTasks.forEach(task => {
-                if (task.category === category && !lockedTaskIdsToday.includes(task.id)) {
-                    task.completed = false;
-                    saveTaskStatus(task);
-                }
-            });
-            renderCategoryTasks(category);
-            updateAllProgress();
-            updateSaveProgressButtonState();
 
-            if (activeTab === 'dashboard') {
-                const pointsElements = [domElements.todayPointsStat, domElements.currentWeekPointsStat];
-                pointsElements.forEach(el => {
-                    if (el) {
-                        el.classList.add('progress-value-resetting');
-                        setTimeout(() => el.classList.remove('progress-value-resetting'), 500);
-                    }
-                });
-            }
-        });
-    }
+  if (domElements.addCategoryButton) {
+      domElements.addCategoryButton.addEventListener('click', handleAddCategory);
+  }
 
-    if (domElements.addItemTriggerButtonsTop[category]) {
-        domElements.addItemTriggerButtonsTop[category].addEventListener('click', () => showTempAddTaskForm(category, 'top'));
-    }
-    if (domElements.newTempTaskSaveButtonsTop[category]) {
-        domElements.newTempTaskSaveButtonsTop[category].addEventListener('click', () => handleSaveTempTask(category, 'top'));
-    }
-    if (domElements.newTempTaskCancelButtonsTop[category]) {
-        domElements.newTempTaskCancelButtonsTop[category].addEventListener('click', () => hideTempAddTaskForm(category, 'top'));
-    }
-     if (domElements.newTempTaskInputsTop[category]) {
-        domElements.newTempTaskInputsTop[category].addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSaveTempTask(category, 'top');
-            }
-        });
-    }
-
-    if (domElements.addItemTriggerButtonsBottom[category]) {
-        domElements.addItemTriggerButtonsBottom[category].addEventListener('click', () => showTempAddTaskForm(category, 'bottom'));
-    }
-    if (domElements.newTempTaskSaveButtonsBottom[category]) {
-        domElements.newTempTaskSaveButtonsBottom[category].addEventListener('click', () => handleSaveTempTask(category, 'bottom'));
-    }
-    if (domElements.newTempTaskCancelButtonsBottom[category]) {
-        domElements.newTempTaskCancelButtonsBottom[category].addEventListener('click', () => hideTempAddTaskForm(category, 'bottom'));
-    }
-    if (domElements.newTempTaskInputsBottom[category]) {
-        domElements.newTempTaskInputsBottom[category].addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSaveTempTask(category, 'bottom');
-            }
-        });
-    }
-
-    const taskListElement = domElements.categoryTaskLists[category];
-    if (taskListElement) {
-        taskListElement.addEventListener('dragover', (e) => {
-            if (!editModes[category] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
-            e.preventDefault();
-            
-            taskListElement.querySelectorAll('.task-item').forEach(item => {
-                item.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
-            });
-
-            const afterElement = getDragAfterElement(taskListElement, e.clientY);
-            if (afterElement) {
-                afterElement.classList.add('drag-over-indicator-task'); 
-            } else {
-                const lastItem = taskListElement.querySelector('.task-item:last-child:not(.dragging)');
-                if (lastItem) {
-                    lastItem.classList.add('drag-over-indicator-task-bottom');
-                } else if (!taskListElement.querySelector('.task-item:not(.dragging)')) {
-                }
-            }
-            e.dataTransfer.dropEffect = 'move';
-        });
-        taskListElement.addEventListener('drop', (e) => {
-             if (!editModes[category] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
-            e.preventDefault();
-            const afterElement = getDragAfterElement(taskListElement, e.clientY);
-            if (afterElement) {
-                taskListElement.insertBefore(draggedTaskElement, afterElement);
-            } else {
-                taskListElement.appendChild(draggedTaskElement);
-            }
-        });
+  if (domElements.ctxRenameCategoryButton) {
+    domElements.ctxRenameCategoryButton.addEventListener('click', () => {
+        const categoryId = domElements.categoryTabContextMenu.dataset.categoryId;
+        if (categoryId) handleRenameCategory(categoryId);
+        hideCategoryContextMenu();
+    });
+  }
+  if (domElements.ctxDeleteCategoryButton) {
+    domElements.ctxDeleteCategoryButton.addEventListener('click', () => {
+        const categoryId = domElements.categoryTabContextMenu.dataset.categoryId;
+        if (categoryId) handleDeleteCategory(categoryId);
+        hideCategoryContextMenu();
+    });
+  }
+  // Close context menu on outside click
+  document.addEventListener('click', (event) => {
+    if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden')) {
+        if (!domElements.categoryTabContextMenu.contains(event.target) && 
+            (!currentContextMenuTargetTab || !currentContextMenuTargetTab.contains(event.target))) {
+            hideCategoryContextMenu();
+        }
     }
   });
+
+
+  Object.values(editModes).forEach(val => val = false); 
+
+  domElements.tabContentsContainer.addEventListener('dragover', (e) => {
+    const taskListElement = e.target.closest('.task-list');
+    if (!taskListElement) return;
+    const categoryId = taskListElement.dataset.categoryId;
+    if (!editModes[categoryId] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
+    
+    e.preventDefault();
+    taskListElement.querySelectorAll('.task-item').forEach(item => {
+        item.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
+    });
+    const afterElement = getDragAfterElement(taskListElement, e.clientY);
+    if (afterElement) {
+        afterElement.classList.add('drag-over-indicator-task'); 
+    } else {
+        const lastItem = taskListElement.querySelector('.task-item:last-child:not(.dragging)');
+        if (lastItem) lastItem.classList.add('drag-over-indicator-task-bottom');
+    }
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  domElements.tabContentsContainer.addEventListener('drop', (e) => {
+    const taskListElement = e.target.closest('.task-list');
+    if (!taskListElement) return;
+    const categoryId = taskListElement.dataset.categoryId;
+    if (!editModes[categoryId] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
+    
+    e.preventDefault();
+    const afterElement = getDragAfterElement(taskListElement, e.clientY);
+    if (afterElement) {
+        taskListElement.insertBefore(draggedTaskElement, afterElement);
+    } else {
+        taskListElement.appendChild(draggedTaskElement);
+    }
+  });
+
 
   if (domElements.saveNoteButton) {
       domElements.saveNoteButton.addEventListener('click', saveDailyNote);
@@ -1689,14 +2045,14 @@ function initializeApp() {
     });
   }
 
-  if (domElements.deleteTaskModalCloseButton) {
-    domElements.deleteTaskModalCloseButton.addEventListener('click', hideDeleteTaskConfirmation);
+  if (domElements.deleteConfirmationCloseButton) {
+    domElements.deleteConfirmationCloseButton.addEventListener('click', hideDeleteConfirmation);
   }
-  if (domElements.confirmDeleteTaskButton) {
-    domElements.confirmDeleteTaskButton.addEventListener('click', confirmDeleteTask);
+  if (domElements.confirmDeleteButton) {
+    domElements.confirmDeleteButton.addEventListener('click', confirmDeletion);
   }
-  if (domElements.cancelDeleteTaskButton) {
-    domElements.cancelDeleteTaskButton.addEventListener('click', hideDeleteTaskConfirmation);
+  if (domElements.cancelDeleteButton) {
+    domElements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
   }
 
   if (domElements.expandTasksButton) {
@@ -1715,26 +2071,25 @@ function initializeApp() {
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-        if (!domElements.historyModal?.classList.contains('hidden')) {
+        if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden')) {
+            hideCategoryContextMenu();
+        } else if (!domElements.historyModal?.classList.contains('hidden')) {
             closeHistoryModal();
         } else if (isMonthYearPickerOpen) {
             closeMonthYearPicker();
         } else if (!domElements.saveProgressModal?.classList.contains('hidden')) {
             if(domElements.saveProgressModal) domElements.saveProgressModal.classList.add('hidden');
-        } else if (!domElements.deleteTaskConfirmationModal?.classList.contains('hidden')) {
-            hideDeleteTaskConfirmation();
+        } else if (!domElements.deleteConfirmationModal?.classList.contains('hidden')) {
+            hideDeleteConfirmation();
         } else if (!domElements.fullscreenContentModal?.classList.contains('hidden')) {
             closeFullscreenContentModal();
         }
         else if (activeAddTaskForm) {
-            hideTempAddTaskForm(activeAddTaskForm.category, activeAddTaskForm.position);
+            hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.position);
         }
     }
   });
 
-  if (domElements.tabButtons.dashboard) {
-      domElements.tabButtons.dashboard.click(); 
-  }
 
   updateSaveProgressButtonState();
 
