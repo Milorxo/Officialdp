@@ -50,6 +50,7 @@ let lockedTaskIdsToday = []; // This will be empty at the start of each day due 
 let draggedTaskElement = null;
 let itemToDelete = null; // { type: 'task' | 'category', id: string, nameForConfirmation?: string }
 let editModes = {}; // { categoryId: boolean }
+let folderExpandedState = {}; // { categoryId: boolean } // This now controls visibility of the main task list
 let activeAddTaskForm = null; // { categoryId, position }
 let calendarDisplayDate = new Date();
 let isMonthYearPickerOpen = false;
@@ -94,8 +95,6 @@ const domElements = {
   historyModalDate: null,
   historyModalPointsValue: null,        
   historyModalPointsTotal: null,       
-  // historyPointsProgressFill: null, // Removed: No longer a separate bar for points
-  // historyModalPercentageValue: null, // Removed: Percentage is inside the bar
   historyPercentageProgressFill: null, 
   historyTasksList: null,
   expandTasksButton: null,
@@ -247,6 +246,9 @@ function seedInitialDataIfNeeded() {
         if (editModes[cat.id] === undefined) {
             editModes[cat.id] = false;
         }
+        if (folderExpandedState[cat.id] === undefined) {
+            folderExpandedState[cat.id] = false; 
+        }
     });
 }
 
@@ -286,6 +288,9 @@ function initializeTasksForNewDay() {
     });
     lockedTaskIdsToday = []; // Ensure locked tasks are cleared for the new day
     saveLockedTasksForToday(); // Persist empty locked tasks
+     currentCategories.forEach(cat => { // Reset folder states for the new day
+        folderExpandedState[cat.id] = true; // Default to expanded for new UI
+    });
 }
 
 
@@ -618,7 +623,6 @@ function handleSaveTempTask(categoryId, position) {
              if (firstIndexOfCategory !== -1) {
                 currentTasks.splice(firstIndexOfCategory, 0, newTaskForToday);
              } else { // Category might be empty
-                // Find where this category's tasks *should* go based on category order
                 const categoryOrder = currentCategories.find(c => c.id === categoryId).order;
                 let insertAtIndex = currentTasks.length;
                 for(let i=0; i < currentTasks.length; i++) {
@@ -640,7 +644,7 @@ function handleSaveTempTask(categoryId, position) {
             }
             if (lastIndexOfCategory !== -1) {
                  currentTasks.splice(lastIndexOfCategory + 1, 0, newTaskForToday);
-            } else { // Category was empty, same as 'top' logic for finding insertion point
+            } else { 
                 const categoryOrder = currentCategories.find(c => c.id === categoryId).order;
                 let insertAtIndex = currentTasks.length;
                 for(let i=0; i < currentTasks.length; i++) {
@@ -654,6 +658,10 @@ function handleSaveTempTask(categoryId, position) {
             }
         }
         
+        if (tasksByCatId[categoryId].length === 1 && !folderExpandedState[categoryId]) { 
+            folderExpandedState[categoryId] = true; // Expand if it was the first task added
+        }
+
         renderCategoryTasks(categoryId);
         updateAllProgress();
         hideTempAddTaskForm(categoryId, position);
@@ -667,7 +675,7 @@ function getTaskById(taskId) {
 }
 
 function startTaskEdit(taskItemElement, task) {
-    if (task.locked || taskItemElement.classList.contains('editing')) return; // 'locked' concept is mostly removed for daily use
+    if (task.locked || taskItemElement.classList.contains('editing')) return;
 
     taskItemElement.classList.add('editing');
     
@@ -746,7 +754,6 @@ function renderTaskItem(task) {
   item.dataset.taskId = task.id;
   item.setAttribute('role', 'listitem');
   item.setAttribute('tabindex', '0'); 
-  // Aria-label updated dynamically on click/state change
 
   const textSpan = document.createElement('span');
   textSpan.className = 'task-text';
@@ -755,7 +762,6 @@ function renderTaskItem(task) {
 
   const updateAriaLabel = () => {
     const isCompleted = item.classList.contains('completed');
-    // const isLocked = item.classList.contains('locked'); // 'locked' class is less relevant now for daily interaction
     item.setAttribute('aria-label', `${task.text}, ${isCompleted ? 'completed' : 'not completed'}`);
   };
 
@@ -763,9 +769,6 @@ function renderTaskItem(task) {
   if (task.completed) {
     item.classList.add('completed');
   }
-  // item.classList.toggle('locked', lockedTaskIdsToday.includes(task.id)); // 'locked' state is transient now
-  // if (lockedTaskIdsToday.includes(task.id)) item.setAttribute('aria-disabled', 'true');
-
   updateAriaLabel();
 
 
@@ -783,7 +786,6 @@ function renderTaskItem(task) {
   }
 
   item.addEventListener('click', (e) => {
-    // if (item.classList.contains('locked') || item.classList.contains('editing')) return;
     if (item.classList.contains('editing')) return;
     
     if (editModes[task.categoryId] && e.target === textSpan) {
@@ -792,7 +794,7 @@ function renderTaskItem(task) {
     }
     if (!editModes[task.categoryId]) {
         task.completed = !task.completed;
-        saveTaskStatus(task); // Saves with current active day
+        saveTaskStatus(task); 
         item.classList.toggle('completed');
         updateAriaLabel();
         item.classList.remove('animate-task-complete', 'animate-task-uncomplete');
@@ -803,7 +805,6 @@ function renderTaskItem(task) {
   });
 
    item.addEventListener('keydown', (e) => {
-        // if (item.classList.contains('locked') || item.classList.contains('editing')) return;
         if (item.classList.contains('editing')) return;
 
         if (e.key === 'Enter' || e.key === ' ') {
@@ -816,10 +817,10 @@ function renderTaskItem(task) {
         }
     });
 
-    if (editModes[task.categoryId] && !item.classList.contains('editing')) { // No 'locked' check needed here for draggable
+    if (editModes[task.categoryId] && !item.classList.contains('editing')) { 
         item.draggable = true;
         item.addEventListener('dragstart', (e) => {
-            if (!editModes[task.categoryId] || item.classList.contains('editing')) { // No 'locked' check
+            if (!editModes[task.categoryId] || item.classList.contains('editing')) {
                 e.preventDefault();
                 return;
             }
@@ -827,38 +828,40 @@ function renderTaskItem(task) {
             setTimeout(() => item.classList.add('dragging'), 0);
             e.dataTransfer.effectAllowed = 'move';
         });
-        item.addEventListener('dragend', () => {
+        item.addEventListener('dragend', () => { 
+            const tasksActualListElement = item.closest('.category-tasks-list');
+            if (!tasksActualListElement) return;
+
             item.classList.remove('dragging');
             draggedTaskElement = null;
             document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
                 el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
             });
             
-            const taskListElement = item.closest('.task-list');
-            if (taskListElement) {
-                const categoryId = taskListElement.dataset.categoryId;
-                const newTaskOrderIds = Array.from(taskListElement.querySelectorAll('.task-item')).map(el => el.dataset.taskId);
-                
-                let tasksByCatId = loadUserTasksDefinitions();
-                tasksByCatId[categoryId] = newTaskOrderIds.map(id => tasksByCatId[categoryId].find(t => t.id === id)).filter(Boolean);
-                saveUserTasksDefinitions(tasksByCatId);
+            const categoryId = item.closest('.category-section')?.id.replace('category-section-', '');
+            if (!categoryId) return;
 
-                // Reorder currentTasks as well to match the new definition order
-                const tasksForThisCategory = currentTasks.filter(t => t.categoryId === categoryId);
-                const otherTasks = currentTasks.filter(t => t.categoryId !== categoryId);
-                const reorderedCategoryTasks = newTaskOrderIds
-                    .map(id => tasksForThisCategory.find(t => t.id === id))
-                    .filter(Boolean);
+            const newTaskOrderIds = Array.from(tasksActualListElement.querySelectorAll('.task-item')).map(el => el.dataset.taskId);
+            
+            let tasksByCatId = loadUserTasksDefinitions();
+            tasksByCatId[categoryId] = newTaskOrderIds.map(id => tasksByCatId[categoryId].find(t => t.id === id)).filter(Boolean);
+            saveUserTasksDefinitions(tasksByCatId);
+
+            // Reorder currentTasks as well to match the new definition order
+            const tasksForThisCategory = currentTasks.filter(t => t.categoryId === categoryId);
+            const otherTasks = currentTasks.filter(t => t.categoryId !== categoryId);
+            const reorderedCategoryTasks = newTaskOrderIds
+                .map(id => tasksForThisCategory.find(t => t.id === id))
+                .filter(Boolean);
+            
+            currentTasks = [...otherTasks, ...reorderedCategoryTasks].sort((a,b) => {
+                const catAOrder = currentCategories.find(c => c.id === a.categoryId).order;
+                const catBOrder = currentCategories.find(c => c.id === b.categoryId).order;
+                if(catAOrder !== catBOrder) return catAOrder - catBOrder;
                 
-                currentTasks = [...otherTasks, ...reorderedCategoryTasks].sort((a,b) => {
-                    const catAOrder = currentCategories.find(c => c.id === a.categoryId).order;
-                    const catBOrder = currentCategories.find(c => c.id === b.categoryId).order;
-                    if(catAOrder !== catBOrder) return catAOrder - catBOrder;
-                    
-                    const tasksInCatAOrder = (tasksByCatId[a.categoryId] || []).map(t => t.id);
-                    return tasksInCatAOrder.indexOf(a.id) - tasksInCatAOrder.indexOf(b.id);
-                });
-            }
+                const tasksInCatAOrder = (tasksByCatId[a.categoryId] || []).map(t => t.id);
+                return tasksInCatAOrder.indexOf(a.id) - tasksInCatAOrder.indexOf(b.id);
+            });
         });
     } else {
         item.draggable = false;
@@ -890,12 +893,9 @@ function confirmDeletion() {
             tasksByCatId[task.categoryId] = tasksByCatId[task.categoryId].filter(t => t.id !== itemToDelete.id);
             saveUserTasksDefinitions(tasksByCatId);
         }
-        // Remove task status for potentially multiple days if it existed
-        // This is complex, for now, just remove for current active day.
-        // A more robust cleanup would iterate known history dates or be part of monthly cleanup.
         localStorage.removeItem(getTaskStorageKey(itemToDelete.id, currentActiveDate));
         
-        lockedTaskIdsToday = lockedTaskIdsToday.filter(id => id !== itemToDelete.id); // Should be empty anyway now
+        lockedTaskIdsToday = lockedTaskIdsToday.filter(id => id !== itemToDelete.id);
         saveLockedTasksForToday();
         renderCategoryTasks(task.categoryId);
 
@@ -941,27 +941,17 @@ function hideDeleteConfirmation() {
 }
 
 function renderCategoryTasks(categoryId) {
-  const taskListElement = document.querySelector(`#category-section-${categoryId} .task-list`);
-  if (!taskListElement) return;
+  const categorySection = document.getElementById(`category-section-${categoryId}`);
+  if (!categorySection) return;
 
-  taskListElement.innerHTML = '';
-  taskListElement.dataset.categoryId = categoryId; 
+  const taskListContainer = categorySection.querySelector('ul.task-list'); // Main container from template
+  if (!taskListContainer) {
+      console.error("Task list container not found for category:", categoryId);
+      return;
+  }
+  taskListContainer.innerHTML = ''; // Clear previous content
 
   const categoryTasksFromCurrent = currentTasks.filter(task => task.categoryId === categoryId);
-  
-  // Get the defined order from user task definitions
-  const userDefinedOrder = (loadUserTasksDefinitions()[categoryId] || []).map(t => t.id);
-
-  // Sort the tasks for display based on the defined order
-  categoryTasksFromCurrent.sort((a, b) => {
-    const indexA = userDefinedOrder.indexOf(a.id);
-    const indexB = userDefinedOrder.indexOf(b.id);
-    if (indexA === -1 && indexB === -1) return 0; 
-    if (indexA === -1) return 1; 
-    if (indexB === -1) return -1; 
-    return indexA - indexB;
-  });
-
 
   if (categoryTasksFromCurrent.length === 0) {
     const emptyMessage = document.createElement('p');
@@ -970,14 +960,94 @@ function renderCategoryTasks(categoryId) {
     if (editModes[categoryId]) {
         emptyMessage.classList.add('edit-mode-empty');
     }
-    taskListElement.appendChild(emptyMessage);
-  } else {
-    categoryTasksFromCurrent.forEach(task => {
-      const taskItem = renderTaskItem(task);
-      taskListElement.appendChild(taskItem);
-    });
+    taskListContainer.appendChild(emptyMessage);
+    folderExpandedState[categoryId] = false; // No tasks, so "folder" is conceptually closed
+    return;
   }
+
+  // 1. Create the new "Square Task Folder Box UI"
+  const folderDisplayElement = document.createElement('div');
+  folderDisplayElement.className = 'task-folder-display';
+  
+  const boxAndLabelWrapper = document.createElement('div');
+  boxAndLabelWrapper.className = 'task-folder-box-wrapper';
+  boxAndLabelWrapper.setAttribute('role', 'button');
+  boxAndLabelWrapper.setAttribute('tabindex', '0');
+  boxAndLabelWrapper.setAttribute('aria-label', 'Toggle task list visibility');
+
+  const squareBox = document.createElement('div');
+  squareBox.className = 'task-folder-square-box';
+  
+  const taskSymbolSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  taskSymbolSvg.setAttribute('class', 'task-folder-symbol');
+  taskSymbolSvg.setAttribute('viewBox', '0 0 24 24');
+  taskSymbolSvg.innerHTML = `<path d="M19,3H14.82C14.4,1.84 13.3,1 12,1S9.6,1.84 9.18,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M12,3A1,1 0 0,1 13,4A1,1 0 0,1 12,5A1,1 0 0,1 11,4A1,1 0 0,1 12,3M7,7H17V9H7V7M7,11H17V13H7V11M7,15H14V17H7V15Z" />`;
+  squareBox.appendChild(taskSymbolSvg);
+  boxAndLabelWrapper.appendChild(squareBox);
+
+  const taskLabel = document.createElement('span');
+  taskLabel.className = 'task-folder-label-text';
+  taskLabel.textContent = 'Task';
+  boxAndLabelWrapper.appendChild(taskLabel);
+  folderDisplayElement.appendChild(boxAndLabelWrapper);
+
+  const addItemPlusIcon = document.createElement('div');
+  addItemPlusIcon.className = 'add-new-folder-plus-icon';
+  addItemPlusIcon.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>`;
+  addItemPlusIcon.title = "Add new task group (placeholder)";
+  addItemPlusIcon.setAttribute('role', 'button');
+  addItemPlusIcon.setAttribute('aria-label', 'Add new task group (placeholder)');
+  // addItemPlusIcon.onclick = () => { /* Future: Add new folder/box logic */ alert('Add new folder feature coming soon!'); };
+  folderDisplayElement.appendChild(addItemPlusIcon);
+  taskListContainer.appendChild(folderDisplayElement);
+
+
+  // 2. Create the actual list of tasks (ul that will contain li.task-item)
+  const tasksActualListElement = document.createElement('ul');
+  tasksActualListElement.className = 'category-tasks-list'; // For the LIs
+  tasksActualListElement.setAttribute('aria-live', 'polite');
+  tasksActualListElement.dataset.categoryId = categoryId; // For D&D
+
+  const userDefinedOrder = (loadUserTasksDefinitions()[categoryId] || []).map(t => t.id);
+  categoryTasksFromCurrent.sort((a, b) => {
+    const indexA = userDefinedOrder.indexOf(a.id);
+    const indexB = userDefinedOrder.indexOf(b.id);
+    if (indexA === -1 && indexB === -1) return 0;
+    if (indexA === -1) return 1;
+    if (indexB === -1) return -1;
+    return indexA - indexB;
+  });
+
+  categoryTasksFromCurrent.forEach(task => {
+    const taskItem = renderTaskItem(task);
+    tasksActualListElement.appendChild(taskItem);
+  });
+  taskListContainer.appendChild(tasksActualListElement);
+
+  // 3. Set initial state and event listener for Toggling
+  const updateFolderVisualState = () => {
+    const isExpanded = folderExpandedState[categoryId];
+    boxAndLabelWrapper.setAttribute('aria-expanded', isExpanded.toString());
+    tasksActualListElement.classList.toggle('hidden', !isExpanded);
+    // Optionally, change squareBox style when expanded
+    squareBox.classList.toggle('expanded', isExpanded); 
+  };
+
+  updateFolderVisualState();
+
+  boxAndLabelWrapper.addEventListener('click', () => {
+    folderExpandedState[categoryId] = !folderExpandedState[categoryId];
+    updateFolderVisualState();
+  });
+  boxAndLabelWrapper.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      folderExpandedState[categoryId] = !folderExpandedState[categoryId];
+      updateFolderVisualState();
+    }
+  });
 }
+
 
 function renderAllCategorySections() {
     if (!domElements.tabContentsContainer || !domElements.categorySectionTemplate) return;
@@ -1009,7 +1079,7 @@ function renderAllCategorySections() {
 
         sectionElement.querySelector('.undo-category-button').onclick = () => {
             currentTasks.forEach(task => {
-                if (task.categoryId === category.id) { // No locked check needed
+                if (task.categoryId === category.id) { 
                     task.completed = false;
                     saveTaskStatus(task);
                 }
@@ -1160,9 +1230,8 @@ function switchTab(categoryIdToActivate) {
 }
 
 
-function calculateProgress() { // Calculates for currentTasks (assumed to be for the active day)
+function calculateProgress() { 
   let completedCount = 0;
-  // Tasks are never "locked" in the middle of the day with auto-reset
   currentTasks.forEach(task => { 
     if (task.completed) { 
       completedCount++;
@@ -1334,38 +1403,36 @@ function renderCalendar() {
     let percentageCompleted = 0;
     let hasHistoryData = false;
     
-    // Default fill color (very subtle or transparent for future/empty days initially)
-    fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)'; // Very transparent cyan
+    fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)'; 
 
     if (dateString === todayDateString) { 
         cell.classList.add('current-day');
-        const progress = calculateProgress(); // Live progress for today
+        const progress = calculateProgress(); 
         percentageCompleted = progress.percentage;
-        fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; // Vibrant cyan for current day
+        fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; 
         if (percentageCompleted > 40) { 
             cell.classList.add('high-fill'); 
         }
         const noteToday = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString);
         hasHistoryData = progress.completedCount > 0 || !!noteToday;
 
-    } else { // For past or future days
+    } else { 
         const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
         const historyDataString = localStorage.getItem(historyKey);
         if (historyDataString) {
             try {
                 const historyEntry = JSON.parse(historyDataString);
                 percentageCompleted = historyEntry.percentageCompleted || 0;
-                // Only apply specific past day fill if there's history and it's a past day
                 if (cellDate < today) {
-                   fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)'; // Muted cyan for past days with history
+                   fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)'; 
                 }
                 hasHistoryData = (historyEntry.completedTasks && Object.values(historyEntry.completedTasks).some(arr => arr.length > 0)) || !!historyEntry.userNote;
             } catch(e) { 
                 console.warn("Error parsing history for calendar cell:", e); 
-                 if (cellDate < today) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; // Default to less prominent on error for past
+                 if (cellDate < today) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; 
             }
         } else {
-             if (cellDate < today) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; // Default for past day with no specific history
+             if (cellDate < today) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; 
         }
         
         if (cellDate < today) {
@@ -1546,7 +1613,6 @@ function saveHistoricalNote() {
     if (existingHistoryStr) {
         historyEntry = JSON.parse(existingHistoryStr);
     } else { 
-        // If saving note for today and no history entry exists yet, create one
         const progress = isToday ? calculateProgress() : { pointsEarned: 0, percentageCompleted: 0, totalTasks: 0, completedTasks: {} };
         const completedTasksForEntry = isToday ? {} : {};
         if (isToday) {
@@ -1564,7 +1630,7 @@ function saveHistoricalNote() {
             completedTasks: isToday ? completedTasksForEntry : {}, 
             userNote: "",
             pointsEarned: progress.pointsEarned,
-            percentageCompleted: progress.percentageCompleted, // Corrected from percentageCompleted
+            percentageCompleted: progress.percentageCompleted, 
             totalTasksOnDate: progress.totalTasks,
             dailyTargetPoints: DAILY_TARGET_POINTS 
         };
@@ -1573,7 +1639,6 @@ function saveHistoricalNote() {
     historyEntry.userNote = noteContent;
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
 
-    // If saving for today, also update the main daily note input and its storage
     if (isToday && domElements.dailyNoteInput) {
         domElements.dailyNoteInput.value = noteContent;
         localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent);
@@ -1589,7 +1654,7 @@ function saveHistoricalNote() {
     
     domElements.expandReflectionButton.classList.toggle('hidden', !noteContent);
 
-    renderCalendar(); // Update calendar fill/indicators
+    renderCalendar(); 
 }
 
 function clearHistoricalNote() {
@@ -1674,10 +1739,8 @@ function updateCategoryTabIndicators() {
         tabButton.classList.remove('category-complete-indicator');
 
         const categoryTasks = currentTasks.filter(task => task.categoryId === category.id);
-        // No 'locked' check for indicators, reflects all tasks for the day
         
         if (categoryTasks.length === 0) { 
-            // No indicator for empty category, or could be a checkmark if preferred
             return;
         }
         
@@ -1705,7 +1768,7 @@ function updateAllProgress() {
   renderCalendar(); 
 }
 
-function saveLockedTasksForToday() { // Saves the current state of lockedTaskIdsToday
+function saveLockedTasksForToday() { 
     const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
     localStorage.setItem(STORAGE_KEY_LOCKED_TASKS_PREFIX + currentActiveDate, JSON.stringify(lockedTaskIdsToday));
 }
@@ -1720,7 +1783,7 @@ function openFullscreenContentModal(type, date) {
     const isToday = date === getTodayDateString();
 
 
-    if (isToday) { // Build from live data for today
+    if (isToday) { 
         const progress = calculateProgress();
         const completedTasksToday = {};
         currentCategories.forEach(cat => completedTasksToday[cat.id] = []);
@@ -1825,6 +1888,9 @@ function handleAddCategory() {
 
         if (editModes[newCategoryId] === undefined) {
             editModes[newCategoryId] = false; 
+        }
+         if (folderExpandedState[newCategoryId] === undefined) {
+            folderExpandedState[newCategoryId] = true; // Default to expanded for new UI
         }
         
         renderTabs();
@@ -1962,8 +2028,6 @@ function initializeApp() {
   domElements.historyModalDate = document.getElementById('history-modal-date');
   domElements.historyModalPointsValue = document.getElementById('history-modal-points-value');
   domElements.historyModalPointsTotal = document.getElementById('history-modal-points-total');
-  // domElements.historyPointsProgressFill = document.getElementById('history-points-progress-fill'); // Removed
-  // domElements.historyModalPercentageValue = document.getElementById('history-modal-percentage-value'); // Removed
   domElements.historyPercentageProgressFill = document.getElementById('history-percentage-progress-fill');
   domElements.historyTasksList = document.getElementById('history-tasks-list');
   domElements.expandTasksButton = document.getElementById('expand-tasks-button');
@@ -2036,39 +2100,47 @@ function initializeApp() {
 
 
   Object.values(editModes).forEach(val => val = false); 
+  currentCategories.forEach(cat => { 
+    if (folderExpandedState[cat.id] === undefined) {
+        folderExpandedState[cat.id] = true; // Default to expanded for new UI
+    }
+  });
+
 
   domElements.tabContentsContainer.addEventListener('dragover', (e) => {
-    const taskListElement = e.target.closest('.task-list');
-    if (!taskListElement) return;
-    const categoryId = taskListElement.dataset.categoryId;
-    if (!editModes[categoryId] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
+    const tasksActualListElement = e.target.closest('.category-tasks-list');
+    if (!tasksActualListElement) return;
+    
+    const categoryId = tasksActualListElement.dataset.categoryId;
+    if (!categoryId || !editModes[categoryId] || !draggedTaskElement || draggedTaskElement.closest('.category-tasks-list') !== tasksActualListElement) return;
     
     e.preventDefault();
-    taskListElement.querySelectorAll('.task-item').forEach(item => {
+    tasksActualListElement.querySelectorAll('.task-item').forEach(item => {
         item.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
     });
-    const afterElement = getDragAfterElement(taskListElement, e.clientY);
+    const afterElement = getDragAfterElement(tasksActualListElement, e.clientY);
     if (afterElement) {
         afterElement.classList.add('drag-over-indicator-task'); 
     } else {
-        const lastItem = taskListElement.querySelector('.task-item:last-child:not(.dragging)');
+        const lastItem = tasksActualListElement.querySelector('.task-item:last-child:not(.dragging)');
         if (lastItem) lastItem.classList.add('drag-over-indicator-task-bottom');
     }
     e.dataTransfer.dropEffect = 'move';
   });
 
   domElements.tabContentsContainer.addEventListener('drop', (e) => {
-    const taskListElement = e.target.closest('.task-list');
-    if (!taskListElement) return;
-    const categoryId = taskListElement.dataset.categoryId;
-    if (!editModes[categoryId] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
-    
+    const tasksActualListElement = e.target.closest('.category-tasks-list');
+    if (!tasksActualListElement) return;
+
+    const categoryId = tasksActualListElement.dataset.categoryId;
+    if (!categoryId || !editModes[categoryId] || !draggedTaskElement || draggedTaskElement.closest('.category-tasks-list') !== tasksActualListElement) return;
+        
     e.preventDefault();
-    const afterElement = getDragAfterElement(taskListElement, e.clientY);
+    const afterElement = getDragAfterElement(tasksActualListElement, e.clientY);
     if (afterElement) {
-        taskListElement.insertBefore(draggedTaskElement, afterElement);
+        tasksActualListElement.insertBefore(draggedTaskElement, afterElement);
     } else {
-        taskListElement.appendChild(draggedTaskElement);
+        tasksActualListElement.appendChild(draggedTaskElement);
     }
   });
 
