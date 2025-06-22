@@ -1,10 +1,9 @@
-
-const CACHE_NAME = 'daily-productivity-cache-v5'; // Incremented version
+const CACHE_NAME = 'daily-productivity-cache-v4'; // Incremented version
 const CORE_ASSETS = [ // Assets that use CacheFirst strategy
   '/',
   '/index.html',
   '/dp.png',
-  '/dp_192.png', // Added dp_192.png
+  '/dp_192.png',
   '/dp_512.png',
   '/manifest.json',
   'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap',
@@ -47,79 +46,84 @@ self.addEventListener('fetch', event => {
   const requestUrl = new URL(event.request.url);
 
   // Network First, then Cache for index.js and index.css
-  if (requestUrl.pathname.endsWith('index.js') || requestUrl.pathname.endsWith('index.css')) {
+  if (requestUrl.pathname === '/index.js' || requestUrl.pathname === '/index.css') {
     event.respondWith(
-      caches.open(CACHE_NAME).then(cache => {
-        return fetch(event.request).then(response => {
-          if (response.ok) { // Check if the response is valid
-            cache.put(event.request, response.clone());
+      fetch(event.request)
+        .then(networkResponse => {
+          if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
+            // Network failed or returned an error, try cache
+            console.warn(`Network fetch for ${requestUrl.pathname} failed, trying cache.`);
+            return caches.match(event.request).then(cachedResponse => {
+                return cachedResponse || networkResponse; // Return cached or original network error
+            });
           }
-          return response;
-        }).catch(() => {
-          return cache.match(event.request).then(response => {
-            return response || new Response("Network error, and not found in cache.", { status: 404, statusText: "Not Found" });
+          // Network fetch successful, cache it and return
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
           });
-        });
-      })
+          return networkResponse;
+        })
+        .catch(() => {
+          // Truly offline or network error, try to serve from cache
+          console.warn(`Network completely unavailable for ${requestUrl.pathname}, serving from cache if possible.`);
+          return caches.match(event.request).then(cachedResponse => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // If not in cache and network fails, the browser will handle the error.
+            // Optionally, return a specific offline response for these critical files if needed.
+            console.error(`${requestUrl.pathname} not found in cache and network failed.`);
+            // For a critical file like index.js, if it's not in cache and network fails,
+            // this could lead to the app not loading. Ensure it's cached during install
+            // if offline fallback for it is absolutely critical after first load.
+            // However, NetworkFirst implies we want the freshest.
+            return new Response(`${requestUrl.pathname} not available`, { status: 404, statusText: 'Not Found' });
+          });
+        })
     );
     return;
   }
 
-  // Cache First for core assets
-  if (CORE_ASSETS.some(assetPath => requestUrl.pathname.endsWith(assetPath) || requestUrl.href === assetPath || (requestUrl.origin === 'https://fonts.gstatic.com' && CORE_ASSETS.some(coreAsset => coreAsset.includes(requestUrl.pathname))) )) {
-    event.respondWith(
-      caches.open(CACHE_NAME).then(cache => {
-        return cache.match(event.request).then(response => {
-          if (response) {
-            return response;
-          }
-          return fetch(event.request).then(networkResponse => {
-            if (networkResponse.ok) { // Check if the response is valid
-               cache.put(event.request, networkResponse.clone());
+  // Cache First, then Network for other assets (core assets)
+  event.respondWith(
+    caches.match(event.request)
+      .then(cachedResponse => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then(
+          networkResponse => {
+            if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'basic' && networkResponse.type !== 'cors')) {
+              return networkResponse;
             }
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME)
+              .then(cache => {
+                cache.put(event.request, responseToCache);
+              });
             return networkResponse;
-          }).catch(() => {
-             return new Response("Asset not found in cache and network error.", { status: 404, statusText: "Not Found" });
-          });
+          }
+        ).catch(error => {
+          console.error('Fetch failed for a non-critical asset; returning offline page instead.', error);
+          // Optionally, return a custom offline page or a generic fallback for other assets.
         });
       })
-    );
-    return;
-  }
-  
-  // Default: try network, then cache for any other GET requests not explicitly handled.
-  // This is a general fallback.
-  event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return fetch(event.request).then(response => {
-        if (response.ok) {
-           cache.put(event.request, response.clone());
-        }
-        return response;
-      }).catch(() => {
-        return cache.match(event.request).then(response => {
-          return response || new Response("Resource not available offline.", { status: 404, statusText: "Not Found" });
-        });
-      });
-    })
   );
 });
 
 self.addEventListener('activate', event => {
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.filter(cacheName => {
-          // Delete old caches except the current one
-          return cacheName.startsWith('daily-productivity-cache-') && cacheName !== CACHE_NAME;
-        }).map(cacheName => {
-          console.log('Deleting old cache:', cacheName);
-          return caches.delete(cacheName);
+        cacheNames.map(cacheName => {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
-    }).then(() => {
-      // Claim clients to ensure the new service worker controls the page immediately
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
