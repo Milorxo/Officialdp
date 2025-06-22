@@ -1,5 +1,4 @@
 
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -7,79 +6,93 @@
 
 // Default categories and tasks if nothing in localStorage
 const DEFAULT_CATEGORIES_CONFIG = [
-  { id: 'routine', name: 'Routine', order: 0, deletable: false, tasks: [
-    "Wake up at 5:30 AM", "Pray", "Shower", "Read Daily Text", "Clean bed",
-    "Prepare solar", "Put back solar", "Take 5-min break every 25 mins",
-    "Pray again", "Erase temptation", "Read 1 Bible chapter", "Sleep at 9:10–9:30 PM"
+  { id: 'routine', name: 'Routine', order: 0, deletable: false, folders: [
+      { id: 'default_folder_routine', name: 'Tasks', type: 'task', order: 0, tasks: [
+        "Wake up at 5:30 AM", "Pray", "Shower", "Read Daily Text", "Clean bed",
+        "Prepare solar", "Put back solar", "Take 5-min break every 25 mins",
+        "Pray again", "Erase temptation", "Read 1 Bible chapter", "Sleep at 9:10–9:30 PM"
+      ]}
   ]},
-  { id: 'health', name: 'Health', order: 1, deletable: false, tasks: [
-    "Ice facing", "Run 30 mins", "100 jumping jacks", "Stretch 5 mins",
-    "100 push-ups", "20 sit-ups", "Dumbbell: 10 reps × 2 sets",
-    "Sunlight: 15–20 mins", "Drink 4.5L water", "Self-reprogram",
-    "Shower consistently", "Social media < 1 hour"
+  { id: 'health', name: 'Health', order: 1, deletable: false, folders: [
+      { id: 'default_folder_health', name: 'Tasks', type: 'task', order: 0, tasks: [
+        "Ice facing", "Run 30 mins", "100 jumping jacks", "Stretch 5 mins",
+        "100 push-ups", "20 sit-ups", "Dumbbell: 10 reps × 2 sets",
+        "Sunlight: 15–20 mins", "Drink 4.5L water", "Self-reprogram",
+        "Shower consistently", "Social media < 1 hour"
+      ]}
   ]},
-  { id: 'god', name: 'God', order: 2, deletable: false, tasks: [
-    "Self-Bible Study", "Thursday congregation", "Sunday congregation",
-    "Be the person God expects"
+  { id: 'god', name: 'God', order: 2, deletable: false, folders: [
+      { id: 'default_folder_god', name: 'Tasks', type: 'task', order: 0, tasks: [
+        "Self-Bible Study", "Thursday congregation", "Sunday congregation",
+        "Be the person God expects"
+      ]}
   ]},
-  { id: 'personal', name: 'Personal', order: 3, deletable: false, tasks: ["Content creation"] },
+  { id: 'personal', name: 'Personal', order: 3, deletable: false, folders: [
+      { id: 'default_folder_personal', name: 'Tasks', type: 'task', order: 0, tasks: ["Content creation"] }
+  ]},
 ];
 
 
 const DAILY_TARGET_POINTS = 2700;
 const TARGET_POINTS_FOR_WEEKLY_VIEW = 20000;
 
-// Old keys (for migration)
-const OLD_STORAGE_KEY_TASK_PREFIX = 'lifeTrackerTask_';
-const OLD_USER_DEFINED_TASKS_KEY = 'lifeTrackerUserDefinedTasks_v2'; 
-
-// New and existing keys
+const STORAGE_KEY_TASK_COMPLETION_PREFIX = 'lifeTrackerTaskCompletion_'; // For individual task completion on a specific date
 const STORAGE_KEY_LAST_VISIT_DATE = 'lifeTrackerLastVisitDate';
-const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_'; // For main daily reflection
+const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_';
 const STORAGE_KEY_DAILY_HISTORY_PREFIX = 'lifeTrackerHistory_';
-const STORAGE_KEY_LAST_MONTH_PROCESSED = 'lifeTrackerLastMonthProcessed';
-const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate'; 
-const USER_CATEGORIES_KEY = 'lifeTrackerUserCategories_v2'; // Stays same for category definitions
-const APP_FOLDERS_KEY = 'lifeTrackerAppFolders_v1'; // New key for folder structures and their task definitions/note content
-const TASK_STATE_STORAGE_KEY_PREFIX = 'lifeTrackerTaskState_'; // For daily completion status: taskState_{date}_{folderId}_{taskId}
+const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate';
+const STORAGE_KEY_LAST_MONTH_PROCESSED = 'lifeTrackerLastMonthProcessed'; // For cleanup
+
+const USER_CATEGORIES_KEY = 'lifeTrackerUserCategories_v2';
+const USER_FOLDERS_KEY = 'lifeTrackerUserFolders_v2'; // Incremented version for new folder structure with type and content
 
 
-let currentCategories = []; 
-let foldersByCategoryId = {}; // Main data structure for folders and their content definitions
+let currentCategories = [];
+let userFoldersByCategoryId = {};
+// folderObj: { id, name, type: 'task' | 'notes', order, tasks?: [taskDefObj, ...], content?: [noteItemObj, ...] }
+// taskDefObj: { id, text }
+// noteItemObj: { id, type: 'text'|'link'|'image', value: string | {url, text} | {dataUrl, alt} }
 
-let activeTabId = 'dashboard'; 
-let currentModalDate = null; 
-let draggedTaskElement = null; // For tasks within a folder
-let itemToDelete = null; // { type: 'task' | 'folder' | 'category', id: string, nameForConfirmation?: string, categoryId?: string, folderId?: string }
-let currentCategoryView = { mode: 'folders', categoryId: null, folderId: null }; // Tracks if showing folders, task folder content, or note folder content
-let currentFolderEditModes = {}; // { folderId: boolean } for task reordering/editing within a task folder
-let activeAddTaskForm = null; // { categoryId, folderId, position }
+let currentTaskCompletionStatus = {}; // { [taskDefId_dateString]: boolean }
+
+let activeTabId = 'dashboard';
+let currentModalDate = null;
+let draggedItemElement = null; // Can be task or note item
+let itemToDelete = null; // { type: 'task' | 'category' | 'folder' | 'noteItem', id: string, categoryId?: string, folderId?: string, nameForConfirmation?: string }
+let editModes = {}; // { categoryId: boolean } - For task folders, enables drag/drop and delete icons. For notes folders, might enable edit state.
+let categoryViewMode = {}; // { categoryId: 'list_folders' | 'view_folder_content' }
+let activeFolderIdForCategory = {}; // { categoryId: folderId }
+let activeAddTaskForm = null; // { categoryId, folderId, position ('top'|'bottom') } - For task folders
+
 let calendarDisplayDate = new Date();
 let isMonthYearPickerOpen = false;
 let pickerSelectedMonth = new Date().getMonth();
 let pickerSelectedYear = new Date().getFullYear();
 let currentFullscreenContent = null;
-let longPressTimer = null; // Specifically for category tab long press
+
+let longPressTimer = null;
 const LONG_PRESS_DURATION = 700; // ms
-let currentContextMenuTargetTab = null; // For category tabs
-let currentContextMenuTargetFolderBox = null; // For folder boxes (the visual square)
+let currentContextMenuTargetTab = null;
+let currentFolderOptionsMenu = { element: null, folderId: null, categoryId: null };
+
 let midnightTimer = null;
-let tempFolderCreationData = null; // { type: 'task' | 'note', categoryId: string }
+let currentEditingNoteItem = null; // { folderId, categoryId, itemId, itemElement }
 
 
 // DOM Elements
 const domElements = {
   tabsContainer: null,
-  tabContentsContainer: null, 
+  tabContentsContainer: null,
   addCategoryButton: null,
-  categorySectionTemplate: null, 
+  categorySectionTemplate: null,
+  backToFoldersButtonTemplate: null,
   categoryTabContextMenu: null,
   ctxRenameCategoryButton: null,
   ctxDeleteCategoryButton: null,
   folderOptionsContextMenu: null,
   ctxRenameFolderButton: null,
   ctxDeleteFolderButton: null,
-  
+
   dashboardSummariesContainer: null,
   todayProgressFill: null,
   todayPointsStat: null,
@@ -95,14 +108,14 @@ const domElements = {
   monthYearPickerCloseButton: null,
   pickerMonthsGrid: null,
   pickerYearsList: null,
-  dailyNoteInput: null, // Main daily reflection
+  dailyNoteInput: null,
   saveNoteButton: null,
   historyModal: null,
   historyModalCloseButton: null,
   historyModalDate: null,
-  historyModalPointsValue: null,        
-  historyModalPointsTotal: null,       
-  historyPercentageProgressFill: null, 
+  historyModalPointsValue: null,
+  historyModalPointsTotal: null,
+  historyPercentageProgressFill: null,
   historyTasksList: null,
   expandTasksButton: null,
   historicalReflectionWrapper: null,
@@ -124,17 +137,25 @@ const domElements = {
   fullscreenModalTitle: null,
   fullscreenModalArea: null,
   fullscreenModalCloseButton: null,
-  chooseFolderTypeModal: null,
-  chooseFolderTypeCloseButton: null,
-  selectTaskFolderButton: null,
-  selectNoteFolderButton: null,
-  enterFolderNameModal: null,
-  enterFolderNameCloseButton: null,
-  enterFolderNameTitle: null,
-  folderNameInput: null,
+
+  // Add Folder Modal (two-step)
+  addFolderModal: null,
+  addFolderModalCloseButton: null,
+  addFolderStep1: null,
+  addFolderStep2: null,
+  selectTaskFolderTypeButton: null,
+  selectNotesFolderTypeButton: null,
+  addFolderBackButton: null,
+  selectedFolderTypeNameSpan: null,
+  newFolderNameInput: null,
   createFolderButton: null,
-  cancelCreateFolderButton: null,
-  imageUploadInput: null,
+  cancelAddFolderButton: null,
+
+  // Notes Folder elements (will be part of categorySectionTemplate or dynamically created)
+  noteItemTemplate: null,
+  noteItemEditTextareaTemplate: null,
+  noteItemEditLinkTemplate: null,
+  noteItemEditImageTemplate: null,
 };
 
 function getProgressFillColor(percentage) {
@@ -166,12 +187,12 @@ function createUniqueId(prefix = 'id') {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
-// Generates storage key for a task's daily completion status
-function getTaskStateStorageKey(date, folderId, taskId) {
-  return `${TASK_STATE_STORAGE_KEY_PREFIX}${date}_${folderId}_${taskId}`;
+// Storage key for a task's completion status on a given date
+function getTaskCompletionStorageKey(taskDefinitionId, dateString) {
+  return `${STORAGE_KEY_TASK_COMPLETION_PREFIX}${taskDefinitionId}_${dateString}`;
 }
 
-// Category and Folder/Task Data Management
+// Category, Folder, and Task Data Management
 function loadUserCategories() {
     const storedCategories = localStorage.getItem(USER_CATEGORIES_KEY);
     if (storedCategories) {
@@ -182,10 +203,7 @@ function loadUserCategories() {
         }
     }
     return DEFAULT_CATEGORIES_CONFIG.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        order: cat.order,
-        deletable: cat.deletable !== undefined ? cat.deletable : true, 
+        id: cat.id, name: cat.name, order: cat.order, deletable: cat.deletable !== undefined ? cat.deletable : true,
     }));
 }
 
@@ -193,174 +211,140 @@ function saveUserCategories(categories) {
     localStorage.setItem(USER_CATEGORIES_KEY, JSON.stringify(categories.sort((a,b) => a.order - b.order)));
 }
 
-function loadFoldersByCategoryId() {
-    const storedFolders = localStorage.getItem(APP_FOLDERS_KEY);
+function loadUserFolders() {
+    const storedFolders = localStorage.getItem(USER_FOLDERS_KEY);
     if (storedFolders) {
         try {
-            return JSON.parse(storedFolders);
+            const parsedFolders = JSON.parse(storedFolders);
+            // Ensure all folders have a 'type' and 'content' or 'tasks'
+            Object.keys(parsedFolders).forEach(catId => {
+                parsedFolders[catId].forEach(folder => {
+                    if (!folder.type) { // Migration for older task-only folders
+                        folder.type = 'task';
+                    }
+                    if (folder.type === 'task' && !folder.tasks) {
+                        folder.tasks = [];
+                    }
+                    if (folder.type === 'notes' && !folder.content) {
+                        folder.content = [];
+                    }
+                    // Ensure note items have IDs
+                    if (folder.type === 'notes' && folder.content) {
+                        folder.content.forEach(item => { if (!item.id) item.id = createUniqueId('noteitem'); });
+                    }
+                });
+            });
+            return parsedFolders;
         } catch (e) {
             console.error("Error parsing stored folders:", e);
         }
     }
-    return {}; // Initialize as empty if not found
+    // If no folders found, create from default config
+    const initialFolders = {};
+    DEFAULT_CATEGORIES_CONFIG.forEach(catConfig => {
+        initialFolders[catConfig.id] = (catConfig.folders || []).map(folderConfig => ({
+            id: folderConfig.id || createUniqueId('folder'),
+            name: folderConfig.name,
+            type: folderConfig.type || 'task', // Default to 'task'
+            order: folderConfig.order !== undefined ? folderConfig.order : 0,
+            tasks: folderConfig.type === 'notes' ? undefined : (folderConfig.tasks || []).map(taskTextOrObj =>
+                typeof taskTextOrObj === 'string'
+                ? { id: createUniqueId('taskdef'), text: taskTextOrObj }
+                : { id: taskTextOrObj.id || createUniqueId('taskdef'), text: taskTextOrObj.text }
+            ),
+            content: folderConfig.type === 'notes' ? (folderConfig.content || []) : undefined
+        }));
+    });
+    return initialFolders;
 }
 
-function saveFoldersByCategoryId(folders) {
-    localStorage.setItem(APP_FOLDERS_KEY, JSON.stringify(folders));
+function saveUserFolders(foldersByCatId) {
+    localStorage.setItem(USER_FOLDERS_KEY, JSON.stringify(foldersByCatId));
 }
 
-function migrateOldTaskStructure() {
-    const oldTasksData = localStorage.getItem(OLD_USER_DEFINED_TASKS_KEY);
-    if (!oldTasksData) return false; // No old data to migrate
-
-    console.log("Old task structure found. Migrating to new folder system...");
+function migrateOldTaskStructureIfNeeded() {
+    const oldV1Key = 'lifeTrackerUserFolders_v1';
+    if (localStorage.getItem(USER_FOLDERS_KEY) || !localStorage.getItem(oldV1Key)) {
+        return false; // Already on v2 or no v1 data
+    }
+    console.log("Migrating folders from v1 to v2 structure...");
     try {
-        const oldTasksByCatId = JSON.parse(oldTasksData);
-        const newFoldersByCatId = {};
-        const today = getTodayDateString(); // For migrating task states for today
-
-        currentCategories.forEach(category => {
-            const defaultFolderId = createUniqueId(`folder-${category.id}-default`);
-            const newFolder = {
-                id: defaultFolderId,
-                name: "Tasks", // Default folder name
-                type: "task",
-                categoryId: category.id,
-                order: 0,
-                content: [] // Task definitions
-            };
-
-            const categoryOldTasks = oldTasksByCatId[category.id] || [];
-            categoryOldTasks.forEach(oldTaskDef => {
-                const newTaskId = oldTaskDef.id || createUniqueId('task'); // Ensure ID exists
-                newFolder.content.push({
-                    id: newTaskId,
-                    text: oldTaskDef.text,
-                    // categoryId is implicit via parent folder
-                });
-
-                // Migrate completion status for today if exists
-                const oldTaskStatusKey = `${OLD_STORAGE_KEY_TASK_PREFIX}${newTaskId}_${today}`;
-                const oldStatus = localStorage.getItem(oldTaskStatusKey);
-                if (oldStatus === 'true') {
-                    localStorage.setItem(getTaskStateStorageKey(today, defaultFolderId, newTaskId), 'true');
+        const oldFolders = JSON.parse(localStorage.getItem(oldV1Key));
+        Object.keys(oldFolders).forEach(catId => {
+            oldFolders[catId].forEach(folder => {
+                if (!folder.type) folder.type = 'task'; // Add type
+                if (folder.type === 'task' && !folder.tasks) folder.tasks = [];
+                if (folder.type === 'notes') {
+                     if (!folder.content) folder.content = [];
+                     folder.tasks = undefined; // Remove tasks if it's a notes folder
                 }
-                localStorage.removeItem(oldTaskStatusKey); // Clean up old status key
             });
-            
-            newFoldersByCatId[category.id] = [newFolder];
         });
-
-        foldersByCategoryId = newFoldersByCatId;
-        saveFoldersByCategoryId(foldersByCategoryId);
-        localStorage.removeItem(OLD_USER_DEFINED_TASKS_KEY); // Remove old data structure
-        // Also clean up all OLD_STORAGE_KEY_TASK_PREFIX for other dates (might be extensive, or rely on monthly cleanup)
-        // For simplicity, we only migrated today's states. Other historical data in old format would be lost unless a more complex migration is done.
-        // The prompt implies preserving user tasks, which this does for their definitions.
-        console.log("Migration complete.");
-        return true; // Migration occurred
-    } catch (e) {
-        console.error("Error migrating old task structure:", e);
+        userFoldersByCategoryId = oldFolders;
+        saveUserFolders(userFoldersByCategoryId);
+        localStorage.removeItem(oldV1Key);
+        console.log("Folder migration v1 to v2 successful.");
+        return true;
+    } catch(e) {
+        console.error("Error migrating folders v1 to v2:", e);
         return false;
     }
 }
 
 
+function initializeTaskCompletionStatusForNewDay() {
+    // No need to clear currentTaskCompletionStatus object entirely,
+    // as it's keyed by date. Old dates just won't be accessed.
+}
+
+function getTaskCompletionStatus(taskDefinitionId, dateString) {
+    return currentTaskCompletionStatus[getTaskCompletionStorageKey(taskDefinitionId, dateString)] || false;
+}
+
+function setTaskCompletionStatus(taskDefinitionId, dateString, isCompleted) {
+    const key = getTaskCompletionStorageKey(taskDefinitionId, dateString);
+    if (isCompleted) {
+        currentTaskCompletionStatus[key] = true;
+    } else {
+        delete currentTaskCompletionStatus[key];
+    }
+    localStorage.setItem(key, isCompleted.toString());
+}
+
+function loadTaskCompletionForDate(dateString) {
+    currentTaskCompletionStatus = {};
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX) && key.endsWith(`_${dateString}`)) {
+            currentTaskCompletionStatus[key] = localStorage.getItem(key) === 'true';
+        }
+    }
+}
+
 function seedInitialDataIfNeeded() {
     currentCategories = loadUserCategories();
-    
-    // Attempt migration first if new folder key doesn't exist but old task key does
-    if (!localStorage.getItem(APP_FOLDERS_KEY) && localStorage.getItem(OLD_USER_DEFINED_TASKS_KEY)) {
-        migrateOldTaskStructure(); // This will populate foldersByCategoryId
-    } else {
-        foldersByCategoryId = loadFoldersByCategoryId();
-    }
+    migrateOldTaskStructureIfNeeded(); // Handles migration USER_FOLDERS_KEY v1 to v2
+    userFoldersByCategoryId = loadUserFolders(); // This now also handles basic defaults if v2 is missing type.
 
-    let categoriesUpdated = false;
-    let foldersUpdated = false;
-
-    if (!currentCategories || currentCategories.length === 0) {
-        currentCategories = DEFAULT_CATEGORIES_CONFIG.map(cat => ({
-            id: cat.id, name: cat.name, order: cat.order, deletable: cat.deletable !== undefined ? cat.deletable : true,
-        }));
-        categoriesUpdated = true;
-    }
-    
-    // Ensure every category has at least a default "Tasks" folder if no folders exist for it.
-    // This also handles the case where APP_FOLDERS_KEY was empty or new categories were added.
-    currentCategories.forEach(category => {
-        if (!foldersByCategoryId[category.id] || foldersByCategoryId[category.id].length === 0) {
-            const defaultFolderId = createUniqueId(`folder-${category.id}-default`);
-            const defaultFolder = {
-                id: defaultFolderId,
-                name: "Tasks",
-                type: "task",
-                categoryId: category.id,
-                order: 0,
-                content: [] // Task definitions
-            };
-
-            // If it's a default category from initial config, populate its tasks
-            const defaultConfigCat = DEFAULT_CATEGORIES_CONFIG.find(dc => dc.id === category.id);
-            if (defaultConfigCat && defaultConfigCat.tasks) {
-                defaultFolder.content = defaultConfigCat.tasks.map(taskText => ({
-                    id: createUniqueId('task'),
-                    text: taskText,
-                }));
-            }
-            foldersByCategoryId[category.id] = [defaultFolder];
-            foldersUpdated = true;
+    currentCategories.forEach(cat => {
+        if (!userFoldersByCategoryId[cat.id]) {
+            userFoldersByCategoryId[cat.id] = [];
         }
-        // Initialize edit mode for task folders (if any)
-        (foldersByCategoryId[category.id] || []).forEach(folder => {
-            if (folder.type === 'task' && currentFolderEditModes[folder.id] === undefined) {
-                currentFolderEditModes[folder.id] = false;
-            }
+        userFoldersByCategoryId[cat.id].forEach(folder => { // Ensure defaults for new properties
+            if (!folder.type) folder.type = 'task';
+            if (folder.type === 'task' && !folder.tasks) folder.tasks = [];
+            if (folder.type === 'notes' && !folder.content) folder.content = [];
         });
+        if (editModes[cat.id] === undefined) editModes[cat.id] = false;
+        if (categoryViewMode[cat.id] === undefined) categoryViewMode[cat.id] = 'list_folders';
+        if (activeFolderIdForCategory[cat.id] === undefined) activeFolderIdForCategory[cat.id] = null;
     });
-
-    if (categoriesUpdated) saveUserCategories(currentCategories);
-    if (foldersUpdated) saveFoldersByCategoryId(foldersByCategoryId);
+    saveUserCategories(currentCategories);
+    saveUserFolders(userFoldersByCategoryId);
 }
 
 
-// Gets all task definitions for a specific folder
-function getTaskDefinitionsForFolder(folderId) {
-    for (const catId in foldersByCategoryId) {
-        const folder = (foldersByCategoryId[catId] || []).find(f => f.id === folderId);
-        if (folder && folder.type === 'task') {
-            return folder.content || [];
-        }
-    }
-    return [];
-}
-// Gets all tasks with their current day completion status for a folder
-function getTasksForFolderForDay(folderId, dateString) {
-    const taskDefinitions = getTaskDefinitionsForFolder(folderId);
-    return taskDefinitions.map(taskDef => ({
-        ...taskDef,
-        completed: localStorage.getItem(getTaskStateStorageKey(dateString, folderId, taskDef.id)) === 'true'
-    }));
-}
-
-function saveTaskStatus(folderId, taskId, completed, dateString) {
-  localStorage.setItem(getTaskStateStorageKey(dateString, folderId, taskId), completed.toString());
-}
-
-function getCategoryNameById(categoryId) {
-    const category = currentCategories.find(cat => cat.id === categoryId);
-    return category ? category.name : "Unknown Category";
-}
-function getFolderNameById(folderId) {
-    for (const catId in foldersByCategoryId) {
-        const folder = (foldersByCategoryId[catId] || []).find(f => f.id === folderId);
-        if (folder) return folder.name;
-    }
-    return "Unknown Folder";
-}
-
-
-function saveDailyNote() { 
+function saveDailyNote() {
     if (!domElements.dailyNoteInput) return;
     const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
     const noteContent = domElements.dailyNoteInput.value;
@@ -372,12 +356,11 @@ function saveDailyNote() {
         if (historyDataString) {
             try {
                 let historyEntry = JSON.parse(historyDataString);
-                historyEntry.userNote = noteContent; // Main reflection
+                historyEntry.userNote = noteContent;
                 localStorage.setItem(historyKey, JSON.stringify(historyEntry));
-            } catch (e) { console.warn("Could not live update history main reflection", e); }
+            } catch (e) { console.warn("Could not live update history note", e); }
         }
     }
-
     if (domElements.saveNoteButton) {
         domElements.saveNoteButton.textContent = 'Note Saved!';
         setTimeout(() => {
@@ -395,61 +378,56 @@ function loadCurrentDayNote() {
 
 function saveDayToHistory(dateToSave) {
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateToSave;
-    const { pointsEarned, percentageCompleted, totalTasks } = calculateProgressForDate(dateToSave);
-    
-    const completedTasksHistory = {}; // By category, then by folder
+    loadTaskCompletionForDate(dateToSave);
+
+    const completedTasksHistory = {};
+    let tasksCompletedCount = 0;
+    let totalTasksForDay = 0;
+
     currentCategories.forEach(cat => {
-      completedTasksHistory[cat.id] = {};
-      (foldersByCategoryId[cat.id] || []).forEach(folder => {
-        if (folder.type === 'task') {
-          completedTasksHistory[cat.id][folder.id] = { name: folder.name, tasks: [] };
-          const tasksInFolder = getTasksForFolderForDay(folder.id, dateToSave);
-          tasksInFolder.forEach(task => {
-            if (task.completed) {
-              completedTasksHistory[cat.id][folder.id].tasks.push(task.text);
-            }
-          });
-          // Remove folder from history if it had no completed tasks
-          if(completedTasksHistory[cat.id][folder.id].tasks.length === 0) {
-            delete completedTasksHistory[cat.id][folder.id];
-          }
-        }
-      });
-      // Remove category from history if it had no folders with completed tasks
-      if(Object.keys(completedTasksHistory[cat.id]).length === 0) {
-        delete completedTasksHistory[cat.id];
-      }
-    });
-
-    const mainReflection = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave) || "";
-    // Note: Individual note folder contents are already persisted via saveFoldersByCategoryId.
-    // History could snapshot them, but for now, history focuses on tasks and main reflection.
-
-    const historyEntry = {
-        date: dateToSave,
-        completedTaskStructure: completedTasksHistory, // New structure
-        userNote: mainReflection, // Main daily reflection
-        pointsEarned: pointsEarned,
-        percentageCompleted: percentageCompleted,
-        totalTasksOnDate: totalTasks,
-        dailyTargetPoints: DAILY_TARGET_POINTS
-    };
-
-    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
-    
-    // Clean up daily task states for the saved day
-    currentCategories.forEach(cat => {
-        (foldersByCategoryId[cat.id] || []).forEach(folder => {
-            if (folder.type === 'task') {
-                (folder.content || []).forEach(taskDef => {
-                    localStorage.removeItem(getTaskStateStorageKey(dateToSave, folder.id, taskDef.id));
+        completedTasksHistory[cat.id] = [];
+        const foldersInCat = userFoldersByCategoryId[cat.id] || [];
+        foldersInCat.forEach(folder => {
+            if (folder.type === 'task') { // Only count tasks from task folders for progress
+                folder.tasks.forEach(taskDef => {
+                    totalTasksForDay++;
+                    if (getTaskCompletionStatus(taskDef.id, dateToSave)) {
+                        completedTasksHistory[cat.id].push(taskDef.text);
+                        tasksCompletedCount++;
+                    }
                 });
             }
         });
     });
-    // Don't remove main daily note, it's part of history now
-    // localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave); 
-    
+
+    const pointsPerTaskCalculation = totalTasksForDay > 0 ? DAILY_TARGET_POINTS / totalTasksForDay : 0;
+    const finalPointsEarned = Math.round(tasksCompletedCount * pointsPerTaskCalculation);
+    const finalPercentageCompleted = totalTasksForDay > 0 ? Math.round((tasksCompletedCount / totalTasksForDay) * 100) : 0;
+    const noteFromDay = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave) || "";
+
+    const historyEntry = {
+        date: dateToSave,
+        completedTasks: completedTasksHistory,
+        userNote: noteFromDay,
+        pointsEarned: finalPointsEarned,
+        percentageCompleted: finalPercentageCompleted,
+        totalTasksOnDate: totalTasksForDay, // Total from task folders only
+        dailyTargetPoints: DAILY_TARGET_POINTS
+    };
+
+    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+
+    localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave);
+    currentCategories.forEach(cat => {
+        const foldersInCat = userFoldersByCategoryId[cat.id] || [];
+        foldersInCat.forEach(folder => {
+            if (folder.type === 'task') {
+                folder.tasks.forEach(taskDef => {
+                    localStorage.removeItem(getTaskCompletionStorageKey(taskDef.id, dateToSave));
+                });
+            }
+        });
+    });
     console.log(`History finalized and saved for ${dateToSave}:`, historyEntry);
 }
 
@@ -461,16 +439,15 @@ function checkAndClearOldMonthlyData() {
   if (lastProcessedMonthYear && lastProcessedMonthYear !== currentMonthYear) {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(TASK_STATE_STORAGE_KEY_PREFIX)) {
-        // taskState_{date}_{folderId}_{taskId} -> date is YYYY-MM-DD
+      if (key && key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX)) {
         const parts = key.split('_');
-        if (parts.length > 1) {
-            const datePart = parts[1];
-            if (datePart && datePart.length >= 7) { 
-                const monthYearOfKey = datePart.substring(0, 7); 
-                if (monthYearOfKey === lastProcessedMonthYear) { 
-                    localStorage.removeItem(key);
-                }
+        if (parts.length > 2) {
+            const datePart = parts.slice(2).join('_');
+             if (datePart.length >= 7) {
+              const monthYearOfKey = datePart.substring(0, 7);
+              if (monthYearOfKey === lastProcessedMonthYear) {
+                localStorage.removeItem(key);
+              }
             }
         }
       }
@@ -481,7 +458,7 @@ function checkAndClearOldMonthlyData() {
 
 
 function loadAppData() {
-  seedInitialDataIfNeeded(); // This now handles migration and default folder creation
+  seedInitialDataIfNeeded();
 
   let lastVisitDateStr = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE);
   const currentDateStr = getTodayDateString();
@@ -489,54 +466,60 @@ function loadAppData() {
   if (lastVisitDateStr && lastVisitDateStr !== currentDateStr) {
     console.log(`Date changed from ${lastVisitDateStr} to ${currentDateStr}. Processing previous day.`);
     saveDayToHistory(lastVisitDateStr);
-    // Task states for new day are inherently "not completed" as keys won't exist yet
+    initializeTaskCompletionStatusForNewDay();
   } else if (!lastVisitDateStr) {
     console.log("First visit or no last visit date found. Initializing for today.");
-    // No specific task initialization needed as they default to incomplete
+    initializeTaskCompletionStatusForNewDay();
+  } else {
+    console.log("Resuming session for today:", currentDateStr);
+    loadTaskCompletionForDate(currentDateStr);
   }
-  
+
   localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, currentDateStr);
-  
+
   checkAndClearOldMonthlyData();
-  loadCurrentDayNote(); // Main reflection
-  
-  calendarDisplayDate = new Date(); // Current month for calendar
-  calendarDisplayDate.setDate(1); 
-  calendarDisplayDate.setHours(0,0,0,0); 
+  loadCurrentDayNote();
+
+  calendarDisplayDate = new Date();
+  calendarDisplayDate.setDate(1);
+  calendarDisplayDate.setHours(0,0,0,0);
   pickerSelectedMonth = calendarDisplayDate.getMonth();
   pickerSelectedYear = calendarDisplayDate.getFullYear();
   scheduleMidnightTask();
 }
 
+
 function handleMidnightReset() {
     console.log("Midnight reset triggered.");
-    const dateThatJustEnded = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE); 
-    
+    const dateThatJustEnded = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE);
+
     if (!dateThatJustEnded) {
         console.error("Cannot perform midnight reset: last visit date unknown.");
-        scheduleMidnightTask(); 
+        scheduleMidnightTask();
         return;
     }
-
     saveDayToHistory(dateThatJustEnded);
 
     const newCurrentDate = getTodayDateString();
     localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, newCurrentDate);
-    
-    if (domElements.dailyNoteInput) domElements.dailyNoteInput.value = ''; 
+
+    initializeTaskCompletionStatusForNewDay();
+    currentTaskCompletionStatus = {};
+
+    if (domElements.dailyNoteInput) domElements.dailyNoteInput.value = '';
     loadCurrentDayNote();
 
     if (domElements.todayPointsStat) domElements.todayPointsStat.classList.add('progress-value-resetting');
     if (domElements.todayProgressFill) domElements.todayProgressFill.classList.add('progress-value-resetting');
-    
-    updateAllProgress(); 
+
+    updateAllProgress();
 
     setTimeout(() => {
         if (domElements.todayPointsStat) domElements.todayPointsStat.classList.remove('progress-value-resetting');
         if (domElements.todayProgressFill) domElements.todayProgressFill.classList.remove('progress-value-resetting');
-    }, 500); 
-    
-    scheduleMidnightTask(); 
+    }, 500);
+
+    scheduleMidnightTask();
 }
 
 function scheduleMidnightTask() {
@@ -544,15 +527,14 @@ function scheduleMidnightTask() {
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate() + 1);
-    tomorrow.setHours(0, 0, 1, 0); 
+    tomorrow.setHours(0, 0, 1, 0);
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
     console.log(`Next midnight reset scheduled in ${msUntilMidnight / 1000 / 60} minutes.`);
     midnightTimer = setTimeout(handleMidnightReset, msUntilMidnight);
 }
 
-// Drag & Drop for tasks within a folder
-function getDragAfterElement(container, y) {
-    const draggableElements = Array.from(container.querySelectorAll('.task-item:not(.dragging):not(.editing)'));
+function getDragAfterElement(container, y, itemSelector) {
+    const draggableElements = Array.from(container.querySelectorAll(`${itemSelector}:not(.dragging):not(.editing)`));
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
@@ -564,253 +546,252 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
 }
 
-// Toggle edit mode for tasks within a specific task folder
-function toggleTaskFolderEditMode(folderId) {
-    currentFolderEditModes[folderId] = !currentFolderEditModes[folderId];
-    // Re-render the task folder content to reflect edit mode changes (show/hide delete buttons, make draggable etc.)
-    const folder = findFolderById(folderId);
-    if (folder) {
-        renderTaskFolderContents(folder.categoryId, folderId);
-    }
+
+function toggleCategoryEditMode(categoryId) {
+    editModes[categoryId] = !editModes[categoryId];
+    // Re-render the current view for the category
+    // For task folders, this shows/hides delete icons and enables drag.
+    // For notes folders, this might toggle an "edit mode" for the notes content.
+    renderCategoryTasks(categoryId);
 }
 
-// Add Task form within a Task Folder
+
 function showTempAddTaskForm(categoryId, folderId, position) {
     if (activeAddTaskForm) {
         hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position, false);
     }
     activeAddTaskForm = { categoryId, folderId, position };
-    const taskFolderContentEl = document.getElementById(`task-folder-content-${folderId}`);
-    if (!taskFolderContentEl) return;
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    if (!categorySection) return;
 
     const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
-    const formContainer = taskFolderContentEl.querySelector(formContainerClass);
+    const formContainer = categorySection.querySelector(formContainerClass);
     if (!formContainer) return;
-    
-    formContainer.querySelector('.add-item-trigger-button')?.classList.add('hidden');
-    formContainer.querySelector('.new-temp-task-form')?.classList.remove('hidden');
-    formContainer.querySelector('.new-task-temp-input')?.focus();
+
+    const triggerButton = formContainer.querySelector('.add-item-trigger-button');
+    const form = formContainer.querySelector('.new-temp-task-form');
+    const input = formContainer.querySelector('.new-task-temp-input');
+
+    if (triggerButton) triggerButton.classList.add('hidden');
+    if (form) form.classList.remove('hidden');
+    if (input) input.focus();
 }
 
 function hideTempAddTaskForm(categoryId, folderId, position, resetActiveForm = true) {
-    const taskFolderContentEl = document.getElementById(`task-folder-content-${folderId}`);
-    if (!taskFolderContentEl) return;
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    if (!categorySection) return;
     const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
-    const formContainer = taskFolderContentEl.querySelector(formContainerClass);
+    const formContainer = categorySection.querySelector(formContainerClass);
     if (!formContainer) return;
 
-    formContainer.querySelector('.add-item-trigger-button')?.classList.remove('hidden');
+    const triggerButton = formContainer.querySelector('.add-item-trigger-button');
     const form = formContainer.querySelector('.new-temp-task-form');
-    form?.classList.add('hidden');
-    const input = form.querySelector('.new-task-temp-input');
+    const input = formContainer.querySelector('.new-task-temp-input');
+
+    if (triggerButton) triggerButton.classList.remove('hidden');
+    if (form) form.classList.add('hidden');
     if (input) input.value = '';
+
     if (resetActiveForm) activeAddTaskForm = null;
 }
 
 function handleSaveTempTask(categoryId, folderId, position) {
-    const taskFolderContentEl = document.getElementById(`task-folder-content-${folderId}`);
-    if (!taskFolderContentEl) return;
+    const categorySection = document.getElementById(`category-section-${categoryId}`);
+    if (!categorySection) return;
     const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
-    const input = taskFolderContentEl.querySelector(`${formContainerClass} .new-task-temp-input`);
+    const input = categorySection.querySelector(`${formContainerClass} .new-task-temp-input`);
     const taskText = input.value.trim();
 
     if (taskText) {
-        const newTaskDefinition = { id: createUniqueId('task'), text: taskText };
-        const categoryFolders = foldersByCategoryId[categoryId] || [];
-        const folder = categoryFolders.find(f => f.id === folderId);
+        const newTaskDefinition = { id: createUniqueId('taskdef'), text: taskText };
 
+        const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
         if (folder && folder.type === 'task') {
-            if (!folder.content) folder.content = [];
             if (position === 'top') {
-                folder.content.unshift(newTaskDefinition);
+                folder.tasks.unshift(newTaskDefinition);
             } else {
-                folder.content.push(newTaskDefinition);
+                folder.tasks.push(newTaskDefinition);
             }
-            saveFoldersByCategoryId(foldersByCategoryId);
-            renderTaskFolderContents(categoryId, folderId); // Re-render tasks for this folder
+            saveUserFolders(userFoldersByCategoryId);
+
+            renderCategoryTasks(categoryId);
             updateAllProgress();
             hideTempAddTaskForm(categoryId, folderId, position);
+        } else {
+            alert('Error: Could not find the task folder or incorrect folder type.');
         }
     } else {
         alert('Task text cannot be empty.');
     }
 }
 
-function findFolderById(folderId) {
-    for (const catId in foldersByCategoryId) {
-        const folder = (foldersByCategoryId[catId] || []).find(f => f.id === folderId);
-        if (folder) return folder;
-    }
-    return null;
-}
-function getTaskDefinitionById(folderId, taskId) {
-    const folder = findFolderById(folderId);
-    if (folder && folder.type === 'task' && folder.content) {
-        return folder.content.find(taskDef => taskDef.id === taskId);
+function getTaskDefinition(taskDefinitionId) {
+    for (const catId in userFoldersByCategoryId) {
+        const folders = userFoldersByCategoryId[catId];
+        for (const folder of folders) {
+            if (folder.type === 'task' && folder.tasks) {
+                const taskDef = folder.tasks.find(t => t.id === taskDefinitionId);
+                if (taskDef) return { ...taskDef, categoryId: catId, folderId: folder.id };
+            }
+        }
     }
     return null;
 }
 
 
-function startTaskEdit(taskItemElement, folderId, taskDef) {
+function startTaskEdit(taskItemElement, taskDef, categoryId, folderId) {
     if (taskItemElement.classList.contains('editing')) return;
     taskItemElement.classList.add('editing');
-    
+
     const taskTextSpan = taskItemElement.querySelector('.task-text');
     if (taskTextSpan) taskTextSpan.style.display = 'none';
 
-    const editControls = domElements.taskEditControlsTemplate.cloneNode(true);
-    editControls.removeAttribute('id'); 
-    editControls.style.display = 'flex'; 
+    const editControlsTemplate = domElements.taskEditControlsTemplate;
+    if (!editControlsTemplate) return;
+    const editControls = editControlsTemplate.cloneNode(true);
+    editControls.removeAttribute('id');
+    editControls.style.display = 'flex';
 
     const input = editControls.querySelector('.task-edit-input');
+    const saveButton = editControls.querySelector('.task-edit-save');
+    const cancelButton = editControls.querySelector('.task-edit-cancel');
+
     input.value = taskDef.text;
 
-    editControls.querySelector('.task-edit-save').onclick = () => saveTaskEdit(folderId, taskDef.id, input.value, taskItemElement, editControls);
-    editControls.querySelector('.task-edit-cancel').onclick = () => cancelTaskEdit(taskItemElement, editControls, taskTextSpan);
-    
+    saveButton.onclick = () => saveTaskEdit(taskDef.id, categoryId, folderId, input.value, taskItemElement, editControls);
+    cancelButton.onclick = () => cancelTaskEdit(taskItemElement, editControls, taskTextSpan);
+
     const deleteButton = taskItemElement.querySelector('.task-delete-button-editmode');
     if (deleteButton) taskItemElement.insertBefore(editControls, deleteButton);
     else taskItemElement.appendChild(editControls);
-    
     input.focus();
     input.select();
 }
 
-function saveTaskEdit(folderId, taskId, newText, taskItemElement, editControls) {
+function saveTaskEdit(taskDefinitionId, categoryId, folderId, newText, taskItemElement, editControls) {
     newText = newText.trim();
     if (!newText) {
         alert("Task text cannot be empty.");
         return;
     }
-    const folder = findFolderById(folderId);
-    if (folder && folder.type === 'task' && folder.content) {
-        const taskIndex = folder.content.findIndex(t => t.id === taskId);
-        if (taskIndex !== -1) {
-            folder.content[taskIndex].text = newText;
-            saveFoldersByCategoryId(foldersByCategoryId);
+    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+    if (folder && folder.type === 'task') {
+        const taskDef = folder.tasks.find(t => t.id === taskDefinitionId);
+        if (taskDef) {
+            taskDef.text = newText;
+            saveUserFolders(userFoldersByCategoryId);
         }
     }
+
     const taskTextSpan = taskItemElement.querySelector('.task-text');
     if(taskTextSpan) {
-        taskTextSpan.textContent = newText; 
-        taskTextSpan.style.display = ''; 
+        taskTextSpan.textContent = newText;
+        taskTextSpan.style.display = '';
     }
     taskItemElement.classList.remove('editing');
     editControls.remove();
 }
 
 function cancelTaskEdit(taskItemElement, editControls, taskTextSpan) {
-    if (taskTextSpan) taskTextSpan.style.display = ''; 
+    if (taskTextSpan) taskTextSpan.style.display = '';
     taskItemElement.classList.remove('editing');
     editControls.remove();
 }
 
-// Renders a single task item within a task folder view
-function renderTaskItem(task, folderId, categoryId) { // task here includes .completed status for the day
+
+function renderTaskItem(taskDef, categoryId, folderId) {
   const item = document.createElement('li');
   item.className = 'task-item';
-  item.dataset.taskId = task.id;
-  item.dataset.folderId = folderId; // For drag/drop context
+  item.dataset.taskDefId = taskDef.id;
   item.setAttribute('role', 'listitem');
-  item.setAttribute('tabindex', '0'); 
+  item.setAttribute('tabindex', '0');
 
   const textSpan = document.createElement('span');
   textSpan.className = 'task-text';
-  textSpan.textContent = task.text;
+  textSpan.textContent = taskDef.text;
   item.appendChild(textSpan);
 
-  const updateAriaLabel = () => {
-    item.setAttribute('aria-label', `${task.text}, ${item.classList.contains('completed') ? 'completed' : 'not completed'}`);
+  const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+  const isCompleted = getTaskCompletionStatus(taskDef.id, today);
+
+  const updateAriaAndClass = (completedState) => {
+    item.setAttribute('aria-label', `${taskDef.text}, ${completedState ? 'completed' : 'not completed'}`);
+    item.classList.toggle('completed', completedState);
   };
+  updateAriaAndClass(isCompleted);
 
-  if (task.completed) item.classList.add('completed');
-  updateAriaLabel();
 
-  if (currentFolderEditModes[folderId]) {
+  if (editModes[categoryId]) {
       const deleteButton = document.createElement('button');
       deleteButton.className = 'task-delete-button-editmode icon-button';
       deleteButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
-      deleteButton.setAttribute('aria-label', `Delete task: ${task.text}`);
+      deleteButton.setAttribute('aria-label', `Delete task: ${taskDef.text}`);
       deleteButton.title = "Delete Task";
       deleteButton.onclick = (e) => {
-          e.stopPropagation(); 
-          showDeleteConfirmation('task', task.id, `Are you sure you want to delete the task "${task.text}"? This will remove it permanently.`, task.text, categoryId, folderId);
+          e.stopPropagation();
+          showDeleteConfirmation('task', taskDef.id, `Are you sure you want to delete the task "${taskDef.text}"? This will remove it permanently.`, '', categoryId, folderId);
       };
       item.appendChild(deleteButton);
   }
 
   item.addEventListener('click', (e) => {
     if (item.classList.contains('editing')) return;
-    const taskDef = getTaskDefinitionById(folderId, task.id);
-    if (!taskDef) return;
 
-    if (currentFolderEditModes[folderId] && e.target === textSpan) {
-        startTaskEdit(item, folderId, taskDef);
-    } else if (!currentFolderEditModes[folderId]) {
-        task.completed = !task.completed;
-        saveTaskStatus(folderId, task.id, task.completed, localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString());
-        item.classList.toggle('completed');
-        updateAriaLabel();
+    if (editModes[categoryId] && e.target === textSpan) {
+        startTaskEdit(item, taskDef, categoryId, folderId);
+        return;
+    }
+    if (!editModes[categoryId]) {
+        const currentCompletion = getTaskCompletionStatus(taskDef.id, today);
+        setTaskCompletionStatus(taskDef.id, today, !currentCompletion);
+        updateAriaAndClass(!currentCompletion);
         item.classList.remove('animate-task-complete', 'animate-task-uncomplete');
-        void item.offsetWidth; 
-        item.classList.add(task.completed ? 'animate-task-complete' : 'animate-task-uncomplete');
+        void item.offsetWidth;
+        item.classList.add(!currentCompletion ? 'animate-task-complete' : 'animate-task-uncomplete');
         updateAllProgress();
     }
   });
 
-  item.addEventListener('keydown', (e) => {
-    if (item.classList.contains('editing')) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        const taskDef = getTaskDefinitionById(folderId, task.id);
-        if (!taskDef) return;
-        if (!currentFolderEditModes[folderId]) { 
-            item.click(); 
-        } else if (currentFolderEditModes[folderId] && document.activeElement === item) {
-             startTaskEdit(item, folderId, taskDef);
-        }
-    }
-  });
-
-  if (currentFolderEditModes[folderId] && !item.classList.contains('editing')) {
-    item.draggable = true;
-    item.addEventListener('dragstart', (e) => {
-        if (!currentFolderEditModes[folderId] || item.classList.contains('editing')) {
+   item.addEventListener('keydown', (e) => {
+        if (item.classList.contains('editing')) return;
+        if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            return;
+            if (!editModes[categoryId]) item.click();
+            else if (editModes[categoryId] && document.activeElement === item) startTaskEdit(item, taskDef, categoryId, folderId);
         }
-        draggedTaskElement = item;
-        setTimeout(() => item.classList.add('dragging'), 0);
-        e.dataTransfer.effectAllowed = 'move';
     });
-    item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        draggedTaskElement = null;
-        document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
-            el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
-        });
-        
-        const taskListElement = item.closest('.task-list');
-        if (taskListElement) {
-            const fId = taskListElement.dataset.folderId;
-            const cId = taskListElement.dataset.categoryId;
-            const newTaskOrderIds = Array.from(taskListElement.querySelectorAll('.task-item')).map(el => el.dataset.taskId);
-            
-            const folder = findFolderById(fId);
-            if (folder && folder.type === 'task') {
-                folder.content = newTaskOrderIds.map(id => folder.content.find(t => t.id === id)).filter(Boolean);
-                saveFoldersByCategoryId(foldersByCategoryId);
-                // No need to reorder currentTasks as it's not global in the same way now
+
+    if (editModes[categoryId] && !item.classList.contains('editing')) {
+        item.draggable = true;
+        item.addEventListener('dragstart', (e) => {
+            if (!editModes[categoryId] || item.classList.contains('editing')) {
+                e.preventDefault(); return;
             }
-        }
-    });
-  } else {
-    item.draggable = false;
-  }
+            draggedItemElement = item;
+            setTimeout(() => item.classList.add('dragging'), 0);
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        item.addEventListener('dragend', () => {
+            const taskListUl = item.closest('ul.task-list');
+            if (!taskListUl) return;
+            item.classList.remove('dragging');
+            draggedItemElement = null;
+            document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
+                el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
+            });
+
+            const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+            if (folder && folder.type === 'task') {
+                const newTaskOrderIds = Array.from(taskListUl.querySelectorAll('.task-item')).map(el => el.dataset.taskDefId);
+                folder.tasks = newTaskOrderIds.map(id => folder.tasks.find(t => t.id === id)).filter(Boolean);
+                saveUserFolders(userFoldersByCategoryId);
+            }
+        });
+    } else {
+        item.draggable = false;
+    }
   return item;
 }
-
 
 function showDeleteConfirmation(type, id, message, nameForConfirmation = '', categoryId = null, folderId = null) {
     itemToDelete = { type, id, nameForConfirmation, categoryId, folderId };
@@ -824,42 +805,69 @@ function showDeleteConfirmation(type, id, message, nameForConfirmation = '', cat
 
 function confirmDeletion() {
     if (!itemToDelete) return;
-    const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    const { type, id, categoryId, folderId } = itemToDelete;
 
-    if (itemToDelete.type === 'task') {
-        const { id: taskId, categoryId, folderId } = itemToDelete;
-        const folder = findFolderById(folderId);
-        if (folder && folder.type === 'task' && folder.content) {
-            folder.content = folder.content.filter(t => t.id !== taskId);
-            saveFoldersByCategoryId(foldersByCategoryId);
-            // Clean up task state for all dates (complex, for now just today) - or rely on monthly cleanup
-            localStorage.removeItem(getTaskStateStorageKey(today, folderId, taskId)); 
-            renderTaskFolderContents(categoryId, folderId);
+    if (type === 'task') {
+        const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+        if (folder && folder.type === 'task') {
+            folder.tasks = folder.tasks.filter(t => t.id !== id);
+            saveUserFolders(userFoldersByCategoryId);
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(getTaskCompletionStorageKey(id, ''))) {
+                    localStorage.removeItem(key);
+                }
+            }
+             Object.keys(currentTaskCompletionStatus).forEach(key => {
+                if (key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX + id + "_")) {
+                    delete currentTaskCompletionStatus[key];
+                }
+            });
+            renderCategoryTasks(categoryId);
         }
-    } else if (itemToDelete.type === 'folder') {
-        const { id: folderId, categoryId } = itemToDelete;
-        if (foldersByCategoryId[categoryId]) {
-            foldersByCategoryId[categoryId] = foldersByCategoryId[categoryId].filter(f => f.id !== folderId);
-            saveFoldersByCategoryId(foldersByCategoryId);
-            // Clean up all task states for this folder (complex, rely on monthly cleanup or iterate history)
-            // Clean up note content if it was a note folder and stored separately (not current plan)
-            renderFolderSystemForCategory(categoryId, document.querySelector(`#category-section-${categoryId} .category-content-area`));
-        }
-    } else if (itemToDelete.type === 'category') {
-        const categoryId = itemToDelete.id;
-        const category = currentCategories.find(c => c.id === categoryId);
+    } else if (type === 'category') {
+        const category = currentCategories.find(c => c.id === id);
         if (category && category.deletable === false) {
             alert(`Category "${category.name}" is a default category and cannot be deleted.`);
-        } else {
-            currentCategories = currentCategories.filter(cat => cat.id !== categoryId);
-            saveUserCategories(currentCategories);
-            delete foldersByCategoryId[categoryId]; // Remove all its folders
-            saveFoldersByCategoryId(foldersByCategoryId);
-            // Clean up related task states and note contents (very complex without iterating all storage)
+            hideDeleteConfirmation(); return;
+        }
+        currentCategories = currentCategories.filter(cat => cat.id !== id);
+        saveUserCategories(currentCategories);
+        delete userFoldersByCategoryId[id];
+        saveUserFolders(userFoldersByCategoryId);
 
-            document.getElementById(`tab-button-${categoryId}`)?.remove();
-            document.getElementById(`category-section-${categoryId}`)?.remove();
-            if (activeTabId === categoryId) switchTab('dashboard');
+        const tabButton = document.getElementById(`tab-button-${id}`);
+        if (tabButton) tabButton.remove();
+        const categorySection = document.getElementById(`category-section-${id}`);
+        if (categorySection) categorySection.remove();
+        if (activeTabId === id) switchTab('dashboard');
+    } else if (type === 'folder') {
+        const foldersInCat = userFoldersByCategoryId[categoryId];
+        if (foldersInCat) {
+             const folderToDelete = foldersInCat.find(f => f.id === id);
+             if (folderToDelete && folderToDelete.type === 'task') {
+                folderToDelete.tasks.forEach(taskDef => {
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith(getTaskCompletionStorageKey(taskDef.id, ''))) localStorage.removeItem(key);
+                    }
+                    Object.keys(currentTaskCompletionStatus).forEach(key => {
+                        if (key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX + taskDef.id + "_")) delete currentTaskCompletionStatus[key];
+                    });
+                });
+            } else if (folderToDelete && folderToDelete.type === 'notes') {
+                // Notes folder content is self-contained, no external completion status
+            }
+            userFoldersByCategoryId[categoryId] = foldersInCat.filter(f => f.id !== id);
+            saveUserFolders(userFoldersByCategoryId);
+            renderCategoryTasks(categoryId);
+        }
+    } else if (type === 'noteItem') {
+        const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+        if (folder && folder.type === 'notes') {
+            folder.content = folder.content.filter(item => item.id !== id);
+            saveUserFolders(userFoldersByCategoryId);
+            renderNotesFolderContent(folder, categoryId, document.querySelector(`#category-section-${categoryId} .notes-folder-content-wrapper`));
         }
     }
 
@@ -867,542 +875,513 @@ function confirmDeletion() {
     hideDeleteConfirmation();
 }
 
+
 function hideDeleteConfirmation() {
-    if (domElements.deleteConfirmationModal) {
-        domElements.deleteConfirmationModal.classList.add('hidden');
-    }
+    if (domElements.deleteConfirmationModal) domElements.deleteConfirmationModal.classList.add('hidden');
     itemToDelete = null;
 }
 
-// Renders the content of a specific category section
-// This will either be folder boxes or the content of a selected folder.
-function renderCategorySectionContent(categoryId) {
-    const sectionElement = document.getElementById(`category-section-${categoryId}`);
-    if (!sectionElement) return;
+function renderCategoryTasks(categoryId) {
+  const categorySection = document.getElementById(`category-section-${categoryId}`);
+  if (!categorySection) return;
 
-    let contentArea = sectionElement.querySelector('.category-content-area');
-    if (!contentArea) { // Create if not exists (e.g. from template)
-        contentArea = document.createElement('div');
-        contentArea.className = 'category-content-area';
-        // Clear old direct task lists/add forms if they exist from old structure
-        sectionElement.querySelectorAll('.task-list, .add-task-form-container').forEach(el => el.remove());
-        sectionElement.appendChild(contentArea);
+  const category = currentCategories.find(c => c.id === categoryId);
+  if (!category) return;
+
+  const categoryContentArea = categorySection.querySelector('.category-content-area');
+  const taskListUl = categorySection.querySelector('ul.task-list');
+  const notesFolderWrapper = categorySection.querySelector('.notes-folder-content-wrapper');
+  const addTaskFormTop = categorySection.querySelector('.add-task-form-top');
+  const addTaskFormBottom = categorySection.querySelector('.add-task-form-bottom');
+  const categoryHeader = categorySection.querySelector('.category-header');
+  const categoryTitleText = categoryHeader.querySelector('.category-title-text');
+  const categoryHeaderControls = categoryHeader.querySelector('.category-header-controls');
+
+  categoryContentArea.innerHTML = '';
+  taskListUl.innerHTML = '';
+  taskListUl.classList.add('hidden'); // Hide task list by default
+  notesFolderWrapper.classList.add('hidden'); // Hide notes wrapper by default
+  notesFolderWrapper.querySelector('.notes-content-display-area').innerHTML = ''; // Clear old notes
+
+  const activeFolder = userFoldersByCategoryId[categoryId]?.find(f => f.id === activeFolderIdForCategory[categoryId]);
+  const isTaskFolderView = categoryViewMode[categoryId] === 'view_folder_content' && activeFolder?.type === 'task';
+  const isNotesFolderView = categoryViewMode[categoryId] === 'view_folder_content' && activeFolder?.type === 'notes';
+
+  [addTaskFormTop, addTaskFormBottom].forEach(form => form.style.display = (isTaskFolderView && editModes[categoryId]) ? 'block' : 'none');
+
+  if (categoryHeaderControls) {
+      const editButton = categoryHeaderControls.querySelector('.edit-mode-toggle-button');
+      const undoButton = categoryHeaderControls.querySelector('.undo-category-button');
+      const saveNotesButton = categoryHeaderControls.querySelector('#save-notes-folder-button'); // Check if it's there
+
+      if (isTaskFolderView) {
+          if(editButton) editButton.style.display = 'flex';
+          if(undoButton) undoButton.style.display = 'flex';
+          if(saveNotesButton) saveNotesButton.style.display = 'none'; // Hide notes save button
+      } else if (isNotesFolderView) {
+          if(editButton) editButton.style.display = 'none'; // Hide task edit button
+          if(undoButton) undoButton.style.display = 'none'; // Hide task undo button
+          // Save Notes button for notes folder is inside its own control bar now.
+      } else { // list_folders view
+          if(editButton) editButton.style.display = 'none';
+          if(undoButton) undoButton.style.display = 'none';
+          if(saveNotesButton) saveNotesButton.style.display = 'none';
+      }
+  }
+
+  let backButton = categoryHeader.querySelector('.back-to-folders-button');
+  if (categoryViewMode[categoryId] === 'view_folder_content') {
+    if (!backButton) {
+        const buttonTemplate = domElements.backToFoldersButtonTemplate.content.cloneNode(true);
+        backButton = buttonTemplate.querySelector('.back-to-folders-button');
+        backButton.onclick = () => {
+            categoryViewMode[categoryId] = 'list_folders';
+            activeFolderIdForCategory[categoryId] = null;
+            if (activeAddTaskForm?.categoryId === categoryId) hideTempAddTaskForm(categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position);
+            renderCategoryTasks(categoryId);
+        };
+        categoryHeader.prepend(backButton);
     }
-    contentArea.innerHTML = ''; // Clear previous content
+    backButton.style.display = 'flex';
+    categoryTitleText.textContent = activeFolder ? activeFolder.name : category.name;
+  } else {
+    if (backButton) backButton.style.display = 'none';
+    categoryTitleText.textContent = category.name;
+  }
 
-    // Hide category-level edit/undo buttons, they are folder-specific now
-    sectionElement.querySelector('.category-header-controls')?.classList.add('hidden');
-
-
-    if (currentCategoryView.categoryId === categoryId) {
-        if (currentCategoryView.mode === 'folders') {
-            renderFolderSystemForCategory(categoryId, contentArea);
-        } else if (currentCategoryView.mode === 'task_folder') {
-            renderTaskFolderContents(categoryId, currentCategoryView.folderId, contentArea);
-        } else if (currentCategoryView.mode === 'note_folder') {
-            renderNoteFolderContents(categoryId, currentCategoryView.folderId, contentArea);
-        }
+  const editModeButton = categoryHeader.querySelector('.edit-mode-toggle-button');
+   if (editModeButton) {
+        editModeButton.classList.toggle('active-glow', !!editModes[categoryId]);
+        editModeButton.setAttribute('aria-pressed', !!editModes[categoryId]);
     }
+
+  if (categoryViewMode[categoryId] === 'list_folders') {
+    const folders = (userFoldersByCategoryId[categoryId] || []).sort((a,b) => a.order - b.order);
+    const folderDisplayContainer = document.createElement('div');
+    folderDisplayContainer.className = 'task-folders-grid';
+    if (folders.length > 0) folders.forEach(folder => folderDisplayContainer.appendChild(renderFolderBox(folder, categoryId)));
+
+    const addNewFolderPlusButton = document.createElement('button');
+    addNewFolderPlusButton.className = 'add-new-folder-plus-button';
+    addNewFolderPlusButton.title = "Add a new folder to this category";
+    addNewFolderPlusButton.setAttribute('aria-label', "Add new folder");
+    addNewFolderPlusButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>`;
+    addNewFolderPlusButton.onclick = () => openAddFolderModal(categoryId);
+    folderDisplayContainer.appendChild(addNewFolderPlusButton);
+    categoryContentArea.appendChild(folderDisplayContainer);
+    if (folders.length === 0) {
+        const emptyMessage = document.createElement('p'); emptyMessage.className = 'empty-tasks-message';
+        emptyMessage.textContent = 'No folders yet. Click the "+" button to add one.';
+        categoryContentArea.appendChild(emptyMessage);
+    }
+  } else if (isTaskFolderView) {
+    taskListUl.classList.remove('hidden');
+    if (activeFolder && activeFolder.tasks.length > 0) {
+        activeFolder.tasks.forEach(taskDef => taskListUl.appendChild(renderTaskItem(taskDef, categoryId, activeFolder.id)));
+    } else {
+        const emptyMessage = document.createElement('p'); emptyMessage.className = 'empty-tasks-message';
+        emptyMessage.textContent = editModes[categoryId] ? 'This folder is empty. Click "Add Item" to create tasks.' : 'This folder is empty.';
+        if (editModes[categoryId]) emptyMessage.classList.add('edit-mode-empty');
+        taskListUl.appendChild(emptyMessage);
+    }
+  } else if (isNotesFolderView) {
+    notesFolderWrapper.classList.remove('hidden');
+    renderNotesFolderContent(activeFolder, categoryId, notesFolderWrapper);
+  }
 }
 
-// Renders the grid of folder boxes for a category
-function renderFolderSystemForCategory(categoryId, container) {
-    container.innerHTML = ''; // Clear existing content (e.g., if switching from folder view)
-    
-    const foldersGrid = document.createElement('div');
-    foldersGrid.className = 'folders-grid';
-    
-    const folders = (foldersByCategoryId[categoryId] || []).sort((a,b) => a.order - b.order);
-    folders.forEach(folder => {
-        foldersGrid.appendChild(renderFolderBox(folder));
-    });
-
-    const addFolderBtn = document.createElement('button');
-    addFolderBtn.className = 'add-folder-button';
-    addFolderBtn.setAttribute('aria-label', 'Add new folder');
-    addFolderBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>`;
-    addFolderBtn.onclick = () => openChooseFolderTypeModal(categoryId);
-    foldersGrid.appendChild(addFolderBtn);
-
-    container.appendChild(foldersGrid);
-}
-
-// Renders a single folder box item (wrapper, box, name)
-function renderFolderBox(folder) {
+function renderFolderBox(folder, categoryId) {
     const wrapper = document.createElement('div');
-    wrapper.className = 'folder-item-container';
+    wrapper.className = 'task-folder-box-wrapper';
     wrapper.dataset.folderId = folder.id;
-    wrapper.dataset.categoryId = folder.categoryId;
     wrapper.setAttribute('role', 'button');
     wrapper.setAttribute('tabindex', '0');
     wrapper.setAttribute('aria-label', `Open folder: ${folder.name}`);
 
-    const box = document.createElement('div'); // The visual square
-    box.className = 'folder-box';
-    
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'folder-box-icon';
-    if (folder.type === 'task') {
-        iconDiv.innerHTML = `<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-10V7h14v2H7z"></path></svg>`;
-    } else { // note
-        iconDiv.innerHTML = `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path></svg>`;
+    const squareBox = document.createElement('div');
+    squareBox.className = 'task-folder-square-box';
+
+    const symbolSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    symbolSvg.setAttribute('class', 'task-folder-symbol');
+    symbolSvg.setAttribute('viewBox', '0 0 24 24');
+
+    if (folder.type === 'notes') {
+        squareBox.classList.add('notes-folder-icon-box');
+        wrapper.classList.add('notes-folder-label'); // For label color
+        symbolSvg.innerHTML = `<path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 14H8v-2h8v2zm0-4H8v-2h8v2zm0-4H8V6h8v2z"></path>`; // Notes icon
+    } else { // Task folder
+        symbolSvg.innerHTML = `<path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/><path d="M7.035 14.854l-1.889-1.889-1.061 1.061 2.95 2.95 5.869-5.869-1.061-1.061z"/>`; // Task icon
     }
-    box.appendChild(iconDiv);
+    squareBox.appendChild(symbolSvg);
+    wrapper.appendChild(squareBox);
 
-    const optionsTrigger = document.createElement('div');
-    optionsTrigger.className = 'folder-options-trigger';
-    optionsTrigger.innerHTML = `<span></span><span></span><span></span>`;
-    optionsTrigger.setAttribute('aria-label', `Options for folder ${folder.name}`);
-    optionsTrigger.setAttribute('role', 'button');
-    optionsTrigger.tabIndex = 0; // Make focusable for keyboard
-    optionsTrigger.onclick = (e) => { e.stopPropagation(); showFolderContextMenu(folder, box); }; // Pass `box` as target element
-    optionsTrigger.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); showFolderContextMenu(folder, box); }};
-    box.appendChild(optionsTrigger);
-    
-    wrapper.appendChild(box);
+    const label = document.createElement('span');
+    label.className = 'task-folder-label-text';
+    label.textContent = folder.name;
+    wrapper.appendChild(label);
 
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'folder-box-name';
-    nameSpan.textContent = folder.name;
-    wrapper.appendChild(nameSpan);
-    
-    wrapper.onclick = () => {
-        currentCategoryView = {
-            mode: folder.type === 'task' ? 'task_folder' : 'note_folder',
-            categoryId: folder.categoryId,
-            folderId: folder.id
-        };
-        renderCategorySectionContent(folder.categoryId);
+    const optionsIcon = document.createElement('div');
+    optionsIcon.className = 'folder-options-icon entity-options-icon';
+    optionsIcon.innerHTML = `<span></span><span></span><span></span>`;
+    optionsIcon.setAttribute('aria-label', `Options for folder ${folder.name}`);
+    optionsIcon.setAttribute('role', 'button');
+    optionsIcon.tabIndex = 0;
+
+    optionsIcon.onclick = (e) => { e.stopPropagation(); showFolderContextMenu(folder.id, categoryId, optionsIcon); };
+    optionsIcon.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); showFolderContextMenu(folder.id, categoryId, optionsIcon); }};
+    wrapper.appendChild(optionsIcon);
+
+    let folderLongPressTimer;
+    wrapper.addEventListener('touchstart', (e) => {
+        if (e.target === optionsIcon || optionsIcon.contains(e.target)) return;
+        clearTimeout(folderLongPressTimer); optionsIcon.classList.remove('visible');
+        const touchMoveHandler = () => clearTimeout(folderLongPressTimer);
+        wrapper.addEventListener('touchmove', touchMoveHandler, { once: true });
+        folderLongPressTimer = setTimeout(() => { optionsIcon.classList.add('visible'); wrapper.removeEventListener('touchmove', touchMoveHandler); }, LONG_PRESS_DURATION);
+    }, {passive: true});
+    wrapper.addEventListener('touchend', () => clearTimeout(folderLongPressTimer));
+    wrapper.addEventListener('touchcancel', () => clearTimeout(folderLongPressTimer));
+
+    wrapper.onclick = (e) => {
+        if (e.target === optionsIcon || optionsIcon.contains(e.target) || wrapper.querySelector('.folder-inline-rename-input')) return;
+        categoryViewMode[categoryId] = 'view_folder_content';
+        activeFolderIdForCategory[categoryId] = folder.id;
+        renderCategoryTasks(categoryId);
     };
-    wrapper.onkeydown = (e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); wrapper.click(); }};
-
+    wrapper.onkeydown = (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && (e.target !== optionsIcon && !optionsIcon.contains(e.target)) && !wrapper.querySelector('.folder-inline-rename-input')) {
+            e.preventDefault(); categoryViewMode[categoryId] = 'view_folder_content';
+            activeFolderIdForCategory[categoryId] = folder.id; renderCategoryTasks(categoryId);
+        }
+    };
     return wrapper;
 }
 
+// --- Notes Folder Specific Functions ---
+function renderNotesFolderContent(folder, categoryId, notesFolderWrapperElement) {
+    const displayArea = notesFolderWrapperElement.querySelector('.notes-content-display-area');
+    const controls = notesFolderWrapperElement.querySelector('.notes-editor-controls');
+    displayArea.innerHTML = ''; // Clear previous content
 
-// Renders the content of a task folder (task list, add forms, controls)
-function renderTaskFolderContents(categoryId, folderId, container) {
-    if (!container) { // If container not passed, find it (e.g., initial render or direct call)
-        const sectionElement = document.getElementById(`category-section-${categoryId}`);
-        if (!sectionElement) return;
-        container = sectionElement.querySelector('.category-content-area');
-        if (!container) return;
-    }
-    container.innerHTML = ''; // Clear folder grid
-    const folder = findFolderById(folderId);
-    if (!folder) return;
-
-    const header = document.createElement('div');
-    header.className = 'folder-view-header';
-    
-    const backButton = document.createElement('button');
-    backButton.className = 'folder-back-button icon-button'; // Added icon-button
-    backButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>`; // Arrow icon
-    backButton.setAttribute('aria-label', 'Back to folders');
-    backButton.title = 'Back to Folders';
-    backButton.onclick = () => {
-        currentCategoryView = { mode: 'folders', categoryId: categoryId, folderId: null };
-        currentFolderEditModes[folderId] = false; // Reset edit mode when leaving
-        renderCategorySectionContent(categoryId);
-    };
-    header.appendChild(backButton);
-
-    const title = document.createElement('h3');
-    title.className = 'folder-view-title';
-    title.textContent = folder.name;
-    header.appendChild(title);
-
-    const controlsDiv = document.createElement('div');
-    controlsDiv.className = 'folder-view-header-controls';
-
-    const editModeButton = document.createElement('button');
-    editModeButton.className = 'edit-mode-toggle-button icon-button';
-    editModeButton.title = 'Toggle Edit Mode for Tasks';
-    editModeButton.setAttribute('aria-pressed', currentFolderEditModes[folderId] ? 'true' : 'false');
-    editModeButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>`;
-    editModeButton.onclick = () => toggleTaskFolderEditMode(folderId);
-    if (currentFolderEditModes[folderId]) editModeButton.classList.add('active-glow');
-    controlsDiv.appendChild(editModeButton);
-
-    const undoButton = document.createElement('button');
-    undoButton.className = 'undo-folder-button icon-button'; 
-    undoButton.title = 'Uncheck All Tasks in this Folder';
-    undoButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>`;
-    undoButton.onclick = () => {
-        const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
-        (folder.content || []).forEach(taskDef => {
-            saveTaskStatus(folderId, taskDef.id, false, today);
-        });
-        renderTaskFolderContents(categoryId, folderId, container); // Re-render tasks
-        updateAllProgress();
-    };
-    controlsDiv.appendChild(undoButton);
-    header.appendChild(controlsDiv);
-    container.appendChild(header);
-
-    const taskFolderContentDiv = document.createElement('div');
-    taskFolderContentDiv.id = `task-folder-content-${folderId}`;
-    taskFolderContentDiv.className = 'task-folder-content';
-    if(currentFolderEditModes[folderId]) taskFolderContentDiv.classList.add('edit-mode-active');
-
-
-    // Add Task Form (Top)
-    const addTaskFormTop = createAddTaskForm(categoryId, folderId, 'top');
-    taskFolderContentDiv.appendChild(addTaskFormTop);
-
-    const taskListElement = document.createElement('ul');
-    taskListElement.className = 'task-list';
-    taskListElement.setAttribute('aria-live', 'polite');
-    taskListElement.dataset.folderId = folderId; // For drop target check
-    taskListElement.dataset.categoryId = categoryId;
-
-
-    const tasksForDay = getTasksForFolderForDay(folderId, localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString());
-    if (tasksForDay.length === 0) {
-        const emptyMessage = document.createElement('p');
-        emptyMessage.textContent = currentFolderEditModes[folderId] ? 'No tasks defined. Click "Add Item" to create new tasks.' : 'No tasks for today in this folder.';
-        emptyMessage.className = 'empty-tasks-message';
-        if (currentFolderEditModes[folderId]) emptyMessage.classList.add('edit-mode-empty');
-        taskListElement.appendChild(emptyMessage);
+    if (!folder.content || folder.content.length === 0) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'empty-tasks-message'; // Re-use style
+        emptyMsg.textContent = 'This notes folder is empty. Use the controls above to add content.';
+        displayArea.appendChild(emptyMsg);
     } else {
-        tasksForDay.forEach(task => {
-            taskListElement.appendChild(renderTaskItem(task, folderId, categoryId));
-        });
+        folder.content.forEach(item => displayArea.appendChild(renderNoteItem(item, folder.id, categoryId)));
     }
-    taskFolderContentDiv.appendChild(taskListElement);
 
-    // Add Task Form (Bottom)
-    const addTaskFormBottom = createAddTaskForm(categoryId, folderId, 'bottom');
-    taskFolderContentDiv.appendChild(addTaskFormBottom);
-    
-    container.appendChild(taskFolderContentDiv);
+    // Event listeners for controls
+    controls.querySelector('[data-action="add-text"]').onclick = () => addNoteItem(folder.id, categoryId, 'text');
+    controls.querySelector('[data-action="add-link"]').onclick = () => addNoteItem(folder.id, categoryId, 'link');
+    controls.querySelector('[data-action="add-image"]').onclick = () => addNoteItem(folder.id, categoryId, 'image');
+    controls.querySelector('#save-notes-folder-button').onclick = () => saveAllNotesInFolder(folder.id, categoryId);
 }
 
-function createAddTaskForm(categoryId, folderId, position) {
+function renderNoteItem(item, folderId, categoryId, isEditing = false) {
+    const template = domElements.noteItemTemplate.content.cloneNode(true);
+    const noteItemElement = template.querySelector('.note-item');
+    noteItemElement.dataset.itemId = item.id;
+    const contentDiv = noteItemElement.querySelector('.note-item-content');
+
+    if (isEditing) {
+        // Render edit form instead of content
+        contentDiv.appendChild(createNoteItemEditForm(item, folderId, categoryId));
+    } else {
+        switch (item.type) {
+            case 'text':
+                const p = document.createElement('p');
+                p.textContent = item.value || "";
+                contentDiv.appendChild(p);
+                break;
+            case 'link':
+                const a = document.createElement('a');
+                a.href = item.value.url;
+                a.textContent = item.value.text || item.value.url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                contentDiv.appendChild(a);
+                break;
+            case 'image':
+                const img = document.createElement('img');
+                img.src = item.value.dataUrl;
+                img.alt = item.value.alt || 'User image';
+                contentDiv.appendChild(img);
+                break;
+        }
+    }
+
+    noteItemElement.querySelector('.edit-note-item').onclick = (e) => {
+        e.stopPropagation();
+        startNoteItemEdit(item.id, folderId, categoryId, noteItemElement);
+    };
+    noteItemElement.querySelector('.delete-note-item').onclick = (e) => {
+        e.stopPropagation();
+        showDeleteConfirmation('noteItem', item.id, `Delete this ${item.type} item?`, '', categoryId, folderId);
+    };
+
+    // Drag and drop for note items
+    noteItemElement.draggable = true;
+    noteItemElement.addEventListener('dragstart', (e) => {
+        if (noteItemElement.classList.contains('editing')) { e.preventDefault(); return; }
+        draggedItemElement = noteItemElement;
+        setTimeout(() => noteItemElement.classList.add('dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+    });
+    noteItemElement.addEventListener('dragend', () => {
+        const displayArea = noteItemElement.closest('.notes-content-display-area');
+        if (!displayArea) return;
+        noteItemElement.classList.remove('dragging');
+        draggedItemElement = null;
+        document.querySelectorAll('.drag-over-indicator-note, .drag-over-indicator-note-bottom').forEach(el => {
+            el.classList.remove('drag-over-indicator-note', 'drag-over-indicator-note-bottom');
+        });
+
+        const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+        if (folder && folder.type === 'notes') {
+            const newOrderItemIds = Array.from(displayArea.querySelectorAll('.note-item')).map(el => el.dataset.itemId);
+            folder.content = newOrderItemIds.map(id => folder.content.find(contentItem => contentItem.id === id)).filter(Boolean);
+            saveUserFolders(userFoldersByCategoryId);
+             // No immediate re-render needed as DOM is already updated locally, just save.
+        }
+    });
+
+    return noteItemElement;
+}
+
+function addNoteItem(folderId, categoryId, type) {
+    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+    if (!folder || folder.type !== 'notes') return;
+
+    let newItem;
+    switch (type) {
+        case 'text': newItem = { id: createUniqueId('noteitem'), type: 'text', value: "" }; break;
+        case 'link': newItem = { id: createUniqueId('noteitem'), type: 'link', value: { url: "", text: "" } }; break;
+        case 'image': newItem = { id: createUniqueId('noteitem'), type: 'image', value: { dataUrl: "", alt: "" } }; break;
+        default: return;
+    }
+    folder.content.push(newItem);
+
+    // Create the new item element and immediately put it into edit mode
+    const displayArea = document.querySelector(`#category-section-${categoryId} .notes-content-display-area`);
+    if (displayArea) {
+        const newItemElement = renderNoteItem(newItem, folderId, categoryId, true); // Render in edit mode
+        displayArea.appendChild(newItemElement);
+        const inputToFocus = newItemElement.querySelector('textarea, input[type="url"], input[type="file"]');
+        if (inputToFocus) inputToFocus.focus();
+    }
+    // No saveUserFolders here yet, will be saved by "Save Notes" or individual item save
+}
+
+function startNoteItemEdit(itemId, folderId, categoryId, itemElement) {
+    if (currentEditingNoteItem && currentEditingNoteItem.itemId !== itemId) {
+        // If another item is being edited, attempt to save it first or cancel.
+        const prevFolder = userFoldersByCategoryId[currentEditingNoteItem.categoryId]?.find(f => f.id === currentEditingNoteItem.folderId);
+        const prevItem = prevFolder?.content.find(it => it.id === currentEditingNoteItem.itemId);
+        if (prevFolder && prevItem && currentEditingNoteItem.itemElement) {
+             const newPrevItemElement = renderNoteItem(prevItem, currentEditingNoteItem.folderId, currentEditingNoteItem.categoryId, false); // Corrected parameters
+             currentEditingNoteItem.itemElement.replaceWith(newPrevItemElement);
+        }
+    }
+
+    currentEditingNoteItem = { itemId, folderId, categoryId, itemElement };
+    itemElement.classList.add('editing');
+    const contentDiv = itemElement.querySelector('.note-item-content');
+    const originalContent = contentDiv.innerHTML; // Store original for cancel
+    contentDiv.innerHTML = ''; // Clear display content
+
+    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+    const item = folder?.content.find(it => it.id === itemId);
+    if (!item) return;
+
+    contentDiv.appendChild(createNoteItemEditForm(item, folderId, categoryId, originalContent));
+}
+
+function createNoteItemEditForm(item, folderId, categoryId, originalDisplayHTML) {
     const formContainer = document.createElement('div');
-    formContainer.className = `add-task-form-container add-task-form-${position}`;
+    formContainer.className = 'note-item-editing-form';
+    let templateId = '';
 
-    const triggerButton = document.createElement('button');
-    triggerButton.className = 'add-item-trigger-button icon-button';
-    triggerButton.dataset.position = position;
-    triggerButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg> Add Item`;
-    triggerButton.onclick = () => showTempAddTaskForm(categoryId, folderId, position);
-    formContainer.appendChild(triggerButton);
+    switch (item.type) {
+        case 'text': templateId = 'note-item-edit-form-template-text'; break;
+        case 'link': templateId = 'note-item-edit-form-template-link'; break;
+        case 'image': templateId = 'note-item-edit-form-template-image'; break;
+    }
+    const formTemplate = document.getElementById(templateId).content.cloneNode(true);
+    formContainer.appendChild(formTemplate);
 
-    const formDiv = document.createElement('div');
-    formDiv.className = 'new-temp-task-form hidden';
-    
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'new-task-temp-input';
-    input.placeholder = 'Enter task text...';
-    input.onkeypress = (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTempTask(categoryId, folderId, position); }};
-    formDiv.appendChild(input);
+    // Populate form fields
+    if (item.type === 'text') {
+        formContainer.querySelector('.note-edit-textarea').value = item.value || "";
+    } else if (item.type === 'link') {
+        formContainer.querySelector('.note-edit-link-url').value = item.value.url || "";
+        formContainer.querySelector('.note-edit-link-text').value = item.value.text || "";
+    } else if (item.type === 'image') {
+        formContainer.querySelector('.note-edit-image-alt').value = item.value.alt || "";
+        const preview = formContainer.querySelector('.note-edit-image-preview');
+        if (item.value.dataUrl) {
+            preview.src = item.value.dataUrl;
+            preview.style.display = 'block';
+        }
+        formContainer.querySelector('.note-edit-image-file').onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (re) => { preview.src = re.target.result; preview.style.display = 'block'; };
+                reader.readAsDataURL(file);
+            }
+        };
+    }
 
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'form-actions';
     const saveBtn = document.createElement('button');
-    saveBtn.className = 'new-task-temp-save';
-    saveBtn.textContent = 'Save';
-    saveBtn.onclick = () => handleSaveTempTask(categoryId, folderId, position);
-    formDiv.appendChild(saveBtn);
-
+    saveBtn.textContent = 'Save'; saveBtn.className = 'new-task-temp-save'; // Reuse style
+    saveBtn.onclick = () => saveNoteItemEdit(item.id, folderId, categoryId, formContainer);
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'new-task-temp-cancel';
-    cancelBtn.textContent = 'Cancel';
-    cancelBtn.onclick = () => hideTempAddTaskForm(categoryId, folderId, position);
-    formDiv.appendChild(cancelBtn);
-    
-    formContainer.appendChild(formDiv);
+    cancelBtn.textContent = 'Cancel'; cancelBtn.className = 'new-task-temp-cancel'; // Reuse style
+    cancelBtn.onclick = () => cancelNoteItemEdit(item, folderId, categoryId, originalDisplayHTML);
+
+    actionsDiv.appendChild(saveBtn); actionsDiv.appendChild(cancelBtn);
+    formContainer.appendChild(actionsDiv);
     return formContainer;
 }
 
-// Renders the content of a note folder (editor/viewer)
-function renderNoteFolderContents(categoryId, folderId, container) {
-     if (!container) { 
-        const sectionElement = document.getElementById(`category-section-${categoryId}`);
-        if (!sectionElement) return;
-        container = sectionElement.querySelector('.category-content-area');
-        if (!container) return;
+function saveNoteItemEdit(itemId, folderId, categoryId, formContainerElement) {
+    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+    const item = folder?.content.find(it => it.id === itemId);
+    if (!item) return;
+
+    if (item.type === 'text') {
+        item.value = formContainerElement.querySelector('.note-edit-textarea').value;
+    } else if (item.type === 'link') {
+        item.value.url = formContainerElement.querySelector('.note-edit-link-url').value;
+        item.value.text = formContainerElement.querySelector('.note-edit-link-text').value;
+    } else if (item.type === 'image') {
+        item.value.alt = formContainerElement.querySelector('.note-edit-image-alt').value;
+        const fileInput = formContainerElement.querySelector('.note-edit-image-file');
+        const previewSrc = formContainerElement.querySelector('.note-edit-image-preview').src;
+        if (previewSrc && previewSrc !== '#' && (!fileInput.files[0] || previewSrc.startsWith('data:image'))) {
+             item.value.dataUrl = previewSrc;
+        }
     }
-    container.innerHTML = ''; 
-    const folder = findFolderById(folderId);
-    if (!folder || folder.type !== 'note') return;
 
-    const header = document.createElement('div');
-    header.className = 'folder-view-header';
-    
-    const backButton = document.createElement('button');
-    backButton.className = 'folder-back-button icon-button'; // Added icon-button
-    backButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>`; // Arrow icon
-    backButton.setAttribute('aria-label', 'Back to folders');
-    backButton.title = 'Back to Folders';
-    backButton.onclick = () => {
-        currentCategoryView = { mode: 'folders', categoryId: categoryId, folderId: null };
-        renderCategorySectionContent(categoryId);
-    };
-    header.appendChild(backButton);
-
-    const title = document.createElement('h3');
-    title.className = 'folder-view-title';
-    title.textContent = folder.name;
-    header.appendChild(title);
-    
-    const controlsDiv = document.createElement('div');
-    controlsDiv.className = 'folder-view-header-controls note-folder-controls'; // Use specific class for styling if needed
-
-    const addImageButton = document.createElement('button');
-    addImageButton.className = 'add-image-button icon-button';
-    addImageButton.title = 'Add Image';
-    addImageButton.setAttribute('aria-label', 'Add image to note');
-    addImageButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"></path></svg>`;
-    
-    controlsDiv.appendChild(addImageButton);
-    header.appendChild(controlsDiv);
-    container.appendChild(header);
-
-    const noteContentWrapper = document.createElement('div');
-    noteContentWrapper.className = 'note-folder-content-wrapper';
-
-    const noteEditor = document.createElement('div');
-    noteEditor.className = 'note-editor'; // Editable by default
-    noteEditor.setAttribute('contenteditable', 'true');
-    noteEditor.setAttribute('aria-label', `Note content for ${folder.name}`);
-    noteEditor.innerHTML = folder.content || ''; // Load existing content
-    autoLinkText(noteEditor); // Format links on initial load
-
-    addImageButton.onclick = () => {
-        domElements.imageUploadInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file && file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (readEvent) => {
-                    // Create an image element. Styles are applied via CSS .note-editor img
-                    const img = document.createElement('img');
-                    img.src = readEvent.target.result;
-                    img.alt = "Uploaded Image";
-
-                    noteEditor.focus(); // Ensure editor is focused for selection
-                    const selection = window.getSelection();
-                    if (selection.rangeCount > 0) {
-                        const range = selection.getRangeAt(0);
-                        range.deleteContents();
-                        range.insertNode(img);
-                        // Move cursor after inserted image
-                        range.setStartAfter(img);
-                        range.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                    } else {
-                        noteEditor.appendChild(img); // Fallback: append to end
-                    }
-                    // Trigger input to save
-                    noteEditor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-                };
-                reader.readAsDataURL(file);
-                domElements.imageUploadInput.value = ''; // Reset file input
-            }
-        };
-        domElements.imageUploadInput.click();
-    };
-
-
-    noteEditor.addEventListener('input', () => {
-        folder.content = noteEditor.innerHTML;
-        saveFoldersByCategoryId(foldersByCategoryId);
-    });
-
-    noteEditor.addEventListener('blur', () => {
-        autoLinkText(noteEditor); // Format links when editor loses focus
-        folder.content = noteEditor.innerHTML; // Save potentially re-formatted content
-        saveFoldersByCategoryId(foldersByCategoryId);
-    });
-    
-    // Paste/drop/dragover listeners (already exist, verify they work with new structure)
-    ['paste', 'drop'].forEach(eventType => {
-        noteEditor.addEventListener(eventType, (event) => {
-            if (eventType === 'drop') event.preventDefault();
-            const items = (eventType === 'paste' ? event.clipboardData : event.dataTransfer)?.items;
-            if (!items) return;
-
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
-                    const blob = items[i].getAsFile();
-                    if (blob) {
-                        const reader = new FileReader();
-                        reader.onload = (e_reader) => {
-                            const img = document.createElement('img');
-                            img.src = e_reader.target.result;
-                            // Styles are applied by .note-editor img CSS
-
-                            noteEditor.focus(); // Ensure focus
-                            const selection = window.getSelection();
-                            if (selection.rangeCount > 0) {
-                                const range = selection.getRangeAt(0);
-                                range.deleteContents();
-                                range.insertNode(img);
-                                range.setStartAfter(img);
-                                range.collapse(true);
-                                selection.removeAllRanges();
-                                selection.addRange(range);
-
-                            } else {
-                                noteEditor.appendChild(img);
-                            }
-                            // Trigger input to save
-                            noteEditor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-                        };
-                        reader.readAsDataURL(blob);
-                    }
-                    if (eventType === 'paste') event.preventDefault(); 
-                }
-            }
-        });
-    });
-    noteEditor.addEventListener('dragover', (event) => {
-        event.preventDefault(); // Necessary for drop to work
-    });
-
-
-    noteContentWrapper.appendChild(noteEditor);
-    container.appendChild(noteContentWrapper);
+    const itemElement = currentEditingNoteItem?.itemElement;
+    if (itemElement) {
+        const newItemElement = renderNoteItem(item, folderId, categoryId, false);
+        itemElement.replaceWith(newItemElement);
+        itemElement.classList.remove('editing');
+    }
+    currentEditingNoteItem = null;
+    // Main "Save Notes" button for the folder will persist all changes.
 }
 
-function autoLinkText(element) {
-    // This regex tries to avoid matching URLs already inside <a> tags by checking what's NOT preceding.
-    // It's not foolproof for all complex HTML but better than a naive replace.
-    const urlPattern = /(?<!href="|href='|">)(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(?<!href="|href='|">)(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])(?!.*?<\/a>)/ig;
-
-    // We need to iterate over text nodes to avoid breaking existing HTML structure or re-linking.
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    const nodesToReplace = [];
-
-    while (node = walker.nextNode()) {
-        if (node.parentElement.tagName === 'A') continue; // Skip text already in a link
-
-        const matches = [];
-        let match;
-        // Reset lastIndex for global regex on new string
-        urlPattern.lastIndex = 0; 
-        while ((match = urlPattern.exec(node.nodeValue)) !== null) {
-            matches.push({
-                index: match.index,
-                text: match[0]
-            });
-        }
-        
-        if (matches.length > 0) {
-            nodesToReplace.push({textNode: node, matches: matches.reverse()}); // Reverse to process from end of string
+function cancelNoteItemEdit(item, folderId, categoryId, originalDisplayHTML) {
+     const itemElement = currentEditingNoteItem?.itemElement;
+     if (itemElement) {
+        // If it was a newly added item and cancel is hit, remove it
+        const isNewAndEmpty = (!originalDisplayHTML && !item.value && (item.type !== 'link' || (!item.value.url && !item.value.text)) && (item.type !== 'image' || (!item.value.dataUrl)));
+        if (isNewAndEmpty) {
+            const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+            if (folder) folder.content = folder.content.filter(i => i.id !== item.id);
+            itemElement.remove();
+        } else { // Revert to original display or re-render
+            const newItemElement = renderNoteItem(item, folderId, categoryId, false);
+            itemElement.replaceWith(newItemElement);
+            itemElement.classList.remove('editing');
         }
     }
-
-    let linksMade = false;
-    nodesToReplace.forEach(item => {
-        let currentNode = item.textNode;
-        item.matches.forEach(matchInfo => {
-            const matchText = matchInfo.text;
-            let url = matchText;
-            if (!matchText.startsWith('http') && !matchText.startsWith('ftp') && !matchText.startsWith('file')) {
-                url = 'http://' + matchText;
-            }
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            link.textContent = matchText;
-
-            const textAfter = currentNode.splitText(matchInfo.index + matchText.length);
-            const textToLink = currentNode.splitText(matchInfo.index); // This is the matched text node
-            
-            currentNode.parentNode.replaceChild(link, textToLink);
-            currentNode = textAfter.previousSibling.previousSibling; // Move to text node before the link we just inserted, or parent if it was first
-            if (!currentNode || currentNode.nodeType !== Node.TEXT_NODE) { // If we're at the start of original text node
-                 currentNode = link.previousSibling && link.previousSibling.nodeType === Node.TEXT_NODE ? link.previousSibling : element; // A bit of a guess to find a valid node
-            }
-            linksMade = true;
-        });
-    });
-    // The TreeWalker method is more robust but also more complex.
-    // The original simpler regex method is kept if the TreeWalker version is too disruptive during testing.
-    // For now, let's use a slightly improved regex that attempts to avoid re-linking:
-    // This is a simplified version of the above. A full DOM traversal is more robust.
-    // The previous simple replace on innerHTML is problematic for contenteditable.
-    // This version tries to be a bit smarter.
-
-    // Using a non-destructive regex approach:
-    // Find all text nodes not already in an <a> tag.
-    const textNodes = [];
-    const collectTextNodes = (el) => {
-        for (const child of el.childNodes) {
-            if (child.nodeType === Node.TEXT_NODE) {
-                if (child.parentNode.nodeName.toUpperCase() !== 'A') {
-                    textNodes.push(child);
-                }
-            } else if (child.nodeType === Node.ELEMENT_NODE && child.nodeName.toUpperCase() !== 'A') {
-                collectTextNodes(child);
-            }
-        }
-    };
-    
-    collectTextNodes(element);
-    
-    let madeChanges = false;
-    for (const node of textNodes) {
-        const text = node.nodeValue;
-        let newContent = text;
-        newContent = newContent.replace(urlPattern, (match) => {
-            let url = match;
-            if (!match.startsWith('http') && !match.startsWith('ftp') && !match.startsWith('file')) {
-                url = 'http://' + match;
-            }
-            madeChanges = true;
-            return `<a href="${url}" target="_blank" rel="noopener noreferrer">${match}</a>`;
-        });
-
-        if (madeChanges && newContent !== text) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = newContent;
-            const parent = node.parentNode;
-            while (tempDiv.firstChild) {
-                parent.insertBefore(tempDiv.firstChild, node);
-            }
-            parent.removeChild(node);
-        }
-    }
-    // No change to element.innerHTML directly if no links were actually made this call
+    currentEditingNoteItem = null;
 }
+
+function saveAllNotesInFolder(folderId, categoryId) {
+    saveUserFolders(userFoldersByCategoryId);
+    const saveButton = document.querySelector(`#category-section-${categoryId} #save-notes-folder-button`);
+    if (saveButton) {
+        const originalText = saveButton.innerHTML;
+        saveButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"></path></svg> Notes Saved!`;
+        setTimeout(() => { saveButton.innerHTML = originalText; }, 2000);
+    }
+    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+    if(folder) renderNotesFolderContent(folder, categoryId, document.querySelector(`#category-section-${categoryId} .notes-folder-content-wrapper`));
+}
+// --- End Notes Folder Specific Functions ---
 
 
 function renderAllCategorySections() {
     if (!domElements.tabContentsContainer || !domElements.categorySectionTemplate) return;
-    
-    // Remove only non-dashboard sections
     domElements.tabContentsContainer.querySelectorAll('.category-section:not(#dashboard-content)').forEach(sec => sec.remove());
 
     currentCategories.forEach(category => {
-        if (category.id === 'dashboard') return; 
+        if (category.id === 'dashboard') return;
 
         const sectionClone = domElements.categorySectionTemplate.content.cloneNode(true);
         const sectionElement = sectionClone.querySelector('.category-section');
-        
         sectionElement.id = `category-section-${category.id}`;
         sectionElement.setAttribute('aria-labelledby', `tab-button-${category.id}`);
-        if (activeTabId !== category.id) {
-            sectionElement.classList.add('hidden');
-        }
+        if (activeTabId !== category.id) sectionElement.classList.add('hidden');
 
         sectionElement.querySelector('.category-title-text').textContent = category.name;
-        
-        // Initial rendering for the category will be its folder system
-        if(activeTabId === category.id) { // Only render content if it's the active tab to save perf
-             currentCategoryView = { mode: 'folders', categoryId: category.id, folderId: null };
-             renderCategorySectionContent(category.id);
-        }
 
+        const editModeButton = sectionElement.querySelector('.edit-mode-toggle-button');
+        editModeButton.onclick = () => toggleCategoryEditMode(category.id);
+
+        sectionElement.querySelector('.undo-category-button').onclick = () => {
+            const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+            const currentFolderId = activeFolderIdForCategory[category.id];
+            const folder = userFoldersByCategoryId[category.id]?.find(f => f.id === currentFolderId);
+            if (folder && folder.type === 'task') {
+                folder.tasks.forEach(taskDef => setTaskCompletionStatus(taskDef.id, today, false));
+                renderCategoryTasks(category.id);
+                updateAllProgress();
+            }
+        };
+
+        ['top', 'bottom'].forEach(position => {
+            const formContainer = sectionElement.querySelector(position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom');
+            if (formContainer) {
+                formContainer.querySelector('.add-item-trigger-button').onclick = () => {
+                    const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]);
+                    if (currentFolder && currentFolder.type === 'task') {
+                       showTempAddTaskForm(category.id, activeFolderIdForCategory[category.id], position);
+                    }
+                };
+                formContainer.querySelector('.new-task-temp-save').onclick = () => {
+                    const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]);
+                     if (currentFolder && currentFolder.type === 'task') {
+                        handleSaveTempTask(category.id, activeFolderIdForCategory[category.id], position);
+                     }
+                };
+                formContainer.querySelector('.new-task-temp-cancel').onclick = () => {
+                     const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]);
+                    if (currentFolder && currentFolder.type === 'task') {
+                        hideTempAddTaskForm(category.id, activeFolderIdForCategory[category.id], position);
+                    }
+                };
+                formContainer.querySelector('.new-task-temp-input').addEventListener('keypress', (e) => {
+                     const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]);
+                     if (e.key === 'Enter' && currentFolder && currentFolder.type === 'task') {
+                         e.preventDefault(); handleSaveTempTask(category.id, activeFolderIdForCategory[category.id], position);
+                     }
+                });
+            }
+        });
         domElements.tabContentsContainer.appendChild(sectionElement);
+        renderCategoryTasks(category.id);
     });
 }
 
+function clearLongPressTimer(tabButton) {
+    if (longPressTimer) clearTimeout(longPressTimer);
+    longPressTimer = null;
+    if (tabButton) {
+      tabButton.removeEventListener('touchmove', preventScrollDuringLongPress);
+      tabButton.removeEventListener('touchend', () => clearLongPressTimer(tabButton));
+      tabButton.removeEventListener('touchcancel', () => clearLongPressTimer(tabButton));
+    }
+}
+function preventScrollDuringLongPress(e) { clearTimeout(longPressTimer); }
 
 function renderTabs() {
     if (!domElements.tabsContainer) return;
@@ -1420,76 +1399,28 @@ function renderTabs() {
         if (activeTabId === category.id) tabButton.classList.add('active');
 
         const optionsIcon = document.createElement('div');
-        optionsIcon.className = 'tab-options-icon';
+        optionsIcon.className = 'tab-options-icon entity-options-icon';
         optionsIcon.innerHTML = `<span></span><span></span><span></span>`;
         optionsIcon.setAttribute('aria-label', `Options for ${category.name}`);
         optionsIcon.setAttribute('role', 'button');
-        optionsIcon.tabIndex = 0; 
+        optionsIcon.tabIndex = 0;
         tabButton.appendChild(optionsIcon);
-        
-        optionsIcon.addEventListener('click', (e) => { 
-            e.stopPropagation(); 
-            showCategoryContextMenu(category.id, tabButton); 
-        });
-        optionsIcon.addEventListener('keydown', (e) => { 
-            if (e.key === 'Enter' || e.key === ' ') { 
-                e.preventDefault(); 
-                e.stopPropagation(); 
-                showCategoryContextMenu(category.id, tabButton); 
-            }
-        });
 
-        // Refactored touch handling for long press
-        let touchStartEvent = null; // To store the touchstart event for preventDefault
+        optionsIcon.addEventListener('click', (e) => { e.stopPropagation(); showCategoryContextMenu(category.id, tabButton); });
+        optionsIcon.addEventListener('keydown', (e) => { if (e.key==='Enter'||e.key===' ') {e.preventDefault();e.stopPropagation();showCategoryContextMenu(category.id,tabButton);}});
 
-        const clearTabLongPressState = () => {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-            tabButton.removeEventListener('touchmove', handleTabTouchMove);
-            tabButton.removeEventListener('touchend', handleTabTouchEndOrCancel);
-            tabButton.removeEventListener('touchcancel', handleTabTouchEndOrCancel);
-            touchStartEvent = null;
-        };
-
-        const handleTabTouchMove = () => {
-            clearTabLongPressState(); // If finger moves, cancel long press
-        };
-
-        const handleTabTouchEndOrCancel = () => {
-            clearTabLongPressState();
-        };
-        
         tabButton.addEventListener('touchstart', (e) => {
-            clearTabLongPressState(); // Clear any previous state
-            touchStartEvent = e; // Store the event
-
-            tabButton.addEventListener('touchmove', handleTabTouchMove);
-            tabButton.addEventListener('touchend', handleTabTouchEndOrCancel);
-            tabButton.addEventListener('touchcancel', handleTabTouchEndOrCancel);
-
-            longPressTimer = setTimeout(() => {
-                if (touchStartEvent) { // Check if touch is still active (not cancelled by move/end)
-                    touchStartEvent.preventDefault(); // Prevent click/other default actions
-                }
-                optionsIcon.classList.add('visible');
-                showCategoryContextMenu(category.id, tabButton);
-                longPressTimer = null; // Timer has fired
-                // Ensure listeners are removed if timer fires before touchend/cancel
-                tabButton.removeEventListener('touchmove', handleTabTouchMove);
-                tabButton.removeEventListener('touchend', handleTabTouchEndOrCancel);
-                tabButton.removeEventListener('touchcancel', handleTabTouchEndOrCancel);
-            }, LONG_PRESS_DURATION);
+            clearLongPressTimer(tabButton);
+            tabButton.addEventListener('touchmove', preventScrollDuringLongPress);
+            longPressTimer = setTimeout(() => { e.preventDefault(); optionsIcon.classList.add('visible'); showCategoryContextMenu(category.id, tabButton); clearLongPressTimer(tabButton); }, LONG_PRESS_DURATION);
+            tabButton.addEventListener('touchend', () => clearLongPressTimer(tabButton));
+            tabButton.addEventListener('touchcancel', () => clearLongPressTimer(tabButton));
         });
-
-
         tabButton.addEventListener('click', (e) => {
-            if (e.target === tabButton && !optionsIcon.contains(e.target)) { 
-                tabButton.classList.add('show-badge-highlight');
-                setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300);
+            if (e.target === tabButton && !optionsIcon.contains(e.target)) {
+                tabButton.classList.add('show-badge-highlight'); setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300);
             }
-            switchTab(category.id);
+            switchTab(category.id)
         });
         domElements.tabsContainer.insertBefore(tabButton, addCatButton);
     });
@@ -1503,56 +1434,45 @@ function switchTab(categoryIdToActivate) {
     hideFolderContextMenu();
 
     domElements.tabsContainer.querySelectorAll('.tab-button').forEach(button => {
-        const isCurrentActive = (button.id === `tab-button-${activeTabId}`) || (activeTabId === 'dashboard' && button.id === 'dashboard-tab-button');
-        button.classList.toggle('active', isCurrentActive);
-        button.setAttribute('aria-selected', isCurrentActive.toString());
+        const isCurrent = (button.id === `tab-button-${activeTabId}`) || (activeTabId === 'dashboard' && button.id === 'dashboard-tab-button');
+        button.classList.toggle('active', isCurrent);
+        button.setAttribute('aria-selected', isCurrent.toString());
     });
-    
-    if (domElements.tabContentsContainer) {
-        domElements.tabContentsContainer.classList.toggle('main-area-scroll-hidden', categoryIdToActivate === 'dashboard');
-    }
+
+    if (domElements.tabContentsContainer) domElements.tabContentsContainer.classList.toggle('main-area-scroll-hidden', categoryIdToActivate === 'dashboard');
 
     domElements.tabContentsContainer.querySelectorAll('section[role="tabpanel"]').forEach(section => {
-        const isCurrentActiveSection = (section.id === `category-section-${activeTabId}`) || (activeTabId === 'dashboard' && section.id === 'dashboard-content');
-        section.classList.toggle('hidden', !isCurrentActiveSection);
+        const isCurrent = (section.id === `category-section-${activeTabId}`) || (activeTabId === 'dashboard' && section.id === 'dashboard-content');
+        section.classList.toggle('hidden', !isCurrent);
     });
-    
-    if (activeTabId !== 'dashboard') {
-        // Set the view to default 'folders' mode for the category
-        currentCategoryView = { mode: 'folders', categoryId: activeTabId, folderId: null };
-        renderCategorySectionContent(activeTabId); 
-    } else {
-        currentCategoryView = { mode: 'dashboard', categoryId: null, folderId: null };
-    }
 
-    if (activeAddTaskForm) { // Hide any open temp add task forms from other folders/categories
-         const folder = findFolderById(activeAddTaskForm.folderId);
-         if(folder) hideTempAddTaskForm(folder.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position);
-    }
+    if (activeTabId !== 'dashboard') renderCategoryTasks(activeTabId);
+    if (activeAddTaskForm) hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position);
+    currentEditingNoteItem = null; // Cancel any note item edit on tab switch
 }
 
-// Calculates progress for the current day based on all task folders
-function calculateProgressForDate(dateString) {
+function calculateProgress() {
   let completedCount = 0;
-  let totalTasks = 0;
+  let totalTasks = 0; // Only from task folders
+  const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
 
-  Object.values(foldersByCategoryId).forEach(foldersInCat => {
-    (foldersInCat || []).forEach(folder => {
-      if (folder.type === 'task' && folder.content) {
-        folder.content.forEach(taskDef => {
-          totalTasks++;
-          if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
-            completedCount++;
-          }
-        });
-      }
+  currentCategories.forEach(category => {
+    const foldersInCat = userFoldersByCategoryId[category.id] || [];
+    foldersInCat.forEach(folder => {
+        if (folder.type === 'task' && folder.tasks) {
+            folder.tasks.forEach(taskDef => {
+                totalTasks++;
+                if (getTaskCompletionStatus(taskDef.id, today)) {
+                    completedCount++;
+                }
+            });
+        }
     });
   });
 
   const percentage = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
   const pointsPerTask = totalTasks > 0 ? DAILY_TARGET_POINTS / totalTasks : 0;
   const pointsEarned = Math.round(completedCount * pointsPerTask);
-
   return { percentage, pointsEarned, completedCount, totalTasks };
 }
 
@@ -1563,94 +1483,77 @@ function updateDashboardSummaries() {
   const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
 
   currentCategories.forEach(category => {
-    if (category.id === 'dashboard') return; 
-
-    let tasksInCategory = 0;
-    let completedInCategory = 0;
-    (foldersByCategoryId[category.id] || []).forEach(folder => {
-        if (folder.type === 'task' && folder.content) {
-            tasksInCategory += folder.content.length;
-            folder.content.forEach(taskDef => {
-                if (localStorage.getItem(getTaskStateStorageKey(today, folder.id, taskDef.id)) === 'true') {
-                    completedInCategory++;
+    if (category.id === 'dashboard') return;
+    let categoryTotalTasks = 0;
+    let categoryCompletedTasks = 0;
+    const foldersInCat = userFoldersByCategoryId[category.id] || [];
+    foldersInCat.forEach(folder => {
+        if (folder.type === 'task' && folder.tasks) {
+            folder.tasks.forEach(taskDef => {
+                categoryTotalTasks++;
+                if (getTaskCompletionStatus(taskDef.id, today)) {
+                    categoryCompletedTasks++;
                 }
             });
         }
     });
-
-    const summaryDiv = document.createElement('div');
-    summaryDiv.className = 'dashboard-category-summary';
-    summaryDiv.innerHTML = `
-      <h3>${category.name}</h3>
-      <p class="category-stats">${completedInCategory} / ${tasksInCategory}</p>
-    `;
-    const statsP = summaryDiv.querySelector('.category-stats');
-    if (tasksInCategory > 0 && completedInCategory === tasksInCategory) {
-        statsP.classList.add('fully-completed');
+    // Only show summary if it's a category that can contain tasks
+    if (foldersInCat.some(f => f.type === 'task')) {
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'dashboard-category-summary';
+        summaryDiv.innerHTML = `<h3>${category.name}</h3> <p class="category-stats">${categoryCompletedTasks} / ${categoryTotalTasks}</p>`;
+        const statsP = summaryDiv.querySelector('.category-stats');
+        if (categoryTotalTasks > 0 && categoryCompletedTasks === categoryTotalTasks) statsP.classList.add('fully-completed');
+        else statsP.classList.remove('fully-completed');
+        domElements.dashboardSummariesContainer.appendChild(summaryDiv);
     }
-    domElements.dashboardSummariesContainer.appendChild(summaryDiv);
   });
 }
 
 function updateTodaysProgress() {
-  const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
-  const progress = calculateProgressForDate(today); 
-  
+  const progress = calculateProgress();
   if (domElements.todayProgressFill) {
       domElements.todayProgressFill.style.width = `${progress.percentage}%`;
       domElements.todayProgressFill.style.backgroundColor = getProgressFillColor(progress.percentage);
       domElements.todayProgressFill.textContent = `${progress.percentage}%`;
       domElements.todayProgressFill.setAttribute('aria-valuenow', progress.percentage.toString());
   }
-  if (domElements.todayPointsStat) {
-      domElements.todayPointsStat.textContent = `${progress.pointsEarned} / ${DAILY_TARGET_POINTS} points`;
-  }
+  if (domElements.todayPointsStat) domElements.todayPointsStat.textContent = `${progress.pointsEarned} / ${DAILY_TARGET_POINTS} points`;
 }
 
 function updateCurrentWeekProgress() {
-    const todayNormalized = getNormalizedDate(new Date());
+    const todayNorm = getNormalizedDate(new Date());
     let currentWeekStartDateString = localStorage.getItem(STORAGE_KEY_CURRENT_WEEK_START_DATE);
     let currentWeekStartDate;
 
     if (!currentWeekStartDateString) {
-        currentWeekStartDate = new Date(todayNormalized); 
+        currentWeekStartDate = new Date(todayNorm);
         localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
     } else {
         currentWeekStartDate = getNormalizedDate(new Date(currentWeekStartDateString));
-        const daysPassed = (todayNormalized.getTime() - currentWeekStartDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysPassed >= 7) { // Start new week cycle
-            currentWeekStartDate = new Date(todayNormalized); 
-            let dayOfWeek = todayNormalized.getDay(); 
-            let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; 
-            currentWeekStartDate.setDate(todayNormalized.getDate() + diffToMonday);
-            currentWeekStartDate = getNormalizedDate(currentWeekStartDate); 
+        if ((todayNorm.getTime() - currentWeekStartDate.getTime()) / (1000*60*60*24) >= 7) {
+            currentWeekStartDate = new Date(todayNorm);
+            currentWeekStartDate.setDate(todayNorm.getDate() - (todayNorm.getDay() === 0 ? 6 : todayNorm.getDay() - 1));
+            currentWeekStartDate = getNormalizedDate(currentWeekStartDate);
             localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
         }
     }
-    
-    let totalPointsThisWeekCycle = 0;
-    let currentDateIter = new Date(currentWeekStartDate); 
-    const todayDateStringForLoop = getTodayDateString();
 
-    while (currentDateIter <= todayNormalized) {
+    let totalPointsThisWeekCycle = 0;
+    let currentDateIter = new Date(currentWeekStartDate);
+    const todayDateString = getTodayDateString();
+
+    while (currentDateIter <= todayNorm) {
         const dateStringForIter = `${currentDateIter.getFullYear()}-${(currentDateIter.getMonth() + 1).toString().padStart(2, '0')}-${currentDateIter.getDate().toString().padStart(2, '0')}`;
         let pointsForDay = 0;
-
-        if (dateStringForIter === todayDateStringForLoop) {
-            pointsForDay = calculateProgressForDate(dateStringForIter).pointsEarned;
-        } else { 
-            const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateStringForIter;
-            const historyDataString = localStorage.getItem(historyKey);
-            if (historyDataString) {
-                try {
-                    pointsForDay = JSON.parse(historyDataString).pointsEarned || 0;
-                } catch (e) { /* ignore */ }
-            }
+        if (dateStringForIter === todayDateString) pointsForDay = calculateProgress().pointsEarned;
+        else {
+            const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateStringForIter);
+            if (historyDataString) try { pointsForDay = JSON.parse(historyDataString).pointsEarned || 0; } catch (e) {}
         }
         totalPointsThisWeekCycle += pointsForDay;
         currentDateIter.setDate(currentDateIter.getDate() + 1);
     }
-
     const weeklyCyclePercentage = TARGET_POINTS_FOR_WEEKLY_VIEW > 0 ? Math.min(100, Math.round((totalPointsThisWeekCycle / TARGET_POINTS_FOR_WEEKLY_VIEW) * 100)) : 0;
 
     if (domElements.currentWeekProgressFill) {
@@ -1659,70 +1562,48 @@ function updateCurrentWeekProgress() {
         domElements.currentWeekProgressFill.textContent = `${weeklyCyclePercentage}%`;
         domElements.currentWeekProgressFill.setAttribute('aria-valuenow', weeklyCyclePercentage.toString());
     }
-    if (domElements.currentWeekPointsStat) {
-        domElements.currentWeekPointsStat.textContent = `${totalPointsThisWeekCycle} / ${TARGET_POINTS_FOR_WEEKLY_VIEW} points`;
-    }
+    if (domElements.currentWeekPointsStat) domElements.currentWeekPointsStat.textContent = `${totalPointsThisWeekCycle} / ${TARGET_POINTS_FOR_WEEKLY_VIEW} points`;
 }
 
 
 function renderCalendar() {
   if (!domElements.calendarGrid || !domElements.calendarMonthYear) return;
-  domElements.calendarGrid.innerHTML = ''; 
-  const month = calendarDisplayDate.getMonth();
-  const year = calendarDisplayDate.getFullYear();
-  domElements.calendarMonthYear.textContent = `${calendarDisplayDate.toLocaleString('default', { month: 'long' })} ${year}`;
-
-  const firstDayOfMonth = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const startingDayOfWeek = firstDayOfMonth.getDay(); 
-  const todayNorm = getNormalizedDate(new Date());
-  const todayDateStr = getTodayDateString();
+  domElements.calendarGrid.innerHTML = '';
+  domElements.calendarMonthYear.textContent = `${calendarDisplayDate.toLocaleString('default', { month: 'long' })} ${calendarDisplayDate.getFullYear()}`;
+  const month = calendarDisplayDate.getMonth(), year = calendarDisplayDate.getFullYear();
+  const firstDayOfMonth = new Date(year, month, 1), daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startingDayOfWeek = firstDayOfMonth.getDay();
+  const todayNorm = getNormalizedDate(new Date()), todayDateString = getTodayDateString();
 
   ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(dayName => {
-    const dayHeader = document.createElement('div');
-    dayHeader.className = 'calendar-day-header';
-    dayHeader.textContent = dayName;
-    domElements.calendarGrid.appendChild(dayHeader);
+    const dayHeader = document.createElement('div'); dayHeader.className = 'calendar-day-header';
+    dayHeader.textContent = dayName; domElements.calendarGrid.appendChild(dayHeader);
   });
-
   for (let i = 0; i < startingDayOfWeek; i++) {
-    domElements.calendarGrid.appendChild(document.createElement('div')).className = 'calendar-day-cell empty';
+    const emptyCell = document.createElement('div'); emptyCell.className = 'calendar-day-cell empty';
+    domElements.calendarGrid.appendChild(emptyCell);
   }
-
   for (let day = 1; day <= daysInMonth; day++) {
     const cellDate = getNormalizedDate(new Date(year, month, day));
     const dateString = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    const cell = document.createElement('div');
-    cell.className = 'calendar-day-cell';
-    cell.dataset.date = dateString;
-    cell.innerHTML = `<span class="calendar-day-number">${day}</span><div class="calendar-day-fill"></div>`;
-    
-    let percentageCompleted = 0;
-    let hasHistoryData = false;
-    const fillDiv = cell.querySelector('.calendar-day-fill');
+    const cell = document.createElement('div'); cell.className = 'calendar-day-cell'; cell.dataset.date = dateString;
+    const dayNumber = document.createElement('span'); dayNumber.className = 'calendar-day-number'; dayNumber.textContent = day.toString(); cell.appendChild(dayNumber);
+    const fillDiv = document.createElement('div'); fillDiv.className = 'calendar-day-fill'; cell.appendChild(fillDiv);
+    let percentageCompleted = 0, hasHistoryData = false;
     fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)';
 
-    if (dateString === todayDateStr) { 
-        cell.classList.add('current-day');
-        const progress = calculateProgressForDate(dateString);
-        percentageCompleted = progress.percentage;
-        fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; 
-        if (percentageCompleted > 40) cell.classList.add('high-fill'); 
-        hasHistoryData = progress.completedCount > 0 || !!localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString);
+    if (dateString === todayDateString) {
+        cell.classList.add('current-day'); percentageCompleted = calculateProgress().percentage;
+        fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; if (percentageCompleted > 40) cell.classList.add('high-fill');
+        hasHistoryData = (calculateProgress().completedCount > 0) || !!localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString);
     } else {
         const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString);
-        if (historyDataString) {
-            try {
-                const historyEntry = JSON.parse(historyDataString);
-                percentageCompleted = historyEntry.percentageCompleted || 0;
-                if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)';
-                hasHistoryData = (historyEntry.completedTaskStructure && Object.values(historyEntry.completedTaskStructure).some(cat => Object.values(cat).some(folder => folder.tasks.length > 0))) || !!historyEntry.userNote;
-            } catch(e) { 
-                if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)';
-            }
-        } else if (cellDate < todayNorm) {
-            fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)';
-        }
+        if (historyDataString) try {
+            const historyEntry = JSON.parse(historyDataString); percentageCompleted = historyEntry.percentageCompleted || 0;
+            if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)';
+            hasHistoryData = (historyEntry.completedTasks && Object.values(historyEntry.completedTasks).some(arr=>arr.length>0)) || !!historyEntry.userNote;
+        } catch(e) { if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; }
+        else if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)';
         if (cellDate < todayNorm) cell.classList.add('calendar-day-past');
     }
     if (hasHistoryData) cell.classList.add('has-history');
@@ -1733,747 +1614,729 @@ function renderCalendar() {
 }
 
 function showHistoryModal(dateString) {
-  currentModalDate = dateString; 
+  currentModalDate = dateString;
   if (!domElements.historyModal) return;
-
-  const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
-  const historyDataString = localStorage.getItem(historyKey);
+  const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString);
   let historyEntry = null;
   const isToday = dateString === getTodayDateString();
   const isPastDay = new Date(dateString + 'T23:59:59') < getNormalizedDate(new Date()) && !isToday;
 
-  if (isToday) { 
-    const progress = calculateProgressForDate(dateString);
-    const completedTasksTodayStruct = {};
+  if (isToday) {
+    const progress = calculateProgress();
+    const completedTasksTodayFlat = [];
     currentCategories.forEach(cat => {
-      completedTasksTodayStruct[cat.id] = {};
-      (foldersByCategoryId[cat.id] || []).forEach(folder => {
-        if (folder.type === 'task') {
-          const folderTasks = [];
-          (folder.content || []).forEach(taskDef => {
-            if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
-              folderTasks.push(taskDef.text);
+        const folders = userFoldersByCategoryId[cat.id] || [];
+        folders.forEach(folder => {
+            if (folder.type === 'task' && folder.tasks) {
+                folder.tasks.forEach(taskDef => {
+                    if(getTaskCompletionStatus(taskDef.id, dateString)) completedTasksTodayFlat.push(taskDef.text);
+                });
             }
-          });
-          if (folderTasks.length > 0) {
-             completedTasksTodayStruct[cat.id][folder.id] = { name: folder.name, tasks: folderTasks };
-          }
-        }
-      });
-      if(Object.keys(completedTasksTodayStruct[cat.id]).length === 0) delete completedTasksTodayStruct[cat.id];
+        });
     });
-    
-    historyEntry = {
-        date: dateString,
-        completedTaskStructure: completedTasksTodayStruct,
-        userNote: localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || "",
-        pointsEarned: progress.pointsEarned,
-        percentageCompleted: progress.percentage,
-        totalTasksOnDate: progress.totalTasks,
-        dailyTargetPoints: DAILY_TARGET_POINTS
-    };
-  } else if (historyDataString) { 
-      try { historyEntry = JSON.parse(historyDataString); } catch (e) { console.error("Error parsing history for modal:", e); }
-  }
+    const completedTasksTodayGrouped = {};
+     currentCategories.forEach(cat => {
+        completedTasksTodayGrouped[cat.id] = [];
+        const folders = userFoldersByCategoryId[cat.id] || [];
+        folders.forEach(folder => {
+            if (folder.type === 'task' && folder.tasks) {
+                folder.tasks.forEach(taskDef => {
+                    if(getTaskCompletionStatus(taskDef.id, dateString)) completedTasksTodayGrouped[cat.id].push(taskDef.text);
+                });
+            }
+        });
+    });
+
+    const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || (domElements.dailyNoteInput ? domElements.dailyNoteInput.value : "");
+    historyEntry = { date: dateString, completedTasks: completedTasksTodayGrouped, userNote: note, pointsEarned: progress.pointsEarned, percentageCompleted: progress.percentage, totalTasksOnDate: progress.totalTasks, dailyTargetPoints: DAILY_TARGET_POINTS };
+  } else if (historyDataString) try { historyEntry = JSON.parse(historyDataString); } catch (e) {}
 
   domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
   if (historyEntry) {
+    const targetPoints = historyEntry.dailyTargetPoints || DAILY_TARGET_POINTS;
     domElements.historyModalPointsValue.textContent = historyEntry.pointsEarned !== undefined ? historyEntry.pointsEarned.toString() : 'N/A';
-    domElements.historyModalPointsTotal.textContent = (historyEntry.dailyTargetPoints || DAILY_TARGET_POINTS).toString();
+    domElements.historyModalPointsTotal.textContent = targetPoints.toString();
     const completionPercentage = historyEntry.percentageCompleted !== undefined ? historyEntry.percentageCompleted : 0;
     domElements.historyPercentageProgressFill.style.width = `${completionPercentage}%`;
     domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(completionPercentage);
     domElements.historyPercentageProgressFill.textContent = `${completionPercentage}%`;
     domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', completionPercentage);
-
     domElements.historyTasksList.innerHTML = '';
     let hasCompletedTasks = false;
-    if (historyEntry.completedTaskStructure) {
-        Object.keys(historyEntry.completedTaskStructure).forEach(catId => {
-            const categoryData = historyEntry.completedTaskStructure[catId];
-            if(Object.keys(categoryData).length === 0) return;
-
-            const categoryGroup = document.createElement('div');
-            categoryGroup.className = 'history-category-group';
-            const categoryTitle = document.createElement('h5');
-            categoryTitle.className = 'history-category-title';
-            categoryTitle.textContent = getCategoryNameById(catId);
-            categoryGroup.appendChild(categoryTitle);
-            
-            Object.values(categoryData).forEach(folderData => { // folderData = {name, tasks: []}
-                if (folderData.tasks && folderData.tasks.length > 0) {
-                    hasCompletedTasks = true;
-                    const folderTitle = document.createElement('h6'); // Sub-title for folder
-                    folderTitle.className = 'history-folder-title';
-                    folderTitle.textContent = folderData.name;
-                    categoryGroup.appendChild(folderTitle);
-
-                    const ul = document.createElement('ul');
-                    folderData.tasks.forEach(taskText => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `<span>${taskText}</span>`;
-                        ul.appendChild(li);
-                    });
-                    categoryGroup.appendChild(ul);
-                }
-            });
-            if(categoryGroup.querySelector('ul')) domElements.historyTasksList.appendChild(categoryGroup);
+    if (historyEntry.completedTasks) {
+        Object.keys(historyEntry.completedTasks).forEach(catId => {
+            const tasksInCategory = historyEntry.completedTasks[catId];
+            if (tasksInCategory && tasksInCategory.length > 0) {
+                hasCompletedTasks = true;
+                const catGroup = document.createElement('div'); catGroup.className = 'history-category-group';
+                const catTitle = document.createElement('h5'); catTitle.className = 'history-category-title'; catTitle.textContent = getCategoryNameById(catId); catGroup.appendChild(catTitle);
+                const ul = document.createElement('ul');
+                tasksInCategory.forEach(taskText => { const li = document.createElement('li'); const span = document.createElement('span'); span.textContent = taskText; li.appendChild(span); ul.appendChild(li); });
+                catGroup.appendChild(ul); domElements.historyTasksList.appendChild(catGroup);
+            }
         });
     }
     if (!hasCompletedTasks) domElements.historyTasksList.innerHTML = '<p>No tasks were completed on this day.</p>';
     domElements.expandTasksButton.classList.toggle('hidden', !hasCompletedTasks);
-
     domElements.historyUserNoteDisplay.textContent = historyEntry.userNote || "No reflection recorded for this day.";
     domElements.historyUserNoteDisplay.classList.remove('hidden');
     domElements.historyUserNoteEdit.value = historyEntry.userNote || "";
-    domElements.historyUserNoteEdit.classList.add('hidden'); 
-    domElements.historicalNoteControls.classList.add('hidden');
-    domElements.historicalNoteStatus.textContent = '';
-    domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote);
-    if (isPastDay || isToday) { 
-        domElements.historyUserNoteDisplay.ondblclick = () => {
-            domElements.historyUserNoteDisplay.classList.add('hidden');
-            domElements.historyUserNoteEdit.classList.remove('hidden');
-            domElements.historicalNoteControls.classList.remove('hidden');
-            domElements.historyUserNoteEdit.focus();
-        };
-    } else domElements.historyUserNoteDisplay.ondblclick = null; 
-  } else { 
-    domElements.historyModalPointsValue.textContent = 'N/A';
-    domElements.historyModalPointsTotal.textContent = DAILY_TARGET_POINTS.toString();
-    domElements.historyPercentageProgressFill.style.width = `0%`;
-    domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(0);
-    domElements.historyPercentageProgressFill.textContent = `0%`;
-    domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', 0);
-    domElements.historyTasksList.innerHTML = '<p>No data available for this day.</p>';
-    domElements.historyUserNoteDisplay.textContent = "No data available for this day.";
-    domElements.historyUserNoteDisplay.classList.remove('hidden');
     domElements.historyUserNoteEdit.classList.add('hidden');
     domElements.historicalNoteControls.classList.add('hidden');
     domElements.historicalNoteStatus.textContent = '';
-    domElements.expandTasksButton.classList.add('hidden');
-    domElements.expandReflectionButton.classList.add('hidden');
-    domElements.historyUserNoteDisplay.ondblclick = null;
+    domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote);
+    if (isPastDay || isToday) domElements.historyUserNoteDisplay.ondblclick = () => { domElements.historyUserNoteDisplay.classList.add('hidden'); domElements.historyUserNoteEdit.classList.remove('hidden'); domElements.historicalNoteControls.classList.remove('hidden'); domElements.historyUserNoteEdit.focus(); };
+    else domElements.historyUserNoteDisplay.ondblclick = null;
+  } else {
+    domElements.historyModalPointsValue.textContent = 'N/A'; domElements.historyModalPointsTotal.textContent = DAILY_TARGET_POINTS.toString();
+    domElements.historyPercentageProgressFill.style.width = `0%`; domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(0); domElements.historyPercentageProgressFill.textContent = `0%`; domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', 0);
+    domElements.historyTasksList.innerHTML = '<p>No data available for this day.</p>';
+    domElements.historyUserNoteDisplay.textContent = "No data available for this day.";
+    domElements.historyUserNoteDisplay.classList.remove('hidden'); domElements.historyUserNoteEdit.classList.add('hidden'); domElements.historicalNoteControls.classList.add('hidden'); domElements.historicalNoteStatus.textContent = '';
+    domElements.expandTasksButton.classList.add('hidden'); domElements.expandReflectionButton.classList.add('hidden'); domElements.historyUserNoteDisplay.ondblclick = null;
   }
   domElements.historyModal.classList.remove('hidden');
 }
 
+function closeHistoryModal() { if (domElements.historyModal) domElements.historyModal.classList.add('hidden'); currentModalDate = null; }
 
-function closeHistoryModal() {
-  if (domElements.historyModal) domElements.historyModal.classList.add('hidden');
-  currentModalDate = null; 
-}
-
-function saveHistoricalNote() { // For the main daily reflection in history modal
-    if (!currentModalDate || !domElements.historyUserNoteEdit || !domElements.historicalNoteStatus) return;
+function saveHistoricalNote() {
+    if (!currentModalDate || !domElements.historyUserNoteEdit) return;
     const noteContent = domElements.historyUserNoteEdit.value;
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentModalDate;
     let historyEntry;
     const isToday = currentModalDate === getTodayDateString();
-
     const existingHistoryStr = localStorage.getItem(historyKey);
-    if (existingHistoryStr) {
-        historyEntry = JSON.parse(existingHistoryStr);
-    } else { 
-        const progress = isToday ? calculateProgressForDate(currentModalDate) : { pointsEarned: 0, percentageCompleted: 0, totalTasks: 0, completedTaskStructure: {} };
-        historyEntry = {
-            date: currentModalDate,
-            completedTaskStructure: progress.completedTaskStructure || {}, 
-            userNote: "",
-            pointsEarned: progress.pointsEarned,
-            percentageCompleted: progress.percentageCompleted,
-            totalTasksOnDate: progress.totalTasks,
-            dailyTargetPoints: DAILY_TARGET_POINTS 
-        };
-    }
-    historyEntry.userNote = noteContent; // This is the main reflection
-    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
 
-    if (isToday && domElements.dailyNoteInput) { // Also update the main input if it's today
-        domElements.dailyNoteInput.value = noteContent;
-        localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent);
+    if (existingHistoryStr) historyEntry = JSON.parse(existingHistoryStr);
+    else {
+        const progress = isToday ? calculateProgress() : { pointsEarned: 0, percentageCompleted: 0, totalTasks: 0 };
+        const completedTasksForEntry = {};
+        if(isToday) {
+             currentCategories.forEach(cat => {
+                completedTasksForEntry[cat.id] = [];
+                const folders = userFoldersByCategoryId[cat.id] || [];
+                folders.forEach(folder => {
+                     if (folder.type === 'task' && folder.tasks) {
+                        folder.tasks.forEach(taskDef => {
+                            if(getTaskCompletionStatus(taskDef.id, currentModalDate)) completedTasksForEntry[cat.id].push(taskDef.text);
+                        });
+                    }
+                });
+            });
+        } else {
+             currentCategories.forEach(cat => completedTasksForEntry[cat.id] = []);
+        }
+        historyEntry = { date: currentModalDate, completedTasks: completedTasksForEntry, userNote: "", pointsEarned: progress.pointsEarned, percentageCompleted: progress.percentageCompleted, totalTasksOnDate: progress.totalTasks, dailyTargetPoints: DAILY_TARGET_POINTS };
     }
+    historyEntry.userNote = noteContent;
+    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+    if (isToday && domElements.dailyNoteInput) { domElements.dailyNoteInput.value = noteContent; localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent); }
 
     domElements.historyUserNoteDisplay.textContent = noteContent || "No reflection recorded for this day.";
     domElements.historyUserNoteDisplay.classList.remove('hidden');
-    domElements.historyUserNoteEdit.classList.add('hidden');
-    domElements.historicalNoteControls.classList.add('hidden');
-    domElements.historicalNoteStatus.textContent = 'Reflection saved!';
-    setTimeout(() => { domElements.historicalNoteStatus.textContent = ''; }, 2000);
+    domElements.historyUserNoteEdit.classList.add('hidden'); domElements.historicalNoteControls.classList.add('hidden');
+    domElements.historicalNoteStatus.textContent = 'Reflection saved!'; setTimeout(() => { domElements.historicalNoteStatus.textContent = ''; }, 2000);
     domElements.expandReflectionButton.classList.toggle('hidden', !noteContent);
-    renderCalendar(); 
+    renderCalendar();
 }
 
-function clearHistoricalNote() {
-     if (!domElements.historyUserNoteEdit) return;
-    domElements.historyUserNoteEdit.value = "";
-}
+function clearHistoricalNote() { if (domElements.historyUserNoteEdit) domElements.historyUserNoteEdit.value = "";}
 
 function populateMonthYearPicker() {
     if (!domElements.pickerMonthsGrid || !domElements.pickerYearsList) return;
     domElements.pickerMonthsGrid.innerHTML = '';
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    months.forEach((month, index) => {
-        const btn = document.createElement('button');
-        btn.className = 'month-option';
-        btn.textContent = month;
-        btn.dataset.month = index.toString();
+    ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].forEach((month, index) => {
+        const btn = document.createElement('button'); btn.className = 'month-option'; btn.textContent = month; btn.dataset.month = index.toString();
         if (index === pickerSelectedMonth) btn.classList.add('selected');
         btn.onclick = () => { pickerSelectedMonth = index; calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1); renderCalendar(); populateMonthYearPicker(); };
         domElements.pickerMonthsGrid.appendChild(btn);
     });
-    domElements.pickerYearsList.innerHTML = '';
-    let yearToScrollTo = null;
+    domElements.pickerYearsList.innerHTML = ''; let yearToScrollTo = null;
     for (let year = 2000; year <= 2100; year++) {
-        const btn = document.createElement('button');
-        btn.className = 'year-option';
-        btn.textContent = year.toString();
-        btn.dataset.year = year.toString();
+        const btn = document.createElement('button'); btn.className = 'year-option'; btn.textContent = year.toString(); btn.dataset.year = year.toString();
         if (year === pickerSelectedYear) { btn.classList.add('selected'); yearToScrollTo = btn; }
         btn.onclick = () => { pickerSelectedYear = year; calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1); renderCalendar(); populateMonthYearPicker(); };
         domElements.pickerYearsList.appendChild(btn);
     }
-    if (yearToScrollTo) yearToScrollTo.scrollIntoView({ block: 'nearest' });
+    if (yearToScrollTo) yearToScrollTo.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function toggleMonthYearPicker() {
-    if (!domElements.monthYearPickerModal) return;
     isMonthYearPickerOpen = !isMonthYearPickerOpen;
     if (isMonthYearPickerOpen) {
-        pickerSelectedMonth = calendarDisplayDate.getMonth();
-        pickerSelectedYear = calendarDisplayDate.getFullYear();
-        populateMonthYearPicker();
-        domElements.monthYearPickerModal.classList.remove('hidden');
+        pickerSelectedMonth = calendarDisplayDate.getMonth(); pickerSelectedYear = calendarDisplayDate.getFullYear();
+        populateMonthYearPicker(); domElements.monthYearPickerModal.classList.remove('hidden');
     } else domElements.monthYearPickerModal.classList.add('hidden');
 }
 
-function closeMonthYearPicker() {
-    if (!domElements.monthYearPickerModal) return;
-    isMonthYearPickerOpen = false;
-    domElements.monthYearPickerModal.classList.add('hidden');
-}
+function closeMonthYearPicker() { isMonthYearPickerOpen = false; domElements.monthYearPickerModal.classList.add('hidden');}
 
 function updateCategoryTabIndicators() {
     const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
     currentCategories.forEach(category => {
-        const tabButton = document.getElementById(`tab-button-${category.id}`);
-        if (!tabButton) return;
-
-        tabButton.querySelector('.notification-badge')?.remove();
+        const tabButton = document.getElementById(`tab-button-${category.id}`); if (!tabButton) return;
+        const existingBadge = tabButton.querySelector('.notification-badge'); if (existingBadge) existingBadge.remove();
         tabButton.classList.remove('category-complete-indicator');
-
-        let totalTasksInCat = 0;
-        let completedTasksInCat = 0;
-        (foldersByCategoryId[category.id] || []).forEach(folder => {
-            if (folder.type === 'task' && folder.content) {
-                totalTasksInCat += folder.content.length;
-                folder.content.forEach(taskDef => {
-                    if (localStorage.getItem(getTaskStateStorageKey(today, folder.id, taskDef.id)) === 'true') {
-                        completedTasksInCat++;
-                    }
+        let totalTasksInCat = 0, completedTasksInCat = 0;
+        const folders = userFoldersByCategoryId[category.id] || [];
+        folders.forEach(folder => {
+            if (folder.type === 'task' && folder.tasks) {
+                folder.tasks.forEach(taskDef => {
+                    totalTasksInCat++; if (getTaskCompletionStatus(taskDef.id, today)) completedTasksInCat++;
                 });
             }
         });
-        
-        if (totalTasksInCat === 0) return; // No indicator for empty category
-        const isFullyCompleted = completedTasksInCat === totalTasksInCat;
-        const incompleteTasksCount = totalTasksInCat - completedTasksInCat;
-
-        if (isFullyCompleted) tabButton.classList.add('category-complete-indicator');
-        else if (incompleteTasksCount > 0) {
-            const badge = document.createElement('span');
-            badge.className = 'notification-badge';
-            badge.textContent = incompleteTasksCount.toString();
-            tabButton.appendChild(badge);
+        if (totalTasksInCat === 0) return; // Only show indicators for categories with trackable tasks
+        if (completedTasksInCat === totalTasksInCat) tabButton.classList.add('category-complete-indicator');
+        else if (totalTasksInCat - completedTasksInCat > 0) {
+            const badge = document.createElement('span'); badge.className = 'notification-badge';
+            badge.textContent = (totalTasksInCat - completedTasksInCat).toString(); tabButton.appendChild(badge);
         }
     });
 }
 
-
 function updateAllProgress() {
-  updateDashboardSummaries();
-  updateTodaysProgress();
-  updateCurrentWeekProgress();
-  updateCategoryTabIndicators();
-  renderCalendar(); 
+  updateDashboardSummaries(); updateTodaysProgress(); updateCurrentWeekProgress();
+  updateCategoryTabIndicators(); renderCalendar();
 }
-
 
 function openFullscreenContentModal(type, date) {
     if (!domElements.fullscreenContentModal) return;
-    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + date;
-    const historyDataString = localStorage.getItem(historyKey);
-    let historyEntry = null;
-    const isToday = date === getTodayDateString();
-
+    const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + date);
+    let historyEntry = null; const isToday = date === getTodayDateString();
     if (isToday) {
-        const progress = calculateProgressForDate(date);
-        const completedTasksTodayStruct = {}; 
-        // Populate completedTasksTodayStruct similarly to showHistoryModal for today
-        currentCategories.forEach(cat => {
-          completedTasksTodayStruct[cat.id] = {};
-          (foldersByCategoryId[cat.id] || []).forEach(folder => {
-            if (folder.type === 'task') {
-              const folderTasks = [];
-              (folder.content || []).forEach(taskDef => {
-                if (localStorage.getItem(getTaskStateStorageKey(date, folder.id, taskDef.id)) === 'true') {
-                  folderTasks.push(taskDef.text);
+        const progress = calculateProgress();
+        const completedTasksTodayGrouped = {};
+         currentCategories.forEach(cat => {
+            completedTasksTodayGrouped[cat.id] = [];
+            const folders = userFoldersByCategoryId[cat.id] || [];
+            folders.forEach(folder => {
+                if (folder.type === 'task' && folder.tasks) {
+                    folder.tasks.forEach(taskDef => {
+                        if(getTaskCompletionStatus(taskDef.id, date)) completedTasksTodayGrouped[cat.id].push(taskDef.text);
+                    });
                 }
-              });
-              if (folderTasks.length > 0) completedTasksTodayStruct[cat.id][folder.id] = { name: folder.name, tasks: folderTasks };
-            }
-          });
-          if(Object.keys(completedTasksTodayStruct[cat.id]).length === 0) delete completedTasksTodayStruct[cat.id];
+            });
         });
-        historyEntry = { completedTaskStructure: completedTasksTodayStruct, userNote: localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || "" };
-    } else if (historyDataString) {
-        try { historyEntry = JSON.parse(historyDataString); } catch (e) { console.error("Error parsing history for fullscreen:", e); return; }
-    }
-
-    if (!historyEntry) { domElements.fullscreenModalArea.innerHTML = '<p>No content.</p>'; domElements.fullscreenContentModal.classList.remove('hidden'); return; }
+        const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || (domElements.dailyNoteInput ? domElements.dailyNoteInput.value : "");
+        historyEntry = { completedTasks: completedTasksTodayGrouped, userNote: note };
+    } else if (historyDataString) try { historyEntry = JSON.parse(historyDataString); } catch (e) {}
+    if (!historyEntry) { domElements.fullscreenModalArea.innerHTML = '<p>No content available.</p>'; domElements.fullscreenContentModal.classList.remove('hidden'); return; }
 
     const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    domElements.fullscreenModalArea.innerHTML = ''; 
-
+    domElements.fullscreenModalArea.innerHTML = '';
     if (type === 'tasks') {
-        domElements.fullscreenModalTitle.textContent = `Completed Tasks for ${formattedDate}`;
-        let hasContent = false;
-        if (historyEntry.completedTaskStructure) {
-            Object.keys(historyEntry.completedTaskStructure).forEach(catId => {
-                const categoryData = historyEntry.completedTaskStructure[catId];
-                if(Object.keys(categoryData).length === 0) return;
-
-                const catGroup = document.createElement('div');
-                catGroup.className = 'history-category-group';
-                catGroup.innerHTML = `<h4 class="history-category-title">${getCategoryNameById(catId)}</h4>`;
-                
-                Object.values(categoryData).forEach(folderData => {
-                    if (folderData.tasks && folderData.tasks.length > 0) {
-                        hasContent = true;
-                        catGroup.innerHTML += `<h5 class="history-folder-title" style="margin-left:10px; color: #A09CB8;">${folderData.name}</h5>`;
-                        const ul = document.createElement('ul');
-                        ul.style.paddingLeft = '30px';
-                        folderData.tasks.forEach(taskText => {
-                            ul.innerHTML += `<li><span>${taskText}</span></li>`;
-                        });
-                        catGroup.appendChild(ul);
-                    }
-                });
-                 if(catGroup.querySelector('ul')) domElements.fullscreenModalArea.appendChild(catGroup);
-            });
-        }
-        if (!hasContent) domElements.fullscreenModalArea.innerHTML = '<p>No tasks completed.</p>';
+        domElements.fullscreenModalTitle.textContent = `Completed Tasks for ${formattedDate}`; let hasContent = false;
+        if (historyEntry.completedTasks) Object.keys(historyEntry.completedTasks).forEach(catId => {
+            const tasksInCategory = historyEntry.completedTasks[catId];
+            if (tasksInCategory && tasksInCategory.length > 0) {
+                hasContent = true; const catGroup = document.createElement('div'); catGroup.className = 'history-category-group';
+                const catTitle = document.createElement('h4'); catTitle.className = 'history-category-title'; catTitle.textContent = getCategoryNameById(catId); catGroup.appendChild(catTitle);
+                const ul = document.createElement('ul'); tasksInCategory.forEach(taskText => { const li = document.createElement('li'); const span = document.createElement('span'); span.textContent = taskText; li.appendChild(span); ul.appendChild(li); });
+                catGroup.appendChild(ul); domElements.fullscreenModalArea.appendChild(catGroup);
+            }
+        });
+        if (!hasContent) domElements.fullscreenModalArea.innerHTML = '<p>No tasks were completed.</p>';
     } else if (type === 'reflection') {
         domElements.fullscreenModalTitle.textContent = `Reflection for ${formattedDate}`;
-        if (historyEntry.userNote) {
-            const pre = document.createElement('pre');
-            pre.textContent = historyEntry.userNote; // Use textContent for pre to preserve formatting from userNote
-            domElements.fullscreenModalArea.appendChild(pre);
-        } else domElements.fullscreenModalArea.innerHTML = '<p>No reflection recorded.</p>';
+        if (historyEntry.userNote) { const pre = document.createElement('pre'); pre.textContent = historyEntry.userNote; domElements.fullscreenModalArea.appendChild(pre); }
+        else domElements.fullscreenModalArea.innerHTML = '<p>No reflection recorded.</p>';
     }
-    currentFullscreenContent = { type, date };
-    domElements.fullscreenContentModal.classList.remove('hidden');
+    currentFullscreenContent = { type, date }; domElements.fullscreenContentModal.classList.remove('hidden');
 }
 
+function closeFullscreenContentModal() { if (domElements.fullscreenContentModal) domElements.fullscreenContentModal.classList.add('hidden'); currentFullscreenContent = null;}
 
-function closeFullscreenContentModal() {
-    if (domElements.fullscreenContentModal) domElements.fullscreenContentModal.classList.add('hidden');
-    currentFullscreenContent = null;
-}
-
-// Folder Management Functions
-function openChooseFolderTypeModal(categoryId) {
-    tempFolderCreationData = { categoryId };
-    domElements.chooseFolderTypeModal?.classList.remove('hidden');
-}
-function closeChooseFolderTypeModal() {
-    domElements.chooseFolderTypeModal?.classList.add('hidden');
-}
-function openEnterFolderNameModal(type) { // type is 'task' or 'note'
-    if (!tempFolderCreationData) return;
-    tempFolderCreationData.type = type;
-    domElements.enterFolderNameTitle.textContent = `Name Your ${type === 'task' ? 'Task' : 'Note'} Folder`;
-    domElements.folderNameInput.value = '';
-    domElements.enterFolderNameModal?.classList.remove('hidden');
-    domElements.folderNameInput.focus();
-}
-function closeEnterFolderNameModal() {
-    domElements.enterFolderNameModal?.classList.add('hidden');
-    tempFolderCreationData = null;
-}
-
-function handleCreateFolder() {
-    if (!tempFolderCreationData) return;
-    const folderName = domElements.folderNameInput.value.trim();
-    if (!folderName) { alert("Folder name cannot be empty."); return; }
-
-    const { categoryId, type } = tempFolderCreationData;
-    if (!foldersByCategoryId[categoryId]) foldersByCategoryId[categoryId] = [];
-    
-    const newFolder = {
-        id: createUniqueId('folder'),
-        name: folderName,
-        type: type,
-        categoryId: categoryId,
-        order: foldersByCategoryId[categoryId].length,
-        content: type === 'task' ? [] : "" // Empty tasks array or empty note string
-    };
-    foldersByCategoryId[categoryId].push(newFolder);
-    if (type === 'task') currentFolderEditModes[newFolder.id] = false; // Initialize edit mode for new task folder
-
-    saveFoldersByCategoryId(foldersByCategoryId);
-    renderFolderSystemForCategory(categoryId, document.querySelector(`#category-section-${categoryId} .category-content-area`));
-    closeEnterFolderNameModal();
-    updateAllProgress(); // In case this affects task counts for indicators
-}
-
-function handleRenameFolder(folder) {
-    const newName = prompt(`Enter new name for folder "${folder.name}":`, folder.name);
-    if (newName && newName.trim() !== "" && newName.trim() !== folder.name) {
-        folder.name = newName.trim();
-        saveFoldersByCategoryId(foldersByCategoryId);
-        renderFolderSystemForCategory(folder.categoryId, document.querySelector(`#category-section-${folder.categoryId} .category-content-area`));
-    }
-}
-
-function handleDeleteFolder(folder) {
-    const message = (folder.type === 'task' && folder.content && folder.content.length > 0) || (folder.type === 'note' && folder.content && folder.content.trim() !== "")
-        ? `Folder "${folder.name}" contains data. Are you sure you want to delete it and all its contents?`
-        : `Are you sure you want to delete the empty folder "${folder.name}"?`;
-    showDeleteConfirmation('folder', folder.id, message, folder.name, folder.categoryId);
-}
-
-function showFolderContextMenu(folder, targetBoxElement) { // targetBoxElement is the .folder-box
-    hideCategoryContextMenu();
-    hideFolderContextMenu(); 
-    currentContextMenuTargetFolderBox = targetBoxElement; 
-
-    const menu = domElements.folderOptionsContextMenu;
-    if (!menu) return;
-
-    menu.dataset.folderId = folder.id;
-    menu.dataset.categoryId = folder.categoryId;
-
-    const optionsIcon = targetBoxElement.querySelector('.folder-options-trigger');
-    let topPosition, leftPosition;
-
-    if (optionsIcon) { // Position relative to the 3-dot icon if available
-        const iconRect = optionsIcon.getBoundingClientRect();
-        topPosition = iconRect.bottom + window.scrollY + 2;
-        leftPosition = iconRect.left + window.scrollX - (menu.offsetWidth / 2) + (iconRect.width / 2);
-    } else { // Fallback if icon isn't found (shouldn't happen with current structure)
-        const boxRect = targetBoxElement.getBoundingClientRect();
-        topPosition = boxRect.bottom + window.scrollY + 5;
-        leftPosition = boxRect.left + window.scrollX;
-    }
-    
-    const menuWidth = menu.offsetWidth || 120; 
-    const menuHeight = menu.offsetHeight || 80; // Approximate
-    if (leftPosition + menuWidth > window.innerWidth) leftPosition = window.innerWidth - menuWidth - 10;
-    if (topPosition + menuHeight > window.innerHeight) { // If menu goes off bottom, position above icon/box
-        if (optionsIcon) {
-            topPosition = optionsIcon.getBoundingClientRect().top + window.scrollY - menuHeight - 2;
-        } else {
-            topPosition = targetBoxElement.getBoundingClientRect().top + window.scrollY - menuHeight - 5;
-        }
-    }
-    if (leftPosition < 0) leftPosition = 10;
-    if (topPosition < 0) topPosition = 10;
-
-    menu.style.top = `${topPosition}px`;
-    menu.style.left = `${leftPosition}px`;
-    menu.classList.remove('hidden');
-    if (optionsIcon && !optionsIcon.classList.contains('visible')) optionsIcon.classList.add('visible');
-}
-
-
-function hideFolderContextMenu() {
-    if (domElements.folderOptionsContextMenu) {
-        domElements.folderOptionsContextMenu.classList.add('hidden');
-        domElements.folderOptionsContextMenu.removeAttribute('data-folder-id');
-        domElements.folderOptionsContextMenu.removeAttribute('data-category-id');
-    }
-    if (currentContextMenuTargetFolderBox) { // currentContextMenuTargetFolderBox is the .folder-box
-        const optionsIcon = currentContextMenuTargetFolderBox.querySelector('.folder-options-trigger');
-        if (optionsIcon) optionsIcon.classList.remove('visible'); 
-        currentContextMenuTargetFolderBox = null;
-    }
-}
-
-
-// Category Management Functions
 function handleAddCategory() {
     const categoryName = prompt("Enter name for the new category:");
     if (categoryName && categoryName.trim() !== "") {
         const newCategoryId = createUniqueId('cat');
-        const newCategory = {
-            id: newCategoryId, name: categoryName.trim(), order: currentCategories.length, deletable: true,
-        };
-        currentCategories.push(newCategory);
+        currentCategories.push({ id: newCategoryId, name: categoryName.trim(), order: currentCategories.length, deletable: true });
         saveUserCategories(currentCategories);
-
-        // Create a default "Tasks" folder for the new category
-        const defaultFolderId = createUniqueId(`folder-${newCategoryId}-default`);
-        foldersByCategoryId[newCategoryId] = [{
-            id: defaultFolderId, name: "Tasks", type: "task", categoryId: newCategoryId, order: 0, content: []
-        }];
-        currentFolderEditModes[defaultFolderId] = false; // Init edit mode for the default task folder
-        saveFoldersByCategoryId(foldersByCategoryId);
-        
-        renderTabs();
-        renderAllCategorySections(); 
-        switchTab(newCategoryId); 
-        updateAllProgress();
+        userFoldersByCategoryId[newCategoryId] = []; saveUserFolders(userFoldersByCategoryId);
+        editModes[newCategoryId] = false; categoryViewMode[newCategoryId] = 'list_folders'; activeFolderIdForCategory[newCategoryId] = null;
+        renderTabs(); renderAllCategorySections(); switchTab(newCategoryId); updateAllProgress();
     }
 }
 
 function handleRenameCategory(categoryId) {
-    const category = currentCategories.find(cat => cat.id === categoryId);
-    if (!category) return;
+    const category = currentCategories.find(cat => cat.id === categoryId); if (!category) return;
     const newName = prompt(`Enter new name for category "${category.name}":`, category.name);
     if (newName && newName.trim() !== "" && newName.trim() !== category.name) {
-        category.name = newName.trim();
-        saveUserCategories(currentCategories);
-        renderTabs(); 
+        category.name = newName.trim(); saveUserCategories(currentCategories); renderTabs();
         const sectionTitle = document.querySelector(`#category-section-${categoryId} .category-title-text`);
-        if (sectionTitle) sectionTitle.textContent = category.name;
-        updateDashboardSummaries(); 
+        if (sectionTitle && categoryViewMode[categoryId] === 'list_folders') sectionTitle.textContent = category.name;
+        updateDashboardSummaries();
     }
 }
 
+function getCategoryNameById(categoryId) {
+    const category = currentCategories.find(cat => cat.id === categoryId);
+    return category ? category.name : 'Unknown Category';
+}
+
+
 function handleDeleteCategory(categoryId) {
-    const category = currentCategories.find(c => c.id === categoryId);
-    if (!category) return;
-    if (category.deletable === false) {
-        alert(`Category "${category.name}" is a default category and cannot be deleted.`);
-        return;
-    }
-    const foldersInCat = foldersByCategoryId[categoryId] || [];
-    const hasContent = foldersInCat.some(f => (f.type === 'task' && f.content && f.content.length > 0) || (f.type === 'note' && f.content && f.content.trim() !== ""));
-    const message = hasContent 
-        ? `Category "${category.name}" contains folders with data. Are you sure you want to delete this category and all its folders and tasks/notes?`
-        : `Are you sure you want to delete the empty category "${category.name}"?`;
+    const category = currentCategories.find(c => c.id === categoryId); if (!category) return;
+    if (category.deletable === false) { alert(`Category "${category.name}" cannot be deleted.`); return; }
+    const foldersInCat = userFoldersByCategoryId[categoryId] || [];
+    let itemCountInCat = 0;
+    foldersInCat.forEach(f => {
+        if (f.type === 'task') itemCountInCat += (f.tasks?.length || 0);
+        else if (f.type === 'notes') itemCountInCat += (f.content?.length || 0);
+    });
+    const message = itemCountInCat > 0
+        ? `Category "${category.name}" contains folders with content. Delete category and all its content?`
+        : `Delete empty category "${category.name}"?`;
     showDeleteConfirmation('category', categoryId, message, category.name);
 }
 
 function showCategoryContextMenu(categoryId, targetTabElement) {
-    hideCategoryContextMenu(); 
-    hideFolderContextMenu();
-    currentContextMenuTargetTab = targetTabElement; 
-    const menu = domElements.categoryTabContextMenu;
-    if (!menu) return;
-    menu.dataset.categoryId = categoryId;
-    const rect = targetTabElement.getBoundingClientRect();
-    const optionsIcon = targetTabElement.querySelector('.tab-options-icon');
-    let topPosition, leftPosition;
-
-    if (optionsIcon) {
-        const iconRect = optionsIcon.getBoundingClientRect();
-        topPosition = iconRect.bottom + window.scrollY + 2;
-        leftPosition = iconRect.left + window.scrollX - (menu.offsetWidth / 2) + (iconRect.width / 2) ; 
-    } else { 
-        topPosition = rect.bottom + window.scrollY + 5;
-        leftPosition = rect.left + window.scrollX;
-    }
-    const menuWidth = menu.offsetWidth || 120; 
-    const menuHeight = menu.offsetHeight || 80;
+    hideCategoryContextMenu(); hideFolderContextMenu();
+    currentContextMenuTargetTab = targetTabElement;
+    const menu = domElements.categoryTabContextMenu; if (!menu) return;
+    menu.dataset.categoryId = categoryId; const rect = targetTabElement.getBoundingClientRect();
+    const optionsIcon = targetTabElement.querySelector('.entity-options-icon');
+    let topPosition = (optionsIcon ? optionsIcon.getBoundingClientRect().bottom : rect.bottom) + window.scrollY + 2;
+    let leftPosition = (optionsIcon ? optionsIcon.getBoundingClientRect().left - (menu.offsetWidth / 2) + (optionsIcon.offsetWidth / 2) : rect.left) + window.scrollX;
+    const menuWidth = menu.offsetWidth || 150, menuHeight = menu.offsetHeight || 80;
     if (leftPosition + menuWidth > window.innerWidth) leftPosition = window.innerWidth - menuWidth - 10;
-    if (topPosition + menuHeight > window.innerHeight) topPosition = rect.top + window.scrollY - menuHeight - 5;
-    if (leftPosition < 0) leftPosition = 10;
-    if (topPosition < 0) topPosition = 10;
-
-    menu.style.top = `${topPosition}px`;
-    menu.style.left = `${leftPosition}px`;
-    menu.classList.remove('hidden');
+    if (topPosition + menuHeight > window.innerHeight) topPosition = (optionsIcon ? optionsIcon.getBoundingClientRect().top : rect.top) + window.scrollY - menuHeight - 2;
+    if (leftPosition < 0) leftPosition = 10; if (topPosition < 0) topPosition = 10;
+    menu.style.top = `${topPosition}px`; menu.style.left = `${leftPosition}px`; menu.classList.remove('hidden');
     if (optionsIcon && !optionsIcon.classList.contains('visible')) optionsIcon.classList.add('visible');
 }
 
 function hideCategoryContextMenu() {
-    if (domElements.categoryTabContextMenu) {
-        domElements.categoryTabContextMenu.classList.add('hidden');
-        domElements.categoryTabContextMenu.removeAttribute('data-category-id');
-    }
+    if (domElements.categoryTabContextMenu) domElements.categoryTabContextMenu.classList.add('hidden');
     if (currentContextMenuTargetTab) {
-        currentContextMenuTargetTab.querySelector('.tab-options-icon')?.classList.remove('visible'); 
+        const optionsIcon = currentContextMenuTargetTab.querySelector('.entity-options-icon');
+        if (optionsIcon) optionsIcon.classList.remove('visible');
         currentContextMenuTargetTab = null;
     }
 }
 
 
-// initializeApp is called at the end
-function initializeApp() {
-  domElements.tabsContainer = document.getElementById('tabs');
-  domElements.tabContentsContainer = document.getElementById('tab-content');
-  domElements.addCategoryButton = document.getElementById('add-category-button');
-  domElements.categorySectionTemplate = document.getElementById('category-section-template');
-  domElements.categoryTabContextMenu = document.getElementById('category-tab-context-menu');
-  domElements.ctxRenameCategoryButton = document.getElementById('ctx-rename-category');
-  domElements.ctxDeleteCategoryButton = document.getElementById('ctx-delete-category');
-  domElements.folderOptionsContextMenu = document.getElementById('folder-options-context-menu');
-  domElements.ctxRenameFolderButton = document.getElementById('ctx-rename-folder');
-  domElements.ctxDeleteFolderButton = document.getElementById('ctx-delete-folder');
-  
-  domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
-  domElements.todayProgressFill = document.getElementById('today-progress-fill');
-  domElements.todayPointsStat = document.getElementById('today-points-stat');
-  domElements.currentWeekProgressFill = document.getElementById('current-week-progress-fill');
-  domElements.currentWeekPointsStat = document.getElementById('current-week-points-stat');
-  
-  domElements.calendarMonthYearButton = document.getElementById('calendar-month-year-button');
-  domElements.calendarMonthYear = document.getElementById('calendar-month-year');
-  domElements.calendarGrid = document.getElementById('calendar-grid');
-  domElements.calendarPrevMonthButton = document.getElementById('calendar-prev-month');
-  domElements.calendarNextMonthButton = document.getElementById('calendar-next-month');
-  domElements.monthYearPickerModal = document.getElementById('month-year-picker-modal');
-  domElements.monthYearPickerCloseButton = document.getElementById('month-year-picker-close-button');
-  domElements.pickerMonthsGrid = document.getElementById('picker-months-grid');
-  domElements.pickerYearsList = document.getElementById('picker-years-list');
-  domElements.dailyNoteInput = document.getElementById('daily-note-input');
-  domElements.saveNoteButton = document.getElementById('save-note-button');
-  
-  domElements.historyModal = document.getElementById('history-modal');
-  domElements.historyModalCloseButton = document.getElementById('history-modal-close-button');
-  domElements.historyModalDate = document.getElementById('history-modal-date');
-  domElements.historyModalPointsValue = document.getElementById('history-modal-points-value');
-  domElements.historyModalPointsTotal = document.getElementById('history-modal-points-total');
-  domElements.historyPercentageProgressFill = document.getElementById('history-percentage-progress-fill');
-  domElements.historyTasksList = document.getElementById('history-tasks-list');
-  domElements.expandTasksButton = document.getElementById('expand-tasks-button');
-  domElements.historicalReflectionWrapper = document.getElementById('historical-reflection-wrapper');
-  domElements.expandReflectionButton = document.getElementById('expand-reflection-button');
-  domElements.historyUserNoteDisplay = document.getElementById('history-user-note-display');
-  domElements.historyUserNoteEdit = document.getElementById('history-user-note-edit');
-  domElements.historicalNoteControls = document.getElementById('historical-note-controls');
-  domElements.saveHistoricalNoteButton = document.getElementById('save-historical-note-button');
-  domElements.clearHistoricalNoteButton = document.getElementById('clear-historical-note-button');
-  domElements.historicalNoteStatus = document.getElementById('historical-note-status');
-  
-  domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
-  domElements.deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
-  domElements.deleteConfirmationTitle = document.getElementById('delete-confirmation-title');
-  domElements.deleteConfirmationMessage = document.getElementById('delete-confirmation-message');
-  domElements.deleteConfirmationCloseButton = document.getElementById('delete-confirmation-close-button');
-  domElements.confirmDeleteButton = document.getElementById('confirm-delete-button');
-  domElements.cancelDeleteButton = document.getElementById('cancel-delete-button');
+function openAddFolderModal(categoryId) {
+    domElements.addFolderModal.dataset.categoryId = categoryId;
+    domElements.addFolderModal.dataset.selectedType = ''; // Clear previous type
+    domElements.addFolderStep1.classList.remove('hidden');
+    domElements.addFolderStep2.classList.add('hidden');
+    domElements.newFolderNameInput.value = '';
+    domElements.addFolderModal.classList.remove('hidden');
+    // Clear selection style from folder type buttons
+    if(domElements.selectTaskFolderTypeButton) domElements.selectTaskFolderTypeButton.classList.remove('selected-type');
+    if(domElements.selectNotesFolderTypeButton) domElements.selectNotesFolderTypeButton.classList.remove('selected-type');
+}
+function closeAddFolderModal() { domElements.addFolderModal.classList.add('hidden'); }
 
-  domElements.fullscreenContentModal = document.getElementById('fullscreen-content-modal');
-  domElements.fullscreenModalTitle = document.getElementById('fullscreen-modal-title');
-  domElements.fullscreenModalArea = document.getElementById('fullscreen-modal-area');
-  domElements.fullscreenModalCloseButton = document.getElementById('fullscreen-modal-close-button');
-
-  domElements.chooseFolderTypeModal = document.getElementById('choose-folder-type-modal');
-  domElements.chooseFolderTypeCloseButton = document.getElementById('choose-folder-type-close-button');
-  domElements.selectTaskFolderButton = document.getElementById('select-task-folder-button');
-  domElements.selectNoteFolderButton = document.getElementById('select-note-folder-button');
-  domElements.enterFolderNameModal = document.getElementById('enter-folder-name-modal');
-  domElements.enterFolderNameCloseButton = document.getElementById('enter-folder-name-close-button');
-  domElements.enterFolderNameTitle = document.getElementById('enter-folder-name-title');
-  domElements.folderNameInput = document.getElementById('folder-name-input');
-  domElements.createFolderButton = document.getElementById('create-folder-button');
-  domElements.cancelCreateFolderButton = document.getElementById('cancel-create-folder-button');
-  domElements.imageUploadInput = document.getElementById('image-upload-input');
-
-
-  loadAppData(); 
-  renderTabs();
-  renderAllCategorySections(); 
-  updateAllProgress();
-
-  document.getElementById('dashboard-tab-button')?.addEventListener('click', () => switchTab('dashboard'));
-  if (activeTabId === 'dashboard' || !currentCategories.find(c => c.id === activeTabId)) switchTab('dashboard');
-  else switchTab(activeTabId); 
-
-  domElements.addCategoryButton?.addEventListener('click', handleAddCategory);
-  domElements.ctxRenameCategoryButton?.addEventListener('click', () => { const catId = domElements.categoryTabContextMenu.dataset.categoryId; if (catId) handleRenameCategory(catId); hideCategoryContextMenu(); });
-  domElements.ctxDeleteCategoryButton?.addEventListener('click', () => { const catId = domElements.categoryTabContextMenu.dataset.categoryId; if (catId) handleDeleteCategory(catId); hideCategoryContextMenu(); });
-  
-  domElements.ctxRenameFolderButton?.addEventListener('click', () => { const folderId = domElements.folderOptionsContextMenu.dataset.folderId; const folder = findFolderById(folderId); if (folder) handleRenameFolder(folder); hideFolderContextMenu(); });
-  domElements.ctxDeleteFolderButton?.addEventListener('click', () => { const folderId = domElements.folderOptionsContextMenu.dataset.folderId; const folder = findFolderById(folderId); if (folder) handleDeleteFolder(folder); hideFolderContextMenu(); });
-
-  document.addEventListener('click', (event) => { // Global click to hide context menus
-    if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden') && !domElements.categoryTabContextMenu.contains(event.target) && (!currentContextMenuTargetTab || !currentContextMenuTargetTab.contains(event.target))) hideCategoryContextMenu();
-    if (domElements.folderOptionsContextMenu && !domElements.folderOptionsContextMenu.classList.contains('hidden') && !domElements.folderOptionsContextMenu.contains(event.target) && (!currentContextMenuTargetFolderBox || !currentContextMenuTargetFolderBox.parentElement.contains(event.target))) hideFolderContextMenu(); // Check parentElement (the wrapper)
-  });
-
-
-  domElements.tabContentsContainer.addEventListener('dragover', (e) => {
-    const taskListElement = e.target.closest('.task-list');
-    if (!taskListElement) return;
-    const folderId = taskListElement.dataset.folderId;
-    if (!currentFolderEditModes[folderId] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
-    e.preventDefault();
-    taskListElement.querySelectorAll('.task-item').forEach(item => item.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom'));
-    const afterElement = getDragAfterElement(taskListElement, e.clientY);
-    if (afterElement) afterElement.classList.add('drag-over-indicator-task'); 
-    else { const last = taskListElement.querySelector('.task-item:last-child:not(.dragging)'); if (last) last.classList.add('drag-over-indicator-task-bottom'); }
-    e.dataTransfer.dropEffect = 'move';
-  });
-  domElements.tabContentsContainer.addEventListener('drop', (e) => {
-    const taskListElement = e.target.closest('.task-list');
-    if (!taskListElement) return;
-    const folderId = taskListElement.dataset.folderId;
-    if (!currentFolderEditModes[folderId] || !draggedTaskElement || draggedTaskElement.closest('.task-list') !== taskListElement) return;
-    e.preventDefault();
-    const afterElement = getDragAfterElement(taskListElement, e.clientY);
-    if (afterElement) taskListElement.insertBefore(draggedTaskElement, afterElement);
-    else taskListElement.appendChild(draggedTaskElement);
-  });
-
-  domElements.saveNoteButton?.addEventListener('click', saveDailyNote);
-  domElements.historyModalCloseButton?.addEventListener('click', closeHistoryModal);
-  domElements.saveHistoricalNoteButton?.addEventListener('click', saveHistoricalNote);
-  domElements.clearHistoricalNoteButton?.addEventListener('click', clearHistoricalNote);
-  domElements.calendarPrevMonthButton?.addEventListener('click', () => { calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() - 1); renderCalendar(); });
-  domElements.calendarNextMonthButton?.addEventListener('click', () => { calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() + 1); renderCalendar(); });
-  domElements.calendarMonthYearButton?.addEventListener('click', toggleMonthYearPicker);
-  domElements.monthYearPickerCloseButton?.addEventListener('click', closeMonthYearPicker);
-  domElements.monthYearPickerModal?.addEventListener('click', (e) => { if (e.target === domElements.monthYearPickerModal) closeMonthYearPicker(); });
-  
-  domElements.deleteConfirmationCloseButton?.addEventListener('click', hideDeleteConfirmation);
-  domElements.confirmDeleteButton?.addEventListener('click', confirmDeletion);
-  domElements.cancelDeleteButton?.addEventListener('click', hideDeleteConfirmation);
-
-  domElements.expandTasksButton?.addEventListener('click', () => { if (currentModalDate) openFullscreenContentModal('tasks', currentModalDate); });
-  domElements.expandReflectionButton?.addEventListener('click', () => { if (currentModalDate) openFullscreenContentModal('reflection', currentModalDate); });
-  domElements.fullscreenModalCloseButton?.addEventListener('click', closeFullscreenContentModal);
-
-  // Folder Modals
-  domElements.chooseFolderTypeCloseButton?.addEventListener('click', closeChooseFolderTypeModal);
-  domElements.selectTaskFolderButton?.addEventListener('click', () => { closeChooseFolderTypeModal(); openEnterFolderNameModal('task'); });
-  domElements.selectNoteFolderButton?.addEventListener('click', () => { closeChooseFolderTypeModal(); openEnterFolderNameModal('note'); });
-  domElements.enterFolderNameCloseButton?.addEventListener('click', closeEnterFolderNameModal);
-  domElements.createFolderButton?.addEventListener('click', handleCreateFolder);
-  domElements.cancelCreateFolderButton?.addEventListener('click', closeEnterFolderNameModal);
-  domElements.folderNameInput?.addEventListener('keypress', (e) => { if(e.key === 'Enter') handleCreateFolder(); });
-
-
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        if (!domElements.categoryTabContextMenu?.classList.contains('hidden')) hideCategoryContextMenu();
-        else if (!domElements.folderOptionsContextMenu?.classList.contains('hidden')) hideFolderContextMenu();
-        else if (!domElements.historyModal?.classList.contains('hidden')) closeHistoryModal();
-        else if (isMonthYearPickerOpen) closeMonthYearPicker();
-        else if (!domElements.deleteConfirmationModal?.classList.contains('hidden')) hideDeleteConfirmation();
-        else if (!domElements.fullscreenContentModal?.classList.contains('hidden')) closeFullscreenContentModal();
-        else if (!domElements.chooseFolderTypeModal?.classList.contains('hidden')) closeChooseFolderTypeModal();
-        else if (!domElements.enterFolderNameModal?.classList.contains('hidden')) closeEnterFolderNameModal();
-        else if (activeAddTaskForm) {
-            const folder = findFolderById(activeAddTaskForm.folderId);
-            if(folder) hideTempAddTaskForm(folder.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position);
-        }
-    }
-  });
-
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      // Construct the full URL to sw.js using the current origin
-      const swUrl = `${window.location.origin}/sw.js`;
-      navigator.serviceWorker.register(swUrl)
-        .then(reg => console.log('SW registered with URL:', swUrl, reg))
-        .catch(err => console.error('SW registration failed with URL:', swUrl, err));
-    });
-  }
+function handleFolderTypeSelection(type) {
+    domElements.addFolderModal.dataset.selectedType = type;
+    domElements.addFolderStep1.classList.add('hidden');
+    domElements.addFolderStep2.classList.remove('hidden');
+    domElements.selectedFolderTypeNameSpan.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+    domElements.newFolderNameInput.focus();
+    // Visually mark selected type
+    if(domElements.selectTaskFolderTypeButton) domElements.selectTaskFolderTypeButton.classList.toggle('selected-type', type === 'task');
+    if(domElements.selectNotesFolderTypeButton) domElements.selectNotesFolderTypeButton.classList.toggle('selected-type', type === 'notes');
 }
 
-document.addEventListener('DOMContentLoaded', initializeApp);
+
+function handleCreateFolder() {
+    const categoryId = domElements.addFolderModal.dataset.categoryId;
+    const folderType = domElements.addFolderModal.dataset.selectedType;
+    const folderName = domElements.newFolderNameInput.value.trim();
+
+    if (!categoryId || !folderType || !folderName) {
+        alert("Folder name cannot be empty and type must be selected."); return;
+    }
+
+    if (!userFoldersByCategoryId[categoryId]) userFoldersByCategoryId[categoryId] = [];
+    const newFolder = {
+        id: createUniqueId('folder'), name: folderName, type: folderType,
+        order: userFoldersByCategoryId[categoryId].length,
+        tasks: folderType === 'task' ? [] : undefined,
+        content: folderType === 'notes' ? [] : undefined,
+    };
+    userFoldersByCategoryId[categoryId].push(newFolder);
+    saveUserFolders(userFoldersByCategoryId);
+    renderCategoryTasks(categoryId);
+    closeAddFolderModal();
+}
+
+function showFolderContextMenu(folderId, categoryId, targetIconElement) {
+    hideCategoryContextMenu(); hideFolderContextMenu();
+    currentFolderOptionsMenu = { element: targetIconElement.closest('.task-folder-box-wrapper'), folderId, categoryId };
+    const menu = domElements.folderOptionsContextMenu; if (!menu) return;
+    menu.dataset.folderId = folderId; menu.dataset.categoryId = categoryId;
+    const iconRect = targetIconElement.getBoundingClientRect();
+    let topPosition = iconRect.bottom + window.scrollY + 2;
+    let leftPosition = iconRect.right + window.scrollX - menu.offsetWidth;
+    const menuWidth = menu.offsetWidth || 150, menuHeight = menu.offsetHeight || 80;
+    if (leftPosition < 0) leftPosition = iconRect.left + window.scrollX;
+    if (topPosition + menuHeight > window.innerHeight) topPosition = iconRect.top + window.scrollY - menuHeight - 2;
+    if (leftPosition + menuWidth > window.innerWidth) leftPosition = window.innerWidth - menuWidth - 10;
+    if (leftPosition < 0) leftPosition = 10; if (topPosition < 0) topPosition = 10;
+
+    menu.style.top = `${topPosition}px`; menu.style.left = `${leftPosition}px`; menu.classList.remove('hidden');
+    targetIconElement.classList.add('visible');
+}
+
+function hideFolderContextMenu() {
+    if (domElements.folderOptionsContextMenu) domElements.folderOptionsContextMenu.classList.add('hidden');
+    if (currentFolderOptionsMenu.element) {
+        const optionsIcon = currentFolderOptionsMenu.element.querySelector('.entity-options-icon');
+        if (optionsIcon) optionsIcon.classList.remove('visible');
+    }
+    currentFolderOptionsMenu = { element: null, folderId: null, categoryId: null };
+}
+
+function handleRenameFolder(folderId, categoryId) {
+    const folderWrapper = document.querySelector(`.task-folder-box-wrapper[data-folder-id="${folderId}"]`);
+    if (!folderWrapper) return;
+
+    const label = folderWrapper.querySelector('.task-folder-label-text');
+    if (!label || folderWrapper.querySelector('.folder-inline-rename-input')) return;
+
+    const originalName = label.textContent;
+    label.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'folder-inline-rename-input';
+    input.value = originalName;
+    folderWrapper.setAttribute('aria-label', `Renaming folder: ${originalName}`);
+
+
+    const finishRename = (newNameFromInput) => {
+        const newName = newNameFromInput.trim();
+        let finalName = originalName; // Default to original name
+
+        if (newName && newName !== originalName) {
+            const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+            if (folder) {
+                folder.name = newName;
+                finalName = newName; // Update finalName if change is successful
+                saveUserFolders(userFoldersByCategoryId);
+            }
+        }
+        label.textContent = finalName; // Set label to the final name
+        input.remove();
+        label.style.display = '';
+        folderWrapper.setAttribute('aria-label', `Open folder: ${finalName}`);
+         // Re-focus the options icon of the folder for better UX after rename
+        const optionsIcon = folderWrapper.querySelector('.folder-options-icon');
+        if (optionsIcon) optionsIcon.focus();
+    };
+
+    input.addEventListener('blur', () => {
+        // Delay blur processing slightly to allow click on save/cancel from context menu to fire first if that was intended
+        // For inline, blur usually means save.
+        finishRename(input.value);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            finishRename(input.value);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            finishRename(originalName); // Cancel and revert
+        }
+    });
+
+    label.parentNode.insertBefore(input, label.nextSibling);
+    input.focus();
+    input.select();
+    hideFolderContextMenu(); // Ensure menu is hidden after starting rename
+}
+
+function initApp() {
+    // Cache DOM elements
+    domElements.tabsContainer = document.getElementById('tabs');
+    domElements.tabContentsContainer = document.getElementById('tab-content');
+    domElements.addCategoryButton = document.getElementById('add-category-button');
+    domElements.categorySectionTemplate = document.getElementById('category-section-template');
+    domElements.backToFoldersButtonTemplate = document.getElementById('back-to-folders-button-template');
+    domElements.categoryTabContextMenu = document.getElementById('category-tab-context-menu');
+    domElements.ctxRenameCategoryButton = document.getElementById('ctx-rename-category');
+    domElements.ctxDeleteCategoryButton = document.getElementById('ctx-delete-category');
+    domElements.folderOptionsContextMenu = document.getElementById('folder-options-context-menu');
+    domElements.ctxRenameFolderButton = document.getElementById('ctx-rename-folder');
+    domElements.ctxDeleteFolderButton = document.getElementById('ctx-delete-folder');
+
+    domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
+    domElements.todayProgressFill = document.getElementById('today-progress-fill');
+    domElements.todayPointsStat = document.getElementById('today-points-stat');
+    domElements.currentWeekProgressFill = document.getElementById('current-week-progress-fill');
+    domElements.currentWeekPointsStat = document.getElementById('current-week-points-stat');
+    domElements.calendarMonthYearButton = document.getElementById('calendar-month-year-button');
+    domElements.calendarMonthYear = document.getElementById('calendar-month-year');
+    domElements.calendarGrid = document.getElementById('calendar-grid');
+    domElements.calendarPrevMonthButton = document.getElementById('calendar-prev-month');
+    domElements.calendarNextMonthButton = document.getElementById('calendar-next-month');
+    domElements.monthYearPickerModal = document.getElementById('month-year-picker-modal');
+    domElements.monthYearPickerContent = document.getElementById('month-year-picker-content');
+    domElements.monthYearPickerCloseButton = document.getElementById('month-year-picker-close-button');
+    domElements.pickerMonthsGrid = document.getElementById('picker-months-grid');
+    domElements.pickerYearsList = document.getElementById('picker-years-list');
+    domElements.dailyNoteInput = document.getElementById('daily-note-input');
+    domElements.saveNoteButton = document.getElementById('save-note-button');
+    domElements.historyModal = document.getElementById('history-modal');
+    domElements.historyModalCloseButton = document.getElementById('history-modal-close-button');
+    domElements.historyModalDate = document.getElementById('history-modal-date');
+    domElements.historyModalPointsValue = document.getElementById('history-modal-points-value');
+    domElements.historyModalPointsTotal = document.getElementById('history-modal-points-total');
+    domElements.historyPercentageProgressFill = document.getElementById('history-percentage-progress-fill');
+    domElements.historyTasksList = document.getElementById('history-tasks-list');
+    domElements.expandTasksButton = document.getElementById('expand-tasks-button');
+    domElements.historicalReflectionWrapper = document.getElementById('historical-reflection-wrapper');
+    domElements.expandReflectionButton = document.getElementById('expand-reflection-button');
+    domElements.historyUserNoteDisplay = document.getElementById('history-user-note-display');
+    domElements.historyUserNoteEdit = document.getElementById('history-user-note-edit');
+    domElements.historicalNoteControls = document.getElementById('historical-note-controls');
+    domElements.saveHistoricalNoteButton = document.getElementById('save-historical-note-button');
+    domElements.clearHistoricalNoteButton = document.getElementById('clear-historical-note-button');
+    domElements.historicalNoteStatus = document.getElementById('historical-note-status');
+    domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
+    domElements.deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
+    domElements.deleteConfirmationTitle = document.getElementById('delete-confirmation-title');
+    domElements.deleteConfirmationMessage = document.getElementById('delete-confirmation-message');
+    domElements.deleteConfirmationCloseButton = document.getElementById('delete-confirmation-close-button');
+    domElements.confirmDeleteButton = document.getElementById('confirm-delete-button');
+    domElements.cancelDeleteButton = document.getElementById('cancel-delete-button');
+    domElements.fullscreenContentModal = document.getElementById('fullscreen-content-modal');
+    domElements.fullscreenModalTitle = document.getElementById('fullscreen-modal-title');
+    domElements.fullscreenModalArea = document.getElementById('fullscreen-modal-area');
+    domElements.fullscreenModalCloseButton = document.getElementById('fullscreen-modal-close-button');
+
+    domElements.addFolderModal = document.getElementById('add-folder-modal');
+    domElements.addFolderModalCloseButton = document.getElementById('add-folder-modal-close-button');
+    domElements.addFolderStep1 = document.getElementById('add-folder-step-1');
+    domElements.addFolderStep2 = document.getElementById('add-folder-step-2');
+    domElements.selectTaskFolderTypeButton = document.getElementById('select-task-folder-type');
+    domElements.selectNotesFolderTypeButton = document.getElementById('select-notes-folder-type');
+    domElements.addFolderBackButton = document.getElementById('add-folder-back-button');
+    domElements.selectedFolderTypeNameSpan = document.getElementById('selected-folder-type-name');
+    domElements.newFolderNameInput = document.getElementById('new-folder-name-input');
+    domElements.createFolderButton = document.getElementById('create-folder-button');
+    domElements.cancelAddFolderButton = document.getElementById('cancel-add-folder-button');
+
+    domElements.noteItemTemplate = document.getElementById('note-item-template');
+    domElements.noteItemEditTextareaTemplate = document.getElementById('note-item-edit-form-template-text');
+    domElements.noteItemEditLinkTemplate = document.getElementById('note-item-edit-form-template-link');
+    domElements.noteItemEditImageTemplate = document.getElementById('note-item-edit-form-template-image');
+
+
+    // Load data and render initial UI
+    loadAppData();
+    renderTabs();
+    renderAllCategorySections();
+    switchTab('dashboard'); // Default to dashboard
+    updateAllProgress();
+
+    // Attach event listeners
+    if (domElements.addCategoryButton) domElements.addCategoryButton.onclick = handleAddCategory;
+    if (domElements.saveNoteButton) domElements.saveNoteButton.onclick = saveDailyNote;
+    document.getElementById('dashboard-tab-button').onclick = () => switchTab('dashboard');
+
+
+    // Calendar navigation
+    if (domElements.calendarPrevMonthButton) domElements.calendarPrevMonthButton.onclick = () => { calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() - 1); renderCalendar(); };
+    if (domElements.calendarNextMonthButton) domElements.calendarNextMonthButton.onclick = () => { calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() + 1); renderCalendar(); };
+    if (domElements.calendarMonthYearButton) domElements.calendarMonthYearButton.onclick = toggleMonthYearPicker;
+    if (domElements.monthYearPickerCloseButton) domElements.monthYearPickerCloseButton.onclick = closeMonthYearPicker;
+
+    // History Modal listeners
+    if (domElements.historyModalCloseButton) domElements.historyModalCloseButton.onclick = closeHistoryModal;
+    if (domElements.saveHistoricalNoteButton) domElements.saveHistoricalNoteButton.onclick = saveHistoricalNote;
+    if (domElements.clearHistoricalNoteButton) domElements.clearHistoricalNoteButton.onclick = clearHistoricalNote;
+    if (domElements.expandTasksButton) domElements.expandTasksButton.onclick = () => openFullscreenContentModal('tasks', currentModalDate);
+    if (domElements.expandReflectionButton) domElements.expandReflectionButton.onclick = () => openFullscreenContentModal('reflection', currentModalDate);
+    if (domElements.fullscreenModalCloseButton) domElements.fullscreenModalCloseButton.onclick = closeFullscreenContentModal;
+
+    // Delete confirmation modal listeners
+    if (domElements.confirmDeleteButton) domElements.confirmDeleteButton.onclick = confirmDeletion;
+    if (domElements.cancelDeleteButton) domElements.cancelDeleteButton.onclick = hideDeleteConfirmation;
+    if (domElements.deleteConfirmationCloseButton) domElements.deleteConfirmationCloseButton.onclick = hideDeleteConfirmation;
+
+    // Add Folder Modal listeners
+    if (domElements.addFolderModalCloseButton) domElements.addFolderModalCloseButton.onclick = closeAddFolderModal;
+    if (domElements.selectTaskFolderTypeButton) domElements.selectTaskFolderTypeButton.onclick = () => handleFolderTypeSelection('task');
+    if (domElements.selectNotesFolderTypeButton) domElements.selectNotesFolderTypeButton.onclick = () => handleFolderTypeSelection('notes');
+    if (domElements.addFolderBackButton) domElements.addFolderBackButton.onclick = () => {
+        domElements.addFolderStep1.classList.remove('hidden');
+        domElements.addFolderStep2.classList.add('hidden');
+         if(domElements.selectTaskFolderTypeButton) domElements.selectTaskFolderTypeButton.classList.remove('selected-type');
+         if(domElements.selectNotesFolderTypeButton) domElements.selectNotesFolderTypeButton.classList.remove('selected-type');
+    };
+    if (domElements.createFolderButton) domElements.createFolderButton.onclick = handleCreateFolder;
+    if (domElements.cancelAddFolderButton) domElements.cancelAddFolderButton.onclick = closeAddFolderModal;
+    if (domElements.newFolderNameInput) domElements.newFolderNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); handleCreateFolder(); }
+    });
+
+    // Context Menu listeners
+    if (domElements.ctxRenameCategoryButton) domElements.ctxRenameCategoryButton.onclick = () => {
+        const categoryId = domElements.categoryTabContextMenu.dataset.categoryId;
+        hideCategoryContextMenu();
+        handleRenameCategory(categoryId);
+    };
+    if (domElements.ctxDeleteCategoryButton) domElements.ctxDeleteCategoryButton.onclick = () => {
+        const categoryId = domElements.categoryTabContextMenu.dataset.categoryId;
+        hideCategoryContextMenu();
+        handleDeleteCategory(categoryId);
+    };
+    if (domElements.ctxRenameFolderButton) domElements.ctxRenameFolderButton.onclick = () => {
+        const folderId = domElements.folderOptionsContextMenu.dataset.folderId;
+        const categoryId = domElements.folderOptionsContextMenu.dataset.categoryId;
+        hideFolderContextMenu();
+        handleRenameFolder(folderId, categoryId);
+    };
+    if (domElements.ctxDeleteFolderButton) domElements.ctxDeleteFolderButton.onclick = () => {
+        const folderId = domElements.folderOptionsContextMenu.dataset.folderId;
+        const categoryId = domElements.folderOptionsContextMenu.dataset.categoryId;
+        hideFolderContextMenu();
+        const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
+        if (folder) showDeleteConfirmation('folder', folderId, `Are you sure you want to delete the folder "${folder.name}" and all its contents? This action cannot be undone.`, folder.name, categoryId);
+    };
+
+
+    // Global click listener to hide context menus
+    document.addEventListener('click', (e) => {
+        if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden') && currentContextMenuTargetTab && !currentContextMenuTargetTab.contains(e.target) && !domElements.categoryTabContextMenu.contains(e.target)) {
+            hideCategoryContextMenu();
+        }
+        if (domElements.folderOptionsContextMenu && !domElements.folderOptionsContextMenu.classList.contains('hidden') && currentFolderOptionsMenu.element && !currentFolderOptionsMenu.element.contains(e.target) && !domElements.folderOptionsContextMenu.contains(e.target)) {
+            hideFolderContextMenu();
+        }
+        if (domElements.monthYearPickerModal && !domElements.monthYearPickerModal.classList.contains('hidden') && !domElements.monthYearPickerContent.contains(e.target) && e.target !== domElements.calendarMonthYearButton && !domElements.calendarMonthYearButton.contains(e.target)) {
+            closeMonthYearPicker();
+        }
+    });
+
+    // Global keydown listener for Escape key to close modals/menus
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (domElements.monthYearPickerModal && !domElements.monthYearPickerModal.classList.contains('hidden')) closeMonthYearPicker();
+            else if (domElements.historyModal && !domElements.historyModal.classList.contains('hidden')) closeHistoryModal();
+            else if (domElements.fullscreenContentModal && !domElements.fullscreenContentModal.classList.contains('hidden')) closeFullscreenContentModal();
+            else if (domElements.deleteConfirmationModal && !domElements.deleteConfirmationModal.classList.contains('hidden')) hideDeleteConfirmation();
+            else if (domElements.addFolderModal && !domElements.addFolderModal.classList.contains('hidden')) closeAddFolderModal();
+            else if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden')) hideCategoryContextMenu();
+            else if (domElements.folderOptionsContextMenu && !domElements.folderOptionsContextMenu.classList.contains('hidden')) hideFolderContextMenu();
+             // Cancel active inline task edit
+            const activeEditInput = document.querySelector('.task-item.editing .task-edit-input');
+            if (activeEditInput) {
+                const cancelButton = activeEditInput.closest('#task-edit-controls-template, div').querySelector('.task-edit-cancel');
+                if (cancelButton) cancelButton.click();
+            }
+             // Cancel active inline folder rename
+            const activeFolderRenameInput = document.querySelector('.folder-inline-rename-input');
+            if (activeFolderRenameInput) {
+                // Trigger finishRename with original name for Escape
+                const originalName = activeFolderRenameInput.value; // Not ideal, but originalName isn't easily accessible here.
+                                                                    // A better way would be to store originalName on the input.dataset
+                const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+                activeFolderRenameInput.dispatchEvent(event); //This will call the listener in handleRenameFolder
+            }
+            // Cancel active note item edit
+            if (currentEditingNoteItem && currentEditingNoteItem.itemElement) {
+                const cancelNoteBtn = currentEditingNoteItem.itemElement.querySelector('.note-item-editing-form .new-task-temp-cancel');
+                if(cancelNoteBtn) cancelNoteBtn.click();
+            }
+        }
+    });
+
+    // Drag and drop for tasks and note items (event delegation on containers)
+    if (domElements.tabContentsContainer) {
+        domElements.tabContentsContainer.addEventListener('dragover', (e) => {
+            if (draggedItemElement) {
+                const targetContainer = e.target.closest('ul.task-list, .notes-content-display-area');
+                if (!targetContainer) return;
+
+                const isTaskDrag = draggedItemElement.classList.contains('task-item');
+                const isNoteDrag = draggedItemElement.classList.contains('note-item');
+                const isTargetTaskList = targetContainer.classList.contains('task-list');
+                const isTargetNotesArea = targetContainer.classList.contains('notes-content-display-area');
+
+                if ((isTaskDrag && !isTargetTaskList) || (isNoteDrag && !isTargetNotesArea)) return; // Don't allow dragging between types
+
+                e.preventDefault(); // Allow drop
+
+                const itemSelector = isTaskDrag ? '.task-item' : '.note-item';
+                const indicatorClass = isTaskDrag ? 'drag-over-indicator-task' : 'drag-over-indicator-note';
+                const indicatorBottomClass = isTaskDrag ? 'drag-over-indicator-task-bottom' : 'drag-over-indicator-note-bottom';
+
+                document.querySelectorAll(`.${indicatorClass}, .${indicatorBottomClass}`).forEach(el => {
+                    el.classList.remove(indicatorClass, indicatorBottomClass);
+                });
+
+                const afterElement = getDragAfterElement(targetContainer, e.clientY, itemSelector);
+                if (afterElement) {
+                    afterElement.classList.add(indicatorClass);
+                } else {
+                    const allItems = Array.from(targetContainer.querySelectorAll(`${itemSelector}:not(.dragging)`));
+                    if (allItems.length > 0) {
+                        allItems[allItems.length - 1].classList.add(indicatorBottomClass);
+                    } else if (draggedItemElement.parentNode === targetContainer) {
+                        // No indicator needed if dragging the only item in its own empty list
+                    }
+                }
+            }
+        });
+
+        domElements.tabContentsContainer.addEventListener('drop', (e) => {
+            if (draggedItemElement) {
+                e.preventDefault();
+                const targetContainer = e.target.closest('ul.task-list, .notes-content-display-area');
+                if (!targetContainer) return;
+
+                 const isTaskDrag = draggedItemElement.classList.contains('task-item');
+                 const indicatorClass = isTaskDrag ? 'drag-over-indicator-task' : 'drag-over-indicator-note';
+                 const indicatorBottomClass = isTaskDrag ? 'drag-over-indicator-task-bottom' : 'drag-over-indicator-note-bottom';
+
+                document.querySelectorAll(`.${indicatorClass}, .${indicatorBottomClass}`).forEach(el => {
+                    el.classList.remove(indicatorClass, indicatorBottomClass);
+                });
+
+                const itemSelector = isTaskDrag ? '.task-item' : '.note-item';
+                const afterElement = getDragAfterElement(targetContainer, e.clientY, itemSelector);
+
+                if (draggedItemElement.parentNode !== targetContainer) {
+                    return;
+                }
+
+                if (afterElement) {
+                    targetContainer.insertBefore(draggedItemElement, afterElement);
+                } else {
+                    targetContainer.appendChild(draggedItemElement);
+                }
+                // The 'dragend' event on the item itself should handle saving the new order.
+            }
+        });
+    }
+
+    // Ensure Dashboard tab is correctly highlighted if it's the active one
+    const dashboardTabButton = document.getElementById('dashboard-tab-button');
+    if (dashboardTabButton && activeTabId === 'dashboard') {
+        dashboardTabButton.classList.add('active', 'main-tab-highlight');
+        dashboardTabButton.setAttribute('aria-selected', 'true');
+    } else if (dashboardTabButton) {
+        dashboardTabButton.classList.remove('active');
+        dashboardTabButton.setAttribute('aria-selected', 'false');
+    }
+
+    // Set initial active tab classes correctly
+    const currentActiveTabButton = document.querySelector(`#tabs .tab-button[data-category-id="${activeTabId}"], #dashboard-tab-button.active`);
+    if(currentActiveTabButton) {
+        currentActiveTabButton.classList.add('active');
+        if (activeTabId === 'dashboard') currentActiveTabButton.classList.add('main-tab-highlight');
+        currentActiveTabButton.setAttribute('aria-selected', 'true');
+    }
+
+    console.log("Daily Productivity Tracker Initialized");
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
