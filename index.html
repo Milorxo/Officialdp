@@ -21,6 +21,80 @@
 </head>
 <body>
     <div id="app-container">
+        <button id="hamburger-menu-button" aria-label="Open menu" aria-expanded="false" aria-controls="side-menu">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path></svg>
+        </button>
+
+        <nav id="side-menu" class="hidden" aria-hidden="true">
+            <ul>
+                <li><button id="side-menu-dashboard-link" class="side-menu-link">Dashboard</button></li>
+                <li><button id="side-menu-progress-link" class="side-menu-link">Progress System</button></li>
+            </ul>
+        </nav>
+
+        <div id="progress-system-view" class="hidden">
+            <header id="progress-system-header">
+                <h2>Progress Management</h2>
+                <button id="progress-system-back-button" class="icon-button" aria-label="Back to dashboard">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+                    <span>Dashboard</span>
+                </button>
+            </header>
+            <nav id="progress-system-tabs">
+                <button id="progress-tab-setup" class="progress-tab-button active" role="tab" aria-selected="true" aria-controls="progress-setup-content">Current Progress Setup</button>
+                <button id="progress-tab-history" class="progress-tab-button" role="tab" aria-selected="false" aria-controls="progress-history-content">Progress History</button>
+            </nav>
+            <main id="progress-system-tab-content">
+                <section id="progress-setup-content" role="tabpanel" aria-labelledby="progress-tab-setup">
+                    <form id="progress-setup-form">
+                        <div class="form-group">
+                            <label for="progress-plan-name">Plan Name:</label>
+                            <input type="text" id="progress-plan-name" placeholder="e.g., Fitness Challenge Q3">
+                        </div>
+                        <div class="form-group">
+                            <label for="progress-start-date">Start Date:</label>
+                            <input type="date" id="progress-start-date">
+                        </div>
+                        <div class="form-group">
+                            <label for="progress-start-day">Start Day of Week:</label>
+                            <select id="progress-start-day">
+                                <option value="0">Sunday</option>
+                                <option value="1">Monday</option>
+                                <option value="2">Tuesday</option>
+                                <option value="3">Wednesday</option>
+                                <option value="4">Thursday</option>
+                                <option value="5">Friday</option>
+                                <option value="6">Saturday</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="progress-target-weekly-points">Target Weekly Points:</label>
+                            <input type="number" id="progress-target-weekly-points" placeholder="e.g., 15000" min="100">
+                        </div>
+                        <div id="progress-form-actions">
+                            <button type="submit" id="save-progress-plan-button">Save Plan</button>
+                            <button type="button" id="end-current-plan-button" class="hidden">End Current Plan</button>
+                        </div>
+                    </form>
+                    <div id="active-plan-summary" class="hidden">
+                        <h4>Active Plan</h4>
+                        <p><strong>Name:</strong> <span id="active-plan-name-display"></span></p>
+                        <p><strong>Start Date:</strong> <span id="active-plan-start-date-display"></span></p>
+                        <p><strong>Week Starts On:</strong> <span id="active-plan-start-day-display"></span></p>
+                        <p><strong>Weekly Target:</strong> <span id="active-plan-target-points-display"></span> points</p>
+                    </div>
+                </section>
+                <section id="progress-history-content" role="tabpanel" aria-labelledby="progress-tab-history" class="hidden">
+                    <h3>Completed Progress Plans</h3>
+                    <ul id="progress-history-list">
+                        <!-- History items will be populated here by JS -->
+                        <!-- Example: <li><div>Plan Name</div><div>Dates</div><div>Progress</div></li> -->
+                    </ul>
+                    <p id="no-progress-history" class="hidden">No completed progress plans yet.</p>
+                </section>
+            </main>
+        </div>
+
         <div id="main-content-wrapper">
             <aside id="dashboard-column" role="complementary">
                 <h2>Activity Dashboard</h2>
@@ -54,10 +128,7 @@
                                 </button>
                                 <button id="calendar-next-month" class="calendar-nav-button" aria-label="Next month">&gt;</button>
                             </div>
-                            <!-- Month/Year Picker Popup is now a full modal, defined later -->
-                            <div id="calendar-grid">
-                                <!-- Calendar days will be populated by JS -->
-                            </div>
+                            <div id="calendar-grid"></div>
                         </div>
 
                         <div id="daily-note-container">
@@ -74,7 +145,7 @@
                             <p id="today-points-stat" class="points-stat">0 / 2700 points</p>
                         </div>
                         <div id="current-week-progress-container">
-                            <h3>Weekly Progress</h3>
+                            <h3 id="current-weekly-plan-name-display" class="weekly-plan-name-title">Weekly Progress</h3>
                             <div class="progress-bar-container">
                                 <div id="current-week-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
                             </div>
@@ -203,32 +274,21 @@
         <button class="task-edit-cancel">Cancel</button>
     </div>
     
-    <!-- Template for category section (used by JS) -->
     <template id="category-section-template">
         <section class="category-section" role="tabpanel">
             <div class="category-header">
-                 <!-- Back to Folders button will be prepended here by JS when viewing folder contents -->
-                <h2 class="category-title-text">Category Name</h2> <!-- This will also show Folder Name when inside a folder -->
-                <div class="category-header-controls"> <!-- This div will be shown/hidden -->
+                <h2 class="category-title-text">Category Name</h2>
+                <div class="category-header-controls">
                     <button class="edit-mode-toggle-button icon-button" aria-label="Toggle edit mode for tasks" title="Toggle Edit Mode" aria-pressed="false">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
                     </button>
                     <button class="undo-category-button icon-button" aria-label="Uncheck all tasks in current view" title="Uncheck All Tasks in View">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>
                     </button>
-                    <!-- Notes Folder specific header controls (e.g., "Save Notes") will be added here by JS -->
                 </div>
             </div>
-            <!-- Container for Folder Boxes OR Task List OR Notes Content depending on view mode -->
-            <div class="category-content-area">
-                <!-- JS will populate this with folder boxes or tasks list -->
-            </div>
-
-            <!-- This UL is specifically for task lists in Task Folders -->
-            <ul class="task-list" aria-live="polite">
-            </ul>
-            
-            <!-- This DIV is for Notes Folder content area -->
+            <div class="category-content-area"></div>
+            <ul class="task-list" aria-live="polite"></ul>
             <div class="notes-folder-content-wrapper hidden">
                 <div class="notes-editor-controls">
                      <button class="notes-control-button" data-action="add-text">
@@ -244,15 +304,11 @@
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"></path></svg> Save Notes
                     </button>
                 </div>
-                <div class="notes-content-display-area scrollable-list">
-                    <!-- Note items (text, links, images) will be rendered here -->
-                </div>
+                <div class="notes-content-display-area scrollable-list"></div>
             </div>
-
-            <div class="add-task-form-container add-task-form-top"> <!-- This will be shown when inside a TASK folder -->
+            <div class="add-task-form-container add-task-form-top">
                 <button class="add-item-trigger-button icon-button" data-position="top">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                    Add Item
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg> Add Item
                 </button>
                 <div class="new-temp-task-form hidden">
                     <input type="text" class="new-task-temp-input" placeholder="Enter task text...">
@@ -260,11 +316,9 @@
                     <button class="new-task-temp-cancel">Cancel</button>
                 </div>
             </div>
-            <!-- Task list UL is above Notes folder content wrapper now -->
-            <div class="add-task-form-container add-task-form-bottom"> <!-- This will be shown when inside a TASK folder -->
+            <div class="add-task-form-container add-task-form-bottom">
                  <button class="add-item-trigger-button icon-button" data-position="bottom">
-                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                    Add Item
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg> Add Item
                 </button>
                 <div class="new-temp-task-form hidden">
                     <input type="text" class="new-task-temp-input" placeholder="Enter task text...">
@@ -275,12 +329,9 @@
         </section>
     </template>
     
-    <!-- Template for a single note item (used by JS for Notes Folders) -->
     <template id="note-item-template">
         <div class="note-item" draggable="true">
-            <div class="note-item-content">
-                <!-- Content (p, a, img) goes here -->
-            </div>
+            <div class="note-item-content"></div>
             <div class="note-item-actions">
                 <button class="note-item-action-button edit-note-item" aria-label="Edit item" title="Edit">
                     <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
@@ -305,8 +356,6 @@
         <img class="note-edit-image-preview" src="#" alt="Preview">
     </template>
 
-
-    <!-- Template for the "Back to Folders" button -->
     <template id="back-to-folders-button-template">
         <button class="back-to-folders-button icon-button">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
@@ -314,18 +363,15 @@
         </button>
     </template>
 
-    <!-- Shared Context Menu for Category Tabs -->
     <div id="category-tab-context-menu" class="context-menu hidden">
         <button id="ctx-rename-category">Rename Category</button>
         <button id="ctx-delete-category">Delete Category</button>
     </div>
 
-    <!-- Shared Context Menu for Folder Boxes -->
     <div id="folder-options-context-menu" class="context-menu hidden">
         <button id="ctx-rename-folder">Rename</button>
         <button id="ctx-delete-folder">Delete</button>
     </div>
-
 
     <script type="module" src="index.js"></script>
 </body>
