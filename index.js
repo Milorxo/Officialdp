@@ -59,7 +59,7 @@ let isMonthYearPickerOpen = false;
 let pickerSelectedMonth = new Date().getMonth();
 let pickerSelectedYear = new Date().getFullYear();
 let currentFullscreenContent = null;
-let longPressTimer = null;
+let longPressTimer = null; // Specifically for category tab long press
 const LONG_PRESS_DURATION = 700; // ms
 let currentContextMenuTargetTab = null; // For category tabs
 let currentContextMenuTargetFolderBox = null; // For folder boxes (the visual square)
@@ -1404,19 +1404,6 @@ function renderAllCategorySections() {
 }
 
 
-function clearLongPressTimer(tabButton) {
-    if (longPressTimer) clearTimeout(longPressTimer);
-    longPressTimer = null;
-    if (tabButton) { 
-      tabButton.removeEventListener('touchmove', preventScrollDuringLongPress);
-      tabButton.removeEventListener('touchend', () => clearLongPressTimer(tabButton));
-      tabButton.removeEventListener('touchcancel', () => clearLongPressTimer(tabButton));
-    }
-}
-function preventScrollDuringLongPress(e) {
-    clearLongPressTimer(e.currentTarget);
-}
-
 function renderTabs() {
     if (!domElements.tabsContainer) return;
     domElements.tabsContainer.querySelectorAll('.tab-button[data-category-id]').forEach(btn => btn.remove());
@@ -1440,22 +1427,69 @@ function renderTabs() {
         optionsIcon.tabIndex = 0; 
         tabButton.appendChild(optionsIcon);
         
-        optionsIcon.addEventListener('click', (e) => { e.stopPropagation(); showCategoryContextMenu(category.id, tabButton); });
-        optionsIcon.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); showCategoryContextMenu(category.id, tabButton); }});
-        tabButton.addEventListener('touchstart', (e) => {
-            clearLongPressTimer(tabButton); 
-            tabButton.addEventListener('touchmove', preventScrollDuringLongPress);
-            longPressTimer = setTimeout(() => { e.preventDefault(); optionsIcon.classList.add('visible'); showCategoryContextMenu(category.id, tabButton); clearLongPressTimer(tabButton); }, LONG_PRESS_DURATION);
-            tabButton.addEventListener('touchend', () => clearLongPressTimer(tabButton));
-            tabButton.addEventListener('touchcancel', () => clearLongPressTimer(tabButton));
+        optionsIcon.addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            showCategoryContextMenu(category.id, tabButton); 
         });
+        optionsIcon.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' || e.key === ' ') { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                showCategoryContextMenu(category.id, tabButton); 
+            }
+        });
+
+        // Refactored touch handling for long press
+        let touchStartEvent = null; // To store the touchstart event for preventDefault
+
+        const clearTabLongPressState = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            tabButton.removeEventListener('touchmove', handleTabTouchMove);
+            tabButton.removeEventListener('touchend', handleTabTouchEndOrCancel);
+            tabButton.removeEventListener('touchcancel', handleTabTouchEndOrCancel);
+            touchStartEvent = null;
+        };
+
+        const handleTabTouchMove = () => {
+            clearTabLongPressState(); // If finger moves, cancel long press
+        };
+
+        const handleTabTouchEndOrCancel = () => {
+            clearTabLongPressState();
+        };
+        
+        tabButton.addEventListener('touchstart', (e) => {
+            clearTabLongPressState(); // Clear any previous state
+            touchStartEvent = e; // Store the event
+
+            tabButton.addEventListener('touchmove', handleTabTouchMove);
+            tabButton.addEventListener('touchend', handleTabTouchEndOrCancel);
+            tabButton.addEventListener('touchcancel', handleTabTouchEndOrCancel);
+
+            longPressTimer = setTimeout(() => {
+                if (touchStartEvent) { // Check if touch is still active (not cancelled by move/end)
+                    touchStartEvent.preventDefault(); // Prevent click/other default actions
+                }
+                optionsIcon.classList.add('visible');
+                showCategoryContextMenu(category.id, tabButton);
+                longPressTimer = null; // Timer has fired
+                // Ensure listeners are removed if timer fires before touchend/cancel
+                tabButton.removeEventListener('touchmove', handleTabTouchMove);
+                tabButton.removeEventListener('touchend', handleTabTouchEndOrCancel);
+                tabButton.removeEventListener('touchcancel', handleTabTouchEndOrCancel);
+            }, LONG_PRESS_DURATION);
+        });
+
 
         tabButton.addEventListener('click', (e) => {
             if (e.target === tabButton && !optionsIcon.contains(e.target)) { 
                 tabButton.classList.add('show-badge-highlight');
                 setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300);
             }
-            switchTab(category.id)
+            switchTab(category.id);
         });
         domElements.tabsContainer.insertBefore(tabButton, addCatButton);
     });
