@@ -349,11 +349,9 @@ header h1 {
     display: none; /* Hide badge if category is complete (checkmark shown) */
 }
 
-/* Category Tab Context Menu (three dots icon) */
-.tab-options-icon {
+/* Generic Entity Options Icon (for Tabs and Folders) */
+.entity-options-icon {
     position: absolute;
-    top: 6px;
-    right: 6px;
     width: 20px;
     height: 20px;
     display: flex;
@@ -366,26 +364,39 @@ header h1 {
     z-index: 5;
     padding: 2px; /* Clickable area */
 }
-.tab-button:hover .tab-options-icon,
-.tab-button .tab-options-icon.visible { /* JS will add .visible for long press */
-    opacity: 0.8;
-}
-.tab-options-icon:hover {
-    opacity: 1;
-}
-.tab-options-icon span {
+.entity-options-icon span {
     display: block;
     width: 3.5px;
     height: 3.5px;
-    background-color: #A09CB8; /* Match tab text color or make it more prominent */
+    background-color: #A09CB8;
     border-radius: 50%;
 }
-.tab-button:hover .tab-options-icon span,
-.tab-button .tab-options-icon.visible span {
+.entity-options-icon.visible,
+.tab-button:hover .entity-options-icon,
+.task-folder-box-wrapper:hover .entity-options-icon { /* Show on hover for parent */
+    opacity: 0.8;
+}
+.entity-options-icon:hover {
+    opacity: 1;
+}
+.entity-options-icon.visible span,
+.tab-button:hover .entity-options-icon span,
+.task-folder-box-wrapper:hover .entity-options-icon span {
     background-color: #C5C1D6;
 }
+/* Tab specific positioning for options icon */
+.tab-button .entity-options-icon {
+    top: 6px;
+    right: 6px;
+}
+/* Folder specific positioning for options icon */
+.task-folder-box-wrapper .entity-options-icon {
+    top: 5px;
+    right: 5px;
+}
 
-/* Shared Context Menu */
+
+/* Shared Context Menu (for Tabs and Folders) */
 .context-menu {
     position: absolute;
     background-color: #1F1C2C;
@@ -393,8 +404,8 @@ header h1 {
     border-radius: 8px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     padding: 8px 0;
-    z-index: 1050; /* Above modals but below critical system popups */
-    min-width: 120px;
+    z-index: 1050; 
+    min-width: 160px; /* Slightly wider for longer text like "Rename Folder" */
 }
 .context-menu button {
     display: block;
@@ -412,8 +423,7 @@ header h1 {
     background-color: rgba(0, 207, 232, 0.1);
     color: #E0FFFF;
 }
-.context-menu button#ctx-delete-category:hover,
-.context-menu button#ctx-delete-folder:hover {
+.context-menu button[id*="delete"]:hover { /* Universal delete styling */
     background-color: rgba(255, 107, 107, 0.1);
     color: #FF8787;
 }
@@ -428,7 +438,6 @@ main#tab-content {
 #tab-content section { padding: 0 5px; }
 #tab-content section.hidden { display: none; }
 
-/* Category Section Styling - Container for folders or folder content */
 .category-section .category-header {
     display: flex;
     justify-content: space-between;
@@ -436,6 +445,7 @@ main#tab-content {
     margin-bottom: 25px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 18px;
+    position: relative; /* For back button positioning */
 }
 .category-section .category-header .category-title-text { 
     font-size: 2em;
@@ -449,14 +459,34 @@ main#tab-content {
     margin: 0;
     border: none;
     padding: 0;
+    flex-grow: 1; /* Allow title to take space */
+    text-align: left; /* Default, overridden if back button present */
 }
-/* This is for controls inside a folder view, not the main category header anymore */
-.folder-view-header-controls {
+.category-header-controls { /* This div will be hidden when viewing folder list */
     display: flex;
     gap: 10px; 
     align-items: center;
-    margin-left: auto; /* Push controls to the right if title is centered or takes space */
 }
+.back-to-folders-button {
+    color: #00CFE8;
+    margin-right: 15px; /* Space between back button and title */
+    font-size: 1em; /* Adjust as needed */
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    gap: 6px;
+}
+.back-to-folders-button svg {
+    width: 20px;
+    height: 20px;
+}
+.back-to-folders-button:hover {
+    color: #7FFFD4;
+    background-color: rgba(0, 207, 232, 0.05);
+}
+.category-header.has-back-button .category-title-text {
+    text-align: center; /* Center title when back button is present */
+}
+
 
 .icon-button { 
     background: none;
@@ -476,22 +506,19 @@ main#tab-content {
     height: 22px;
     fill: currentColor;
 }
-.edit-mode-toggle-button, 
-.undo-category-button, /* Will be used inside task folder view, renamed to undo-folder-button */
-.add-image-button { /* New button for note folders */
+.edit-mode-toggle-button,
+.undo-category-button { 
     text-shadow: 0 0 5px rgba(0, 229, 255, 0.5), 0 0 10px rgba(0, 229, 255, 0.3);
 }
 .edit-mode-toggle-button:hover,
-.undo-category-button:hover,
-.add-image-button:hover {
+.undo-category-button:hover {
     color: #7FFFD4;
     background-color: rgba(127, 255, 212, 0.1);
     text-shadow: 0 0 8px rgba(127, 255, 212, 0.7), 0 0 18px rgba(127, 255, 212, 0.5);
 }
 
 .edit-mode-toggle-button:active,
-.undo-category-button:active,
-.add-image-button:active {
+.undo-category-button:active {
     transform: scale(0.92);
 }
 .edit-mode-toggle-button.active-glow {
@@ -784,7 +811,6 @@ main#tab-content {
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); margin-bottom: 18px;
 }
 .progress-bar-fill {
-    /* Default background (hsl(0, 100%, 50%) - red) will be overridden by JS for Today, Weekly, and History Completion % */
     background-color: hsl(0, 100%, 50%); 
     height: 100%;
     width: 0%; border-radius: 7px; 
@@ -798,270 +824,24 @@ main#tab-content {
     font-size: 1.1em; color: #D5D0E5; font-weight: 500;
     text-align: left; letter-spacing: 0.1px; margin-bottom: 0;
 }
-/* Specific styling for history progress text */
-.history-points-text {
-    margin-bottom: 12px; /* Space before its progress bar */
-}
-.history-percentage-label { /* New label for History Completion Percentage */
-    font-family: 'Poppins', sans-serif;
-    font-size: 1.1em; color: #D5D0E5; font-weight: 500;
-    text-align: left; letter-spacing: 0.1px;
-    margin-bottom: 8px; /* Space before its progress bar */
-}
-
-/* Folder System Specific Styles */
-.category-section .category-content-area {
-    padding-top: 15px;
-}
-.folder-view-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-.folder-back-button {
-    font-family: 'Poppins', sans-serif;
-    font-size: 1em;
-    color: #00CFE8;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 8px; /* Adjusted for icon-only */
-    border-radius: 50%; /* Make it circular for icon */
-    transition: background-color 0.2s ease, color 0.2s ease;
-    line-height: 1; /* Ensure icon is centered */
-    display: flex; /* For icon centering */
-    align-items: center;
-    justify-content: center;
-    margin-right: 10px; /* Space between icon and title */
-}
-.folder-back-button:hover {
-    background-color: rgba(0, 207, 232, 0.1);
-    color: #7FFFD4;
-}
-.folder-back-button svg { /* Style for the arrow SVG if embedded directly */
-    width: 24px;
-    height: 24px;
-    fill: currentColor;
-}
-
-.folder-view-title {
-    font-size: 1.6em; /* Slightly smaller than main category title */
-    color: #E0E0FF;
-    font-weight: 600;
-    font-family: 'Poppins', sans-serif;
-    letter-spacing: 0.2px;
-    margin: 0; 
-    flex-grow: 1;
-    text-align: left;
-}
-.folders-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 18px; 
-    padding: 10px 0;
-}
-
-.folder-item-container { /* New wrapper */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    padding: 5px; /* Add some padding for focus outline */
-    border-radius: 4px; /* For focus outline */
-}
-.folder-item-container:focus-visible {
-    outline: 2px solid #7FFFD4;
-    outline-offset: 0px;
-}
-.folder-item-container:focus-visible .folder-box {
-    /* Optional: slightly different box shadow or border on container focus */
-    box-shadow: 0 0 10px 2px rgba(0, 207, 232, 0.4), 0 0 18px 3px rgba(0, 207, 232, 0.3);
+.history-points-text { margin-bottom: 12px; }
+.history-percentage-label { 
+    font-family: 'Poppins', sans-serif; font-size: 1.1em; color: #D5D0E5; 
+    font-weight: 500; text-align: left; letter-spacing: 0.1px; margin-bottom: 8px; 
 }
 
 
-.folder-box { /* This is now just the visual square */
-    width: 80px; 
-    height: 80px;
-    background-color: #0c0a14; 
-    border: 1px solid #00CFE8;
-    border-radius: 12px;
-    box-shadow: 0 0 8px 1px rgba(0, 207, 232, 0.3), 0 0 15px 2px rgba(0, 207, 232, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 10px; /* Space for icon inside the box */
-    position: relative;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.folder-item-container:hover .folder-box {
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 0 12px 2px rgba(0, 207, 232, 0.5), 0 0 20px 3px rgba(0, 207, 232, 0.35);
-}
-
-.folder-box-icon {
-    width: 50%; 
-    height: auto;
-    /* margin-bottom removed as name is outside */
-}
-.folder-box-icon svg {
-    width: 100%;
-    height: 100%;
-    fill: #00CFE8;
-}
-.folder-box-name { /* Label below the box */
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.85em;
-    font-weight: 500;
-    color: #C5C1D6;
-    word-break: break-word;
-    line-height: 1.2;
-    text-align: center;
-    margin-top: 6px; 
-    max-width: 80px; /* Match box width to prevent overflow */
-}
-
-.add-folder-button { /* Align with folder-box visual part */
-    width: 80px; 
-    height: 80px;
-    border: 2px dashed rgba(0, 207, 232, 0.3);
-    border-radius: 12px;
-    color: rgba(0, 207, 232, 0.6);
-    background-color: transparent;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
-    padding: 0; /* Remove previous padding if any, direct icon centering */
-}
-.add-folder-button svg {
-    width: 30px; /* Adjust icon size if needed for new button size */
-    height: 30px;
-    fill: currentColor;
-}
-.add-folder-button:hover {
-    border-color: #00CFE8;
-    color: #00CFE8;
-    background-color: rgba(0, 207, 232, 0.05);
-}
-
-.folder-options-trigger {
-    position: absolute;
-    top: 6px; /* Adjusted slightly for smaller box */
-    right: 6px; /* Adjusted slightly for smaller box */
-    width: 22px; /* Slightly smaller trigger */
-    height: 22px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
-    align-items: center;
-    cursor: pointer;
-    padding: 3px;
-    border-radius: 50%;
-    opacity: 0; /* Hidden by default, shown on container hover */
-    transition: opacity 0.2s ease, background-color 0.2s ease;
-}
-.folder-item-container:hover .folder-options-trigger,
-.folder-options-trigger.visible { /* .visible is set by JS for long press */
-    opacity: 1;
-}
-.folder-options-trigger:hover {
-    background-color: rgba(255,255,255,0.1);
-}
-.folder-options-trigger span {
-    display: block;
-    width: 3.5px; /* Keep dot size */
-    height: 3.5px;
-    background-color: #A09CB8;
-    border-radius: 50%;
-}
-.folder-item-container:hover .folder-options-trigger span,
-.folder-options-trigger.visible span {
-    background-color: #C5C1D6;
-}
-
-
-/* Note Folder View Specifics */
-.note-folder-content-wrapper {
-    /* Styles for the container of the note editor/viewer */
-}
-.note-editor { /* Now the main view, always editable */
-    width: 100%;
-    min-height: 200px; /* Or more, adjust as needed */
-    padding: 15px;
-    background-color: rgba(0,0,0, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1em;
-    color: #C5C1D6;
-    line-height: 1.6;
-    resize: vertical;
-    outline: none;
-    margin-bottom: 15px;
-    white-space: pre-wrap; /* To respect newlines from contenteditable */
-    word-wrap: break-word; /* Ensure long words/links wrap */
-}
-.note-editor:focus {
-    border-color: #00CFE8;
-    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.2);
-}
-.note-editor img { /* Style for images inside the contenteditable */
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
-    margin: 10px 0;
-    display: block; /* To ensure they take up their own line if desired */
-    border: 1px solid rgba(255,255,255,0.1);
-    cursor: default; /* Default cursor for images inside contenteditable */
-}
-.note-editor a { /* Style for autolinked URLs */
-    color: #7FFFD4;
-    text-decoration: underline;
-}
-.note-editor a:hover {
-    color: #AFFFFF;
-}
-
-/* Note Folder controls (e.g. Add Image button) */
-.note-folder-controls { /* Sits inside folder-view-header-controls */
-    /* Styles here if specific adjustments needed beyond generic folder-view-header-controls */
-}
-
-/* Remove button no longer needed for note folders
-#note-folder-toggle-edit-save {
-    padding: 10px 18px;
-    background-color: #00CFE8;
-    color: #12101A;
-    border: none;
-    border-radius: 8px;
-    font-family: 'Playfair Display', serif;
-    font-size: 0.95em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-#note-folder-toggle-edit-save:hover {
-    background-color: #33DFFF;
-}
-*/
-
-/* Add Task Form Elements (within Task Folder View) */
+/* Add Task Form Elements (shown when inside a folder and in edit mode) */
 .add-task-form-container {
-    display: none; 
+    display: none; /* Hidden by default, JS controls visibility */
     margin-bottom: 20px;
     padding: 10px 5px;
     background-color: rgba(255, 255, 255, 0.02);
     border-radius: 8px;
     min-height: 44px; 
 }
-/* This class will be added to the task folder content area when its edit mode is active */
-.task-folder-content.edit-mode-active .add-task-form-container {
-    display: block; 
-}
+/* category-section.edit-mode-active .add-task-form-container (now handled by JS based on view_folder_content) */
+
 
 .add-item-trigger-button {
     display: flex; 
@@ -1133,13 +913,163 @@ main#tab-content {
 .new-task-temp-cancel:hover { background-color: #6B657D; }
 
 
-/* Task List (within Task Folder View) */
-.task-list { list-style: none; padding: 0; position: relative; }
+/* Category Content Area (holds folder grid or task list) */
+.category-content-area {
+    margin-bottom: 20px; /* Space before task list or bottom add button */
+    display: flex; /* For aligning grid and add folder button */
+    flex-direction: column; /* Stack grid then button */
+    gap: 20px; /* Space between grid and button if both present */
+    flex-grow: 1; /* Allow content area to take space if needed for notes */
+    overflow: hidden; /* For notes content scrolling */
+}
+
+/* Task Folder Grid & Individual Folder Box UI */
+.task-folders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Responsive grid */
+    gap: 25px;
+    padding: 10px 0; /* Padding for the grid area */
+    /* flex-grow removed, parent .category-content-area has it */
+}
+
+.task-folder-box-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    position: relative; /* For options icon positioning */
+    padding: 10px;
+    border-radius: 12px;
+    transition: background-color 0.2s ease;
+}
+.task-folder-box-wrapper:hover {
+    background-color: rgba(255,255,255,0.03);
+}
+
+.task-folder-square-box {
+    width: 80px;
+    height: 80px;
+    background-color: #0A0910; 
+    border: 2px solid #00CFE8; 
+    border-radius: 10px; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 7px rgba(0, 207, 232, 0.6), 
+                0 0 15px rgba(0, 207, 232, 0.4),
+                0 0 1px rgba(0, 207, 232, 0.8); 
+    transition: transform 0.2s ease, box-shadow 0.25s ease;
+}
+.task-folder-box-wrapper:hover .task-folder-square-box {
+    transform: scale(1.03);
+    box-shadow: 0 0 10px rgba(0, 207, 232, 0.8), 
+                0 0 20px rgba(0, 207, 232, 0.6),
+                0 0 2px rgba(0, 207, 232, 1);
+}
+.task-folder-box-wrapper .task-folder-square-box.notes-folder-icon-box {
+    border-color: #BE93FD; /* Purple border for notes folders */
+     box-shadow: 0 0 7px rgba(190, 147, 253, 0.6), 
+                0 0 15px rgba(190, 147, 253, 0.4),
+                0 0 1px rgba(190, 147, 253, 0.8);
+}
+.task-folder-box-wrapper:hover .task-folder-square-box.notes-folder-icon-box {
+    box-shadow: 0 0 10px rgba(190, 147, 253, 0.8), 
+                0 0 20px rgba(190, 147, 253, 0.6),
+                0 0 2px rgba(190, 147, 253, 1);
+}
+
+
+.task-folder-symbol {
+    width: 38px; 
+    height: 38px;
+    fill: #00CFE8; 
+}
+.notes-folder-icon-box .task-folder-symbol {
+    fill: #BE93FD; /* Purple icon for notes */
+}
+
+
+.task-folder-label-text {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9em;
+    color: #00CFE8; 
+    margin-top: 8px;
+    font-weight: 500;
+    text-align: center;
+    word-break: break-word; /* Prevent long names from breaking layout */
+    min-height: 1.2em; /* Reserve space for text or input */
+    width: 100%; /* Ensure it takes width for centering if text is short */
+}
+.task-folder-box-wrapper.notes-folder-label .task-folder-label-text {
+    color: #BE93FD; /* Purple label for notes folders */
+}
+
+
+/* Inline Folder Rename Input */
+.folder-inline-rename-input {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9em;
+    color: #E0E0FF;
+    background-color: rgba(0,0,0, 0.2);
+    border: 1px solid #00CFE8;
+    border-radius: 4px;
+    padding: 4px 6px;
+    margin-top: 8px; /* Same as label's margin-top */
+    text-align: center;
+    width: 100%; /* Takes width of its container (task-folder-box-wrapper child) */
+    max-width: 100px; /* Prevent it from getting too wide if wrapper is wide, adjust as needed */
+    box-sizing: border-box;
+}
+.folder-inline-rename-input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.3);
+}
+
+/* New Standalone Add Folder Button (Plus Icon) */
+.add-new-folder-plus-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px; /* Match folder box */
+    height: 80px; /* Match folder box */
+    background-color: transparent;
+    border: 2px dashed #00CFE8;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    /* align-self: center; remove this if it's part of grid and needs to flow */
+    /* margin: 10px; remove if inside grid and using grid gap */
+}
+.add-new-folder-plus-button svg {
+    width: 38px; /* Similar to folder symbol */
+    height: 38px;
+    fill: #00CFE8;
+    transition: fill 0.2s ease;
+}
+.add-new-folder-plus-button:hover {
+    background-color: rgba(0, 207, 232, 0.1);
+    border-color: #7FFFD4;
+    border-style: solid;
+}
+.add-new-folder-plus-button:hover svg {
+    fill: #7FFFD4;
+}
+
+
+/* Task List (ul.task-list is used when viewing TASK folder content) */
+.task-list { 
+    list-style: none; padding: 0; position: relative; 
+    margin-top: 10px; /* Space if tasks shown directly under header */
+}
+
+
 .empty-tasks-message {
     text-align: center; padding: 35px 25px; color: #8A83A0; font-style: italic;
     font-size: 1.05em; font-family: 'Open Sans', sans-serif;
     background-color: rgba(255, 255, 255, 0.02); border-radius: 10px;
     border: 1px dashed rgba(255, 255, 255, 0.08);
+    margin-top: 15px; 
 }
 .empty-tasks-message.edit-mode-empty {
     border-style: solid;
@@ -1158,8 +1088,9 @@ main#tab-content {
     font-size: 1.1em; color: #D5D0E5; font-weight: 500; line-height: 1.5;
     position: relative; user-select: none;
 }
-/* This class will be added to the task folder content area when its edit mode is active */
-.task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) {
+
+
+.category-section.edit-mode-active .task-item:not(.locked):not(.editing) {
     cursor: grab;
 }
 .task-item .task-text {
@@ -1168,12 +1099,10 @@ main#tab-content {
     margin-right: 15px;
     cursor: default;
 }
-/* Click to complete if not in edit mode for the folder */
-.task-folder-content:not(.edit-mode-active) .task-item:not(.locked):not(.editing) {
+.category-section:not(.edit-mode-active) .task-item:not(.locked):not(.editing) {
     cursor: pointer;
 }
-/* Click text to edit if in edit mode for the folder */
-.task-folder-content.edit-mode-active .task-item:not(.locked) .task-text {
+.category-section.edit-mode-active .task-item:not(.locked) .task-text {
     cursor: text;
 }
 
@@ -1205,7 +1134,7 @@ main#tab-content {
     color: #12101A; font-size: 13px; text-align: center;
     line-height: 18px; font-weight: bold;
 }
-.task-item.locked { /* Lock feature is de-emphasized but styles kept for potential future use */
+.task-item.locked {
     opacity: 0.5; cursor: not-allowed; background-color: rgba(255, 255, 255, 0.015);
     border-color: rgba(255, 255, 255, 0.04); box-shadow: 0 1px 3px rgba(0,0,0, 0.05);
 }
@@ -1217,7 +1146,7 @@ main#tab-content {
     line-height: 18px; font-weight: bold;
 }
 
-/* Task Delete Button (in Task Folder Edit Mode) */
+/* Task Delete Button (in Edit Mode) */
 .task-delete-button-editmode {
     display: none;
     color: #FF6B6B;
@@ -1226,7 +1155,7 @@ main#tab-content {
 }
 .task-delete-button-editmode svg { width: 18px; height: 18px; } /* Slightly smaller for task items */
 
-.task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) .task-delete-button-editmode {
+.category-section.edit-mode-active .task-item:not(.locked):not(.editing) .task-delete-button-editmode {
     display: flex;
 }
 .task-delete-button-editmode:hover {
@@ -1260,14 +1189,198 @@ main#tab-content {
 .task-edit-cancel:hover { background-color: #6B657D; }
 
 
+/* Notes Folder Specific Styles */
+.notes-folder-content-wrapper {
+    flex-grow: 1; /* Allow notes area to fill space */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Parent will handle scroll if needed */
+    padding: 10px 0;
+}
+.notes-editor-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 10px 5px;
+    background-color: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
+}
+.notes-control-button {
+    background-color: #00CFE8;
+    color: #12101A;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.notes-control-button svg {
+    width: 18px;
+    height: 18px;
+    fill: #12101A;
+}
+.notes-control-button:hover {
+    background-color: #33DFFF;
+}
+.notes-control-button.notes-save-button {
+    background-color: #7FFFD4; /* Aquamarine for save */
+    margin-left: auto; /* Push save button to the right */
+}
+.notes-control-button.notes-save-button:hover {
+    background-color: #AFFFFF;
+}
+
+.notes-content-display-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 5px; /* Padding inside the scrollable area */
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    min-height: 200px; /* Ensure it has some height */
+}
+.note-item {
+    background-color: rgba(255, 255, 255, 0.03);
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+    font-family: 'Open Sans', sans-serif;
+    color: #C5C1D6;
+    line-height: 1.6;
+}
+.note-item:last-child {
+    margin-bottom: 0;
+}
+.note-item-content p {
+    margin: 0 0 10px 0;
+    white-space: pre-wrap; /* Preserve line breaks */
+    word-wrap: break-word;
+}
+.note-item-content p:last-child {
+    margin-bottom: 0;
+}
+.note-item-content a {
+    color: #7FFFD4;
+    text-decoration: none;
+    border-bottom: 1px dotted #7FFFD4;
+    word-break: break-all;
+}
+.note-item-content a:hover {
+    color: #AFFFFF;
+    border-bottom-style: solid;
+}
+.note-item-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin-top: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: pointer; /* For potential lightbox */
+}
+.note-item-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 5px;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s ease;
+}
+.note-item:hover .note-item-actions {
+    opacity: 1;
+}
+.note-item-action-button {
+    background: rgba(0,0,0,0.3);
+    border: none;
+    color: #A09CB8;
+    padding: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    line-height: 1;
+}
+.note-item-action-button svg {
+    width: 16px; height: 16px; fill: currentColor;
+}
+.note-item-action-button:hover {
+    color: #E0E0FF;
+    background: rgba(0,0,0,0.5);
+}
+.note-item-action-button.delete-note-item:hover {
+    color: #FF8787;
+}
+
+/* Note Item Editing Form Styles */
+.note-item-editing-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 6px;
+    margin-top: 10px;
+}
+.note-item-editing-form textarea,
+.note-item-editing-form input[type="text"],
+.note-item-editing-form input[type="url"],
+.note-item-editing-form input[type="file"] {
+    width: 100%;
+    padding: 10px 12px;
+    background-color: rgba(0,0,0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1em;
+    color: #C5C1D6;
+}
+.note-item-editing-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+.note-item-editing-form input:focus,
+.note-item-editing-form textarea:focus {
+    outline: none;
+    border-color: #BE93FD; /* Purple focus for notes */
+    box-shadow: 0 0 0 2px rgba(190, 147, 253, 0.2);
+}
+.note-edit-image-preview {
+    max-width: 200px; max-height: 150px; border-radius: 4px; margin-top: 5px;
+    display: none; /* Shown by JS when there's an image */
+}
+.note-item-editing-form .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.note-item-editing-form .form-actions button {
+    padding: 8px 15px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+}
+
+
 /* Drag and Drop Styles */
 .dragging { opacity: 0.5 !important; border: 2px dashed #00CFE8 !important; box-shadow: 0 5px 15px rgba(0, 207, 232, 0.2) !important; }
 .tab-button.dragging { background-color: rgba(0, 207, 232, 0.1) !important; color: #00CFE8 !important; }
-.task-item.drag-over-indicator-task {
+.task-list .task-item.drag-over-indicator-task { /* Target items in the actual task list */
     box-shadow: inset 0 3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important;
 }
 .task-list .task-item.drag-over-indicator-task-bottom {
     box-shadow: inset 0 -3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important;
+}
+.notes-content-display-area .note-item.drag-over-indicator-note {
+    box-shadow: inset 0 3px 0 #BE93FD, 0 2px 5px rgba(0,0,0, 0.08) !important;
+}
+.notes-content-display-area .note-item.drag-over-indicator-note-bottom {
+    box-shadow: inset 0 -3px 0 #BE93FD, 0 2px 5px rgba(0,0,0, 0.08) !important;
 }
 
 
@@ -1308,57 +1421,6 @@ footer {
     cursor: pointer; line-height: 1;
 }
 .close-button:hover, .close-button:focus { color: #E0E0FF; text-decoration: none; }
-
-/* Modal specific title and input styling */
-.modal-title-text {
-    margin-top: 0; margin-bottom: 25px; color: #00E5FF; font-size: 1.7em; text-align: center;
-}
-.modal-input {
-    width: 100%;
-    padding: 12px 15px;
-    background-color: rgba(0,0,0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1em;
-    color: #E0E0FF;
-    margin-bottom: 25px;
-}
-.modal-input::placeholder { color: #706A82; }
-.modal-input:focus {
-    outline: none; border-color: #00CFE8;
-    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.25);
-}
-.modal-actions-centered {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-}
-.modal-button, .modal-button-primary {
-    padding: 10px 25px;
-    border: none;
-    border-radius: 8px;
-    font-family: 'Playfair Display', serif;
-    font-size: 1em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-.modal-button { /* Standard button (e.g., Cancel) */
-    background-color: #454153;
-    color: #C5C1D6;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-}
-.modal-button:hover { background-color: #5a556b; }
-.modal-button:active { transform: scale(0.98); background-color: #3a3647; }
-
-.modal-button-primary { /* Primary action button (e.g., Create, Save) */
-    background-color: #00CFE8;
-    color: #12101A;
-    box-shadow: 0 2px 5px rgba(0, 207, 232, 0.2);
-}
-.modal-button-primary:hover { background-color: #33DFFF; }
-.modal-button-primary:active { transform: scale(0.98); background-color: #00B8D4; }
 
 
 /* History Modal Specifics */
@@ -1401,8 +1463,9 @@ footer {
     padding-left: 25px; font-family: 'Open Sans', sans-serif;
 }
 #history-tasks-list li::before { content: '✔'; color: #00CFE8; position: absolute; left: 0; top: 7px; font-weight: bold; }
+#history-tasks-list li span { }
 
-#historical-reflection-wrapper { margin-top: 0; } /* Adjusted since header now exists */
+#historical-reflection-wrapper { margin-top: 0; } 
 .history-note-paragraph { background-color: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); min-height: 60px; color: #B0ACC9; font-size: 1em; line-height: 1.6; white-space: pre-wrap; margin-bottom: 15px; }
 #history-user-note-edit {
     width: 100%; min-height: 100px; background-color: rgba(0,0,0, 0.15);
@@ -1424,14 +1487,14 @@ footer {
 #historical-note-status { font-size: 0.9em; color: #7FFFD4; margin-left: 10px; flex-grow: 1; text-align: right; }
 
 /* Fullscreen Content Modal Specifics */
-.fullscreen-modal-content-box { /* Specific class for the content box of the fullscreen modal */
+.fullscreen-modal-content-box { 
     width: 90vw;
-    max-width: 1200px; /* Can be wider than other modals */
+    max-width: 1200px; 
     height: 90vh;
-    padding: 25px 30px; /* Adjust padding as needed */
+    padding: 25px 30px; 
     display: flex;
     flex-direction: column;
-    background-color: #161420; /* Slightly different background if desired */
+    background-color: #161420; 
 }
 .fullscreen-modal-title-text {
     margin-top: 0;
@@ -1451,22 +1514,22 @@ footer {
     font-size: 1.05em;
     line-height: 1.7;
 }
-/* Styles for content *within* fullscreen-modal-scrollable-area */
 .fullscreen-modal-scrollable-area .history-category-group { margin-bottom: 20px; }
 .fullscreen-modal-scrollable-area .history-category-title { font-size: 1.3em; color: #00CFE8; margin-bottom: 10px; }
 .fullscreen-modal-scrollable-area ul { list-style: none; padding-left: 0; }
 .fullscreen-modal-scrollable-area li {
-    padding: 8px 0 8px 30px; /* More padding */
-    font-size: 1.1em; /* Larger font in fullscreen */
+    padding: 8px 0 8px 30px; 
+    font-size: 1.1em; 
     position: relative;
 }
 .fullscreen-modal-scrollable-area li::before {
     content: '✔'; color: #00CFE8; position: absolute; left: 0; top: 10px; font-weight: bold; font-size: 1.1em;
 }
-.fullscreen-modal-scrollable-area pre { /* For reflection text */
+.fullscreen-modal-scrollable-area li span { }
+.fullscreen-modal-scrollable-area pre { 
     white-space: pre-wrap;
     word-wrap: break-word;
-    font-family: Tahoma, Geneva, sans-serif; /* Match textarea font */
+    font-family: Tahoma, Geneva, sans-serif; 
     font-size: 1.1em;
     color: #D5D0E5;
 }
@@ -1486,6 +1549,92 @@ footer {
 #cancel-delete-button { background-color: #454153; color: #C5C1D6; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
 #cancel-delete-button:hover { background-color: #5a556b; }
 #cancel-delete-button:active { transform: scale(0.98); background-color: #3a3647; }
+
+/* Add Folder Modal */
+.add-folder-modal-content { max-width: 480px; padding: 25px 30px; } /* Slightly wider for new step 1 */
+.add-folder-modal-content h4 {
+    color: #BE93FD;
+    font-size: 1.3em;
+    margin-bottom: 15px;
+    text-align: center;
+    font-family: 'Playfair Display', serif;
+}
+.folder-type-selection {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+.folder-type-button {
+    flex: 1;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #C5C1D6;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1em;
+    text-align: center;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.folder-type-button:hover {
+    background-color: rgba(0, 207, 232, 0.1);
+    border-color: #00CFE8;
+    color: #E0FFFF;
+    transform: translateY(-2px);
+}
+.folder-type-button.selected-type { /* Style for selected type (if visual indication needed before next step) */
+    background-color: rgba(0, 207, 232, 0.2);
+    border-color: #00CFE8;
+}
+.folder-type-icon {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 5px;
+    fill: currentColor;
+}
+.folder-type-button small {
+    font-size: 0.8em;
+    color: #A09CB8;
+    line-height: 1.3;
+}
+.add-folder-back-button {
+    background: none;
+    border: none;
+    color: #00CFE8;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.9em;
+    cursor: pointer;
+    margin-bottom: 15px;
+    padding: 5px;
+}
+.add-folder-back-button:hover {
+    color: #7FFFD4;
+    text-decoration: underline;
+}
+.add-folder-modal-content label { display: block; margin-bottom: 8px; font-weight: 500; color: #BE93FD; }
+.add-folder-modal-content input[type="text"] {
+    width: 100%; padding: 10px 12px; margin-bottom: 20px;
+    background-color: rgba(0,0,0, 0.15); border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px; font-family: 'Open Sans', sans-serif; font-size: 1em; color: #C5C1D6;
+}
+.add-folder-modal-content input[type="text"]:focus {
+    outline: none; border-color: #00CFE8; box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.2);
+}
+#add-folder-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+#add-folder-modal-actions button {
+    padding: 10px 20px; border: none; border-radius: 8px; font-family: 'Playfair Display', serif;
+    font-size: 1em; font-weight: 600; cursor: pointer; transition: background-color 0.25s ease, transform 0.1s ease;
+}
+#create-folder-button { background-color: #00CFE8; color: #12101A; }
+#create-folder-button:hover { background-color: #33DFFF; }
+#cancel-add-folder-button { background-color: #454153; color: #C5C1D6; }
+#cancel-add-folder-button:hover { background-color: #5a556b; }
 
 
 /* Accessibility */
@@ -1517,21 +1666,27 @@ footer {
     .task-item::before { width: 19px; height: 19px; margin-right: 16px; }
     .task-item.completed::before, .task-item.locked::before { font-size: 12px; line-height: 17px; }
 
-    .fullscreen-modal-content-box { width: 95vw; height: 95vh; }
+    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 20px; }
+    .task-folder-square-box { width: 75px; height: 75px; }
+    .add-new-folder-plus-button { width: 75px; height: 75px; }
+    .task-folder-symbol { width: 36px; height: 36px; }
+    .add-new-folder-plus-button svg { width: 36px; height: 36px;}
+    .task-folder-label-text { font-size: 0.88em; }
+    .folder-inline-rename-input { font-size: 0.88em; max-width: 90px;}
 
-    .folder-box { width: 90px; height: 90px; padding: 12px;}
-    .folder-box-name { max-width: 90px; font-size: 0.88em;}
-    .add-folder-button { width: 90px; height: 90px; }
-    .add-folder-button svg { width: 35px; height: 35px;}
+    .notes-editor-controls { flex-direction: column; align-items: stretch;}
+    .notes-control-button.notes-save-button { margin-left: 0; }
+
+
+    .fullscreen-modal-content-box { width: 95vw; height: 95vh; }
 }
 
 @media (min-width: 768px) and (max-width: 1024px) { /* Specific Tablet Adjustments */
     #dashboard-summaries { grid-template-columns: repeat(2, 1fr); /* Keep 2 columns on larger tablets */ }
      .task-item { font-size: 1.15em; } /* Even slightly more spacious on tablets */
-     .folders-grid { gap: 18px; }
-     .folder-box { width: 90px; height: 90px; } /* Maintained from above for consistency */
-     .folder-box-name { max-width: 90px; }
-     .add-folder-button { width: 90px; height: 90px; }
+    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+    .notes-editor-controls { flex-direction: row; flex-wrap: wrap; } /* Revert to row for wider tablets */
+    .notes-control-button.notes-save-button { margin-left: auto; }
 }
 
 
@@ -1547,32 +1702,20 @@ footer {
     #add-category-button svg { width: 18px; height: 18px;}
 
     #dashboard-tab-button { margin-right: 10px; }
-    .tab-button.category-complete-indicator::before {
-        top: 6px;
-        right: 8px; 
-        font-size: 10px;
-    }
-     .notification-badge {
-        top: 5px;
-        left: 6px;
-        width: 16px;
-        height: 16px;
-        font-size: 9px;
-    }
-    .tab-options-icon {
-        top: 4px;
-        right: 4px;
-        width: 18px;
-        height: 18px;
-    }
-    .tab-options-icon span { width: 3px; height: 3px; }
+    .tab-button.category-complete-indicator::before { top: 6px; right: 8px; font-size: 10px; }
+    .notification-badge { top: 5px; left: 6px; width: 16px; height: 16px; font-size: 9px; }
+    
+    .entity-options-icon { width: 18px; height: 18px; }
+    .entity-options-icon span { width: 3px; height: 3px; }
+    .tab-button .entity-options-icon { top: 4px; right: 4px; }
+    .task-folder-box-wrapper .entity-options-icon { top: 3px; right: 3px; }
 
 
     .category-section .category-header .category-title-text { font-size: 1.8em; }
     .category-section .category-header { margin-bottom: 20px; padding-bottom: 15px; }
     .icon-button svg { width: 20px; height: 20px; }
-
-    .folder-view-title { font-size: 1.4em; }
+    .back-to-folders-button { font-size: 0.9em; margin-right: 10px; }
+    .back-to-folders-button svg { width: 18px; height: 18px; }
 
 
     #dashboard-column > h2 { font-size: 1.8em; margin-bottom: 30px; padding-bottom: 15px; }
@@ -1611,26 +1754,21 @@ footer {
     .points-stat { font-size: 1.05em; }
     .history-percentage-label { font-size: 1.05em; }
 
-    .folders-grid { gap: 15px; justify-content: space-around; } 
-    .folder-box { width: 75px; height: 75px; padding: 8px;}
-    .folder-box-icon { width: 50%; }
-    .folder-box-name { max-width: 75px; font-size: 0.8em; margin-top: 5px; }
-    .add-folder-button { width: 75px; height: 75px; }
-    .add-folder-button svg { width: 28px; height: 28px; }
-    .folder-options-trigger { top: 5px; right: 5px; width: 20px; height: 20px; }
-    .folder-options-trigger span { width: 3px; height: 3px; }
 
-
-    .add-task-form-container { 
-    }
-    .new-temp-task-form {
-      flex-direction: column; 
-      align-items: stretch; 
-    }
+    .new-temp-task-form { flex-direction: column; align-items: stretch; }
     .new-task-temp-input { font-size: 0.95em; margin-bottom: 8px; }
     .new-task-temp-save, .new-task-temp-cancel { font-size: 0.9em; }
     .add-item-trigger-button { font-size: 0.95em; }
     .add-item-trigger-button svg { width: 18px; height: 18px; }
+
+    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 15px;}
+    .task-folder-square-box { width: 70px; height: 70px; }
+    .add-new-folder-plus-button { width: 70px; height: 70px; }
+    .task-folder-symbol { width: 35px; height: 35px; }
+    .add-new-folder-plus-button svg { width: 35px; height: 35px; }
+    .task-folder-label-text { font-size: 0.85em; }
+    .folder-inline-rename-input { font-size: 0.85em; max-width: 80px;}
+
 
     .task-item { font-size: 1.05em; padding: 16px 18px; border-radius: 10px; margin-bottom: 18px; flex-wrap: wrap; }
     .task-item::before { width: 18px; height: 18px; margin-right: 15px; border-radius: 4px; }
@@ -1653,13 +1791,15 @@ footer {
     .history-section-header h4 { font-size: 1.1em; }
     .expand-section-button svg { width: 16px; height: 16px; }
     #history-modal-title-text { font-size: 1.6em; }
-    #history-modal-stats .points-stat { font-size: 1em; } /* Adjust font for history stats on mobile */
+    #history-modal-stats .points-stat { font-size: 1em; } 
     #history-tasks-list { max-height: 150px; }
     .fullscreen-modal-title-text { font-size: 1.6em; }
     .fullscreen-modal-scrollable-area { font-size: 1em; }
     .fullscreen-modal-scrollable-area li { font-size: 1em; padding: 6px 0 6px 25px; }
     .fullscreen-modal-scrollable-area li::before { top: 7px; font-size: 1em; }
     .fullscreen-modal-scrollable-area pre { font-size: 1em; }
+
+    .folder-type-selection { flex-direction: column; } /* Stack type buttons on small mobile */
 
     footer { font-size: 0.85em; padding: 20px 25px; }
 }
@@ -1676,32 +1816,17 @@ footer {
 
 
     #dashboard-tab-button { margin-right: 8px; }
-    .tab-button.category-complete-indicator::before {
-        top: 5px;
-        right: 6px; 
-        font-size: 9px;
-    }
-    .notification-badge {
-        top: 4px;
-        left: 5px;
-        width: 15px;
-        height: 15px;
-        font-size: 8px;
-    }
-    .tab-options-icon {
-        top: 3px;
-        right: 3px;
-        width: 16px;
-        height: 16px;
-    }
-    .tab-options-icon span { width: 2.5px; height: 2.5px; }
+    .tab-button.category-complete-indicator::before { top: 5px; right: 6px; font-size: 9px; }
+    .notification-badge { top: 4px; left: 5px; width: 15px; height: 15px; font-size: 8px; }
+    .tab-button .entity-options-icon { top: 3px; right: 3px; }
 
 
     .category-section .category-header .category-title-text { font-size: 1.6em; }
     .category-section .category-header { margin-bottom: 18px; padding-bottom: 12px; }
     .icon-button svg { width: 18px; height: 18px; }
+    .back-to-folders-button { font-size: 0.85em; }
+    .back-to-folders-button svg { width: 16px; height: 16px; }
 
-    .folder-view-title { font-size: 1.3em; }
 
     #dashboard-column > h2 { font-size: 1.6em; margin-bottom: 18px; padding-bottom: 12px; }
     .dashboard-category-summary { padding: 20px; }
@@ -1739,18 +1864,20 @@ footer {
     .points-stat { font-size: 0.95em; }
     .history-percentage-label { font-size: 0.95em; }
 
-    .folders-grid { gap: 12px; }
-    .folder-box { width: 70px; height: 70px; padding: 6px;}
-    .folder-box-icon { width: 45%; }
-    .folder-box-name { max-width: 70px; font-size: 0.75em; margin-top: 4px;}
-    .add-folder-button { width: 70px; height: 70px; }
-    .add-folder-button svg { width: 25px; height: 25px; }
-
 
     .new-task-temp-input { font-size: 0.9em; }
     .new-task-temp-save, .new-task-temp-cancel { font-size: 0.85em; }
     .add-item-trigger-button { font-size: 0.9em; }
     .add-item-trigger-button svg { width: 16px; height: 16px; }
+
+    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px;}
+    .task-folder-square-box { width: 60px; height: 60px; }
+    .add-new-folder-plus-button { width: 60px; height: 60px; }
+    .task-folder-symbol { width: 30px; height: 30px; }
+    .add-new-folder-plus-button svg { width: 30px; height: 30px; }
+    .task-folder-label-text { font-size: 0.8em; margin-top: 5px; }
+    .folder-inline-rename-input { font-size: 0.8em; max-width: 70px;}
+
 
     .task-item { font-size: 1em; padding: 15px 16px; margin-bottom: 16px; }
     .task-item::before { width: 16px; height: 16px; margin-right: 12px; }
@@ -1766,7 +1893,7 @@ footer {
     .history-section-header h4 { font-size: 1.1em; }
     .expand-section-button svg { width: 14px; height: 14px; }
     #history-modal-title-text { font-size: 1.4em; }
-    #history-modal-stats .points-stat { font-size: 0.9em; } /* Adjust font for history stats on very small screens */
+    #history-modal-stats .points-stat { font-size: 0.9em; } 
     #history-tasks-list { max-height: 120px; }
     .fullscreen-modal-title-text { font-size: 1.4em; }
     .fullscreen-modal-scrollable-area { font-size: 0.95em; }
@@ -1777,13 +1904,4 @@ footer {
     #historical-note-controls button { font-size: 0.9em; padding: 8px 15px; }
     #history-user-note-edit { font-size: 0.95em; }
     footer { padding: 15px 20px; }
-}
-
-/* Ensure modal input fields are styled appropriately */
-#choose-folder-type-modal .modal-content, 
-#enter-folder-name-modal .modal-content {
-    max-width: 400px;
-}
-#enter-folder-name-modal #folder-name-input {
-    margin-bottom: 25px; /* Ensure spacing before buttons */
 }
