@@ -1,5 +1,4 @@
 
-
 /* Global Resets and Base Styles */
 * {
     box-sizing: border-box;
@@ -133,6 +132,7 @@ body {
     background: linear-gradient(125deg, #0D0C15, #141120, #0A0910, #141120, #0D0C15);
     background-size: 400% 400%;
     animation: animateBackgroundGradient 60s ease-in-out infinite;
+    overflow-x: hidden; /* Prevent horizontal scroll with side menu */
 }
 
 #app-container {
@@ -150,12 +150,261 @@ body {
     max-height: 900px;
 }
 
+/* Hamburger Menu and Side Navigation */
+#hamburger-menu-button {
+    position: absolute;
+    top: 25px; 
+    left: 25px;
+    z-index: 1100; /* Above most content, below modals */
+    background: none;
+    border: none;
+    color: #00CFE8;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+#hamburger-menu-button svg {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
+}
+#hamburger-menu-button:hover {
+    background-color: rgba(0, 207, 232, 0.1);
+    color: #7FFFD4;
+}
+
+#side-menu {
+    position: fixed; /* Or absolute if #app-container is overflow:hidden */
+    top: 0;
+    left: -280px; /* Hidden off-screen */
+    width: 260px;
+    height: 100%;
+    background-color: #1A1724; /* Slightly different from modal content for distinction */
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 5px 0 15px rgba(0,0,0,0.2);
+    padding: 70px 0 20px; /* Space for hamburger button and content */
+    z-index: 1090; /* Below hamburger button if it stays visible */
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+#side-menu.open {
+    left: 0;
+}
+#side-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+#side-menu li .side-menu-link {
+    display: block;
+    padding: 15px 25px;
+    color: #C5C1D6;
+    text-decoration: none;
+    font-size: 1.1em;
+    font-family: 'Poppins', sans-serif;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+#side-menu li .side-menu-link:hover,
+#side-menu li .side-menu-link.active-view {
+    background-color: rgba(0, 207, 232, 0.1);
+    color: #E0FFFF;
+}
+
+/* Progress System View */
+#progress-system-view {
+    flex-grow: 1; /* Takes up space if #main-content-wrapper is hidden */
+    display: flex;
+    flex-direction: column;
+    padding: 25px 30px; /* Consistent padding */
+    overflow-y: auto;
+    background-color: #12101A; /* Match app background */
+}
+#progress-system-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+#progress-system-header h2 {
+    font-size: 2em;
+    color: #BE93FD;
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+}
+#progress-system-back-button {
+    font-size: 1em;
+    gap: 8px;
+}
+#progress-system-back-button svg {
+    width: 20px; height: 20px;
+}
+
+#progress-system-tabs {
+    display: flex;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.progress-tab-button {
+    flex-grow: 1;
+    padding: 15px 10px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-size: 1.1em;
+    color: #A09CB8;
+    font-family: 'Poppins', sans-serif;
+    transition: color 0.3s ease, border-bottom-color 0.3s ease;
+}
+.progress-tab-button.active,
+.progress-tab-button:hover {
+    color: #00E5FF;
+}
+.progress-tab-button.active {
+    border-bottom-color: #00E5FF;
+    font-weight: 600;
+}
+
+#progress-setup-form .form-group {
+    margin-bottom: 20px;
+}
+#progress-setup-form label {
+    display: block;
+    color: #BE93FD;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+    font-weight: 500;
+}
+#progress-setup-form input[type="text"],
+#progress-setup-form input[type="date"],
+#progress-setup-form input[type="number"],
+#progress-setup-form select {
+    width: 100%;
+    padding: 12px 15px;
+    background-color: rgba(0,0,0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1em;
+    color: #C5C1D6;
+}
+#progress-setup-form input:focus,
+#progress-setup-form select:focus {
+    outline: none;
+    border-color: #00CFE8;
+    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.25);
+}
+#progress-setup-form select option {
+    background-color: #1A1724; /* Match modal background for dropdown options */
+    color: #C5C1D6;
+}
+#progress-form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+}
+#save-progress-plan-button,
+#end-current-plan-button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Playfair Display', serif;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+#save-progress-plan-button {
+    background-color: #00CFE8; color: #12101A;
+}
+#save-progress-plan-button:hover { background-color: #33DFFF; }
+#end-current-plan-button {
+    background-color: #FF6B6B; color: #FFFFFF;
+}
+#end-current-plan-button:hover { background-color: #FF8787; }
+
+#active-plan-summary {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+}
+#active-plan-summary h4 {
+    color: #00E5FF;
+    font-size: 1.3em;
+    margin-bottom: 15px;
+}
+#active-plan-summary p {
+    margin-bottom: 8px;
+    font-size: 1em;
+    color: #B0ACC9;
+}
+#active-plan-summary p strong {
+    color: #D5D0E5;
+    min-width: 130px;
+    display: inline-block;
+}
+
+
+#progress-history-content h3 {
+    font-size: 1.6em;
+    color: #BE93FD;
+    margin-bottom: 20px;
+}
+#progress-history-list {
+    list-style: none;
+    padding: 0;
+}
+#progress-history-list li {
+    background-color: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 15px;
+    font-family: 'Poppins', sans-serif;
+}
+#progress-history-list .history-item-name {
+    font-size: 1.2em;
+    color: #00CFE8;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+#progress-history-list .history-item-dates,
+#progress-history-list .history-item-stats {
+    font-size: 0.95em;
+    color: #A09CB8;
+    margin-bottom: 5px;
+}
+#progress-history-list .history-item-stats strong {
+    color: #B0ACC9;
+}
+#no-progress-history {
+    text-align: center; padding: 30px 20px; color: #8A83A0; font-style: italic;
+    font-size: 1.05em;
+}
+/* End Progress System View Styles */
+
+
 #main-content-wrapper {
     display: flex;
     flex-grow: 1;
     overflow: hidden;
-    padding: 40px 45px 0;
+    padding: 40px 45px 0; /* Default padding, adjust if hamburger takes space */
 }
+#main-content-wrapper.view-hidden { /* Used when progress view is active */
+    display: none;
+}
+
 
 #dashboard-column {
     flex: 0 0 40%;
@@ -800,11 +1049,16 @@ main#tab-content {
 #today-progress-container { margin-top: 0; }
 #current-week-progress-container { margin-top: 30px; }
 
-#today-progress-container h3, #current-week-progress-container h3 {
-    font-size: 1.6em; color: #BE93FD; margin-bottom: 22px; font-weight: 600;
-    text-align: left; letter-spacing: 0.3px;
-    font-family: 'Playfair Display', serif; /* Explicitly keep Playfair for titles */
+#today-progress-container h3, 
+#current-week-progress-container h3.weekly-plan-name-title { /* Updated selector for weekly plan title */
+    font-size: 1.6em; color: #BE93FD; margin-bottom: 12px; /* Reduced bottom margin for plan name */
+    font-weight: 600; text-align: left; letter-spacing: 0.3px;
+    font-family: 'Playfair Display', serif;
 }
+#current-week-progress-container .progress-bar-container {
+    margin-top: 10px; /* Add some space if plan name is shown */
+}
+
 .progress-bar-container {
     background-color: rgba(0,0,0, 0.2); border-radius: 8px; overflow: hidden;
     height: 22px; border: 1px solid rgba(255,255,255,0.05);
@@ -840,8 +1094,6 @@ main#tab-content {
     border-radius: 8px;
     min-height: 44px; 
 }
-/* category-section.edit-mode-active .add-task-form-container (now handled by JS based on view_folder_content) */
-
 
 .add-item-trigger-button {
     display: flex; 
@@ -929,7 +1181,6 @@ main#tab-content {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Responsive grid */
     gap: 25px;
     padding: 10px 0; /* Padding for the grid area */
-    /* flex-grow removed, parent .category-content-area has it */
 }
 
 .task-folder-box-wrapper {
@@ -1038,8 +1289,6 @@ main#tab-content {
     border-radius: 10px;
     cursor: pointer;
     transition: background-color 0.2s ease, border-color 0.2s ease;
-    /* align-self: center; remove this if it's part of grid and needs to flow */
-    /* margin: 10px; remove if inside grid and using grid gap */
 }
 .add-new-folder-plus-button svg {
     width: 38px; /* Similar to folder symbol */
@@ -1657,6 +1906,12 @@ footer {
     #add-category-button { padding: 14px; margin-left: 8px;}
     #add-category-button svg { width: 20px; height: 20px;}
 
+    #hamburger-menu-button { top: 15px; left: 15px; }
+    #hamburger-menu-button svg { width: 26px; height: 26px; }
+    #side-menu { padding-top: 60px; }
+    #progress-system-view { padding: 20px; }
+    #progress-system-header h2 { font-size: 1.8em; }
+
 
     .category-section .category-header .category-title-text { font-size: 1.9em; } 
     .dashboard-category-summary h3 { font-size: 1.4em; } 
@@ -1693,6 +1948,7 @@ footer {
 @media (max-width: 700px) { /* Mobile */
     body { padding: 20px 15px; animation-duration: 70s; }
     #main-content-wrapper { padding: 20px 25px 0; }
+    #main-content-wrapper.with-hamburger-offset { padding-top: 70px; }
     header { margin-bottom: 20px; }
     header h1 { font-size: 2em; }
     #main-logo { width: 55px; height: 55px; margin-bottom: 8px; }
@@ -1700,6 +1956,18 @@ footer {
     .tab-button.main-tab-highlight { padding: 22px 10px; }
     #add-category-button { padding: 12px; margin-left: 5px;}
     #add-category-button svg { width: 18px; height: 18px;}
+
+    #hamburger-menu-button { top: 12px; left: 12px; }
+    #hamburger-menu-button svg { width: 24px; height: 24px; }
+    #side-menu { width: 240px; left: -250px; padding-top: 55px; }
+    #progress-system-view { padding: 15px; }
+    #progress-system-header { flex-direction: column; align-items: flex-start; gap: 10px;}
+    #progress-system-header h2 { font-size: 1.6em; }
+    #progress-system-tabs { margin-bottom: 20px; }
+    .progress-tab-button { font-size: 1em; padding: 12px 8px; }
+    #progress-setup-form input, #progress-setup-form select { padding: 10px 12px; font-size: 0.95em; }
+    #progress-form-actions { flex-direction: column; }
+
 
     #dashboard-tab-button { margin-right: 10px; }
     .tab-button.category-complete-indicator::before { top: 6px; right: 8px; font-size: 10px; }
@@ -1748,7 +2016,7 @@ footer {
 
     #today-progress-container, #current-week-progress-container { padding: 25px; }
     #current-week-progress-container { margin-top: 25px; }
-    #today-progress-container h3, #current-week-progress-container h3 { font-size: 1.4em; margin-bottom: 18px; }
+    #today-progress-container h3, #current-week-progress-container h3.weekly-plan-name-title { font-size: 1.4em; margin-bottom: 18px; }
     .progress-bar-container { height: 20px; margin-bottom: 16px; }
     .progress-bar-fill { line-height: 20px; font-size: 0.8em; }
     .points-stat { font-size: 1.05em; }
@@ -1806,6 +2074,8 @@ footer {
 @media (max-width: 480px) {
     body { padding: 15px 10px; }
     #main-content-wrapper { padding: 15px 20px 0; }
+    #main-content-wrapper.with-hamburger-offset { padding-top: 60px; }
+
     header { margin-bottom: 15px; }
     header h1 { font-size: 1.8em; }
     #main-logo { width: 50px; height: 50px; margin-bottom: 5px; }
@@ -1856,7 +2126,7 @@ footer {
     .calendar-day-number { font-size: 0.85em; }
     #calendar-grid { gap: 4px; }
 
-    #today-progress-container h3, #current-week-progress-container h3 { font-size: 1.3em; margin-bottom: 15px; }
+    #today-progress-container h3, #current-week-progress-container h3.weekly-plan-name-title { font-size: 1.3em; margin-bottom: 15px; }
     #today-progress-container, #current-week-progress-container { padding: 22px; }
     #current-week-progress-container { margin-top: 22px; }
     .progress-bar-container { height: 18px; margin-bottom: 14px; }
