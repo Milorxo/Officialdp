@@ -1818,8 +1818,17 @@ footer {
     #dashboard-column { padding: 15px; }
     #dashboard-column > h2 { margin-top: 0; font-size: 1.9em; }
 
-    #left-column { flex-basis: auto; padding-left: 0; border-left: none; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 30px; }
-    /* main#tab-content { overflow-y: visible; NO LONGER NEEDED } */
+    #left-column {
+        flex-basis: auto;
+        padding-left: 0;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 30px;
+        flex-grow: 1; /* Ensures #left-column takes available space in #main-content-wrapper */
+        min-height: 0; /* Allows #left-column to shrink if content is small, critical for flex scrolling children */
+    }
+    /* main#tab-content already handles its own scrolling (overflow-y: auto, flex-grow: 1, min-height:0) */
+
     header { margin-bottom: 25px; }
     header h1 { font-size: 2.3em; }
     #main-logo { width: 60px; height: 60px; margin-bottom: 8px; }
