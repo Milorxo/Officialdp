@@ -1,4 +1,5 @@
 
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,134 +7,112 @@
 
 // Default categories and tasks if nothing in localStorage
 const DEFAULT_CATEGORIES_CONFIG = [
-  { id: 'routine', name: 'Routine', order: 0, deletable: false, folders: [
-      { id: 'default_folder_routine', name: 'Tasks', type: 'task', order: 0, tasks: [
-        "Wake up at 5:30 AM", "Pray", "Shower", "Read Daily Text", "Clean bed",
-        "Prepare solar", "Put back solar", "Take 5-min break every 25 mins",
-        "Pray again", "Erase temptation", "Read 1 Bible chapter", "Sleep at 9:10–9:30 PM"
-      ]}
+  { id: 'routine', name: 'Routine', order: 0, deletable: false, tasks: [
+    "Wake up at 5:30 AM", "Pray", "Shower", "Read Daily Text", "Clean bed",
+    "Prepare solar", "Put back solar", "Take 5-min break every 25 mins",
+    "Pray again", "Erase temptation", "Read 1 Bible chapter", "Sleep at 9:10–9:30 PM"
   ]},
-  { id: 'health', name: 'Health', order: 1, deletable: false, folders: [
-      { id: 'default_folder_health', name: 'Tasks', type: 'task', order: 0, tasks: [
-        "Ice facing", "Run 30 mins", "100 jumping jacks", "Stretch 5 mins",
-        "100 push-ups", "20 sit-ups", "Dumbbell: 10 reps × 2 sets",
-        "Sunlight: 15–20 mins", "Drink 4.5L water", "Self-reprogram",
-        "Shower consistently", "Social media < 1 hour"
-      ]}
+  { id: 'health', name: 'Health', order: 1, deletable: false, tasks: [
+    "Ice facing", "Run 30 mins", "100 jumping jacks", "Stretch 5 mins",
+    "100 push-ups", "20 sit-ups", "Dumbbell: 10 reps × 2 sets",
+    "Sunlight: 15–20 mins", "Drink 4.5L water", "Self-reprogram",
+    "Shower consistently", "Social media < 1 hour"
   ]},
-  { id: 'god', name: 'God', order: 2, deletable: false, folders: [
-      { id: 'default_folder_god', name: 'Tasks', type: 'task', order: 0, tasks: [
-        "Self-Bible Study", "Thursday congregation", "Sunday congregation",
-        "Be the person God expects"
-      ]}
+  { id: 'god', name: 'God', order: 2, deletable: false, tasks: [
+    "Self-Bible Study", "Thursday congregation", "Sunday congregation",
+    "Be the person God expects"
   ]},
-  { id: 'personal', name: 'Personal', order: 3, deletable: false, folders: [
-      { id: 'default_folder_personal', name: 'Tasks', type: 'task', order: 0, tasks: ["Content creation"] }
-  ]},
+  { id: 'personal', name: 'Personal', order: 3, deletable: false, tasks: ["Content creation"] },
 ];
 
 
 const DAILY_TARGET_POINTS = 2700;
-let TARGET_POINTS_FOR_WEEKLY_VIEW = 20000; // Will be updated by current progress plan
+const TARGET_POINTS_FOR_WEEKLY_VIEW = 20000;
 
-const STORAGE_KEY_TASK_COMPLETION_PREFIX = 'lifeTrackerTaskCompletion_';
+// Old keys (for migration)
+const OLD_STORAGE_KEY_TASK_PREFIX = 'lifeTrackerTask_';
+const OLD_USER_DEFINED_TASKS_KEY = 'lifeTrackerUserDefinedTasks_v2'; 
+
+// New and existing keys
 const STORAGE_KEY_LAST_VISIT_DATE = 'lifeTrackerLastVisitDate';
-const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_';
+const STORAGE_KEY_DAILY_NOTE_PREFIX = 'lifeTrackerDailyNote_'; // For main daily reflection
 const STORAGE_KEY_DAILY_HISTORY_PREFIX = 'lifeTrackerHistory_';
-const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate'; // May be deprecated or used differently with plans
 const STORAGE_KEY_LAST_MONTH_PROCESSED = 'lifeTrackerLastMonthProcessed';
-
-const USER_CATEGORIES_KEY = 'lifeTrackerUserCategories_v2';
-const USER_FOLDERS_KEY = 'lifeTrackerUserFolders_v2';
-
-const STORAGE_KEY_CURRENT_PROGRESS_PLAN = 'lifeTrackerCurrentProgressPlan_v1';
-const STORAGE_KEY_PROGRESS_HISTORY = 'lifeTrackerProgressHistory_v1';
+const STORAGE_KEY_CURRENT_WEEK_START_DATE = 'lifeTrackerCurrentWeekStartDate'; 
+const USER_CATEGORIES_KEY = 'lifeTrackerUserCategories_v2'; // Stays same for category definitions
+const APP_FOLDERS_KEY = 'lifeTrackerAppFolders_v1'; // New key for folder structures and their task definitions/note content
+const TASK_STATE_STORAGE_KEY_PREFIX = 'lifeTrackerTaskState_'; // For daily completion status: taskState_{date}_{folderId}_{taskId}
 
 
-let currentCategories = [];
-let userFoldersByCategoryId = {};
+let currentCategories = []; 
+let foldersByCategoryId = {}; // Main data structure for folders and their content definitions
 
-let currentTaskCompletionStatus = {};
-
-let activeTabId = 'dashboard';
-let currentModalDate = null;
-let draggedItemElement = null;
-let itemToDelete = null;
-let editModes = {};
-let categoryViewMode = {};
-let activeFolderIdForCategory = {};
-let activeAddTaskForm = null;
-
+let activeTabId = 'dashboard'; 
+let currentModalDate = null; 
+let draggedTaskElement = null; // For tasks within a folder
+let itemToDelete = null; // { type: 'task' | 'folder' | 'category', id: string, nameForConfirmation?: string, categoryId?: string, folderId?: string }
+let currentCategoryView = { mode: 'folders', categoryId: null, folderId: null }; // Tracks if showing folders, task folder content, or note folder content
+let currentFolderEditModes = {}; // { folderId: boolean } for task reordering/editing within a task folder
+let activeAddTaskForm = null; // { categoryId, folderId, position }
 let calendarDisplayDate = new Date();
 let isMonthYearPickerOpen = false;
 let pickerSelectedMonth = new Date().getMonth();
 let pickerSelectedYear = new Date().getFullYear();
 let currentFullscreenContent = null;
-
-let longPressTimer = null;
-const LONG_PRESS_DURATION = 700;
-let currentContextMenuTargetTab = null;
-let currentFolderOptionsMenu = { element: null, folderId: null, categoryId: null };
-
+let longPressTimer = null; // Specifically for category tab long press
+const LONG_PRESS_DURATION = 700; // ms
+let currentContextMenuTargetTab = null; // For category tabs
+let currentContextMenuTargetFolderBox = null; // For folder boxes (the visual square)
 let midnightTimer = null;
-let currentEditingNoteItem = null;
-
-let currentProgressPlan = null; // { name: string, startDate: string, startDayOfWeek: number (0-6), targetWeeklyPoints: number }
-let progressHistory = []; // [ { name, startDate, endDate, weeklyProgressDetails: { pointsEarned, targetPoints, percentage, totalWeeks?, avgWeeklyPoints? } }, ... ]
-let currentView = 'dashboard'; // 'dashboard' or 'progress'
+let tempFolderCreationData = null; // { type: 'task' | 'note', categoryId: string }
+let liveClockInterval = null;
 
 
 // DOM Elements
 const domElements = {
-  // Main App Structure
-  appContainer: null,
-  hamburgerMenuButton: null,
-  sideMenu: null,
-  sideMenuDashboardLink: null,
-  sideMenuProgressLink: null,
-  mainContentWrapper: null, // Existing main content area
-  progressSystemView: null, // New view for progress system
-  
-  // Progress System Specific
-  progressSystemHeader: null,
-  progressSystemBackButton: null,
-  progressTabSetup: null,
-  progressTabHistory: null,
-  progressSetupContent: null,
-  progressHistoryContent: null,
-  progressSetupForm: null,
-  progressPlanNameInput: null,
-  progressStartDateInput: null,
-  progressStartDaySelect: null,
-  progressTargetWeeklyPointsInput: null,
-  saveProgressPlanButton: null,
-  endCurrentPlanButton: null,
-  activePlanSummary: null,
-  activePlanNameDisplay: null,
-  activePlanStartDateDisplay: null,
-  activePlanStartDayDisplay: null,
-  activePlanTargetPointsDisplay: null,
-  progressHistoryList: null,
-  noProgressHistoryMessage: null,
+  // Menu System
+  menuToggleButton: null,
+  appMenuPanel: null,
+  menuItemProgress: null,
+  menuItemClock: null,
+  menuItemDashboard: null,
+  appViewWrapper: null,
+  menuSelectedContentView: null,
+  menuSelectedContentHeader: null,
+  menuSelectedContentTitle: null,
+  closeMenuSelectedViewButton: null,
+  menuSelectedContentArea: null,
+  dashboardColumnView: null, 
+  liveClockView: null,
+  hourHand: null, 
+  minuteHand: null, 
+  secondHand: null, 
+  progressView: null,
 
-  // Existing Elements
+  // PC Progress Sidebar & Mobile Placeholder
+  appProgressSidebar: null,
+  mobileProgressLocation: null,
+  mainContentWrapper: null, // To adjust padding
+
+  // Existing elements
   tabsContainer: null,
-  tabContentsContainer: null,
+  tabContentsContainer: null, 
   addCategoryButton: null,
-  categorySectionTemplate: null,
-  backToFoldersButtonTemplate: null,
+  categorySectionTemplate: null, 
   categoryTabContextMenu: null,
   ctxRenameCategoryButton: null,
   ctxDeleteCategoryButton: null,
   folderOptionsContextMenu: null,
   ctxRenameFolderButton: null,
   ctxDeleteFolderButton: null,
+  
   dashboardSummariesContainer: null,
   todayProgressFill: null,
   todayPointsStat: null,
-  currentWeeklyPlanNameDisplay: null, // For displaying plan name on dashboard
   currentWeekProgressFill: null,
   currentWeekPointsStat: null,
+  todayProgressContainer: null, // The actual element
+  currentWeekProgressContainer: null, // The actual element
   calendarMonthYearButton: null,
   calendarMonthYear: null,
   calendarGrid: null,
@@ -144,14 +123,14 @@ const domElements = {
   monthYearPickerCloseButton: null,
   pickerMonthsGrid: null,
   pickerYearsList: null,
-  dailyNoteInput: null,
+  dailyNoteInput: null, 
   saveNoteButton: null,
   historyModal: null,
   historyModalCloseButton: null,
   historyModalDate: null,
-  historyModalPointsValue: null,
-  historyModalPointsTotal: null,
-  historyPercentageProgressFill: null,
+  historyModalPointsValue: null,        
+  historyModalPointsTotal: null,       
+  historyPercentageProgressFill: null, 
   historyTasksList: null,
   expandTasksButton: null,
   historicalReflectionWrapper: null,
@@ -173,21 +152,17 @@ const domElements = {
   fullscreenModalTitle: null,
   fullscreenModalArea: null,
   fullscreenModalCloseButton: null,
-  addFolderModal: null,
-  addFolderModalCloseButton: null,
-  addFolderStep1: null,
-  addFolderStep2: null,
-  selectTaskFolderTypeButton: null,
-  selectNotesFolderTypeButton: null,
-  addFolderBackButton: null,
-  selectedFolderTypeNameSpan: null,
-  newFolderNameInput: null,
+  chooseFolderTypeModal: null,
+  chooseFolderTypeCloseButton: null,
+  selectTaskFolderButton: null,
+  selectNoteFolderButton: null,
+  enterFolderNameModal: null,
+  enterFolderNameCloseButton: null,
+  enterFolderNameTitle: null,
+  folderNameInput: null,
   createFolderButton: null,
-  cancelAddFolderButton: null,
-  noteItemTemplate: null,
-  noteItemEditTextareaTemplate: null,
-  noteItemEditLinkTemplate: null,
-  noteItemEditImageTemplate: null,
+  cancelCreateFolderButton: null,
+  imageUploadInput: null,
 };
 
 function getProgressFillColor(percentage) {
@@ -219,158 +194,1393 @@ function createUniqueId(prefix = 'id') {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
 
-function getTaskCompletionStorageKey(taskDefinitionId, dateString) {
-  return `${STORAGE_KEY_TASK_COMPLETION_PREFIX}${taskDefinitionId}_${dateString}`;
+// Generates storage key for a task's daily completion status
+function getTaskStateStorageKey(date, folderId, taskId) {
+  return `${TASK_STATE_STORAGE_KEY_PREFIX}${date}_${folderId}_${taskId}`;
 }
 
-// Data Management: Categories, Folders, Tasks (existing functions, slightly adapted if needed)
-function loadUserCategories() { return JSON.parse(localStorage.getItem(USER_CATEGORIES_KEY)) || DEFAULT_CATEGORIES_CONFIG.map(c => ({id:c.id, name:c.name, order:c.order, deletable: c.deletable !== undefined ? c.deletable:true})); }
-function saveUserCategories(categories) { localStorage.setItem(USER_CATEGORIES_KEY, JSON.stringify(categories.sort((a,b) => a.order - b.order))); }
-function loadUserFolders() { const stored = localStorage.getItem(USER_FOLDERS_KEY); if(stored) {const p = JSON.parse(stored); Object.keys(p).forEach(k => p[k].forEach(f => {if(!f.type)f.type='task'; if(f.type==='task' && !f.tasks)f.tasks=[]; if(f.type==='notes' && !f.content)f.content=[]; if(f.type === 'notes' && f.content) f.content.forEach(i => {if(!i.id) i.id = createUniqueId('noteitem')}) ;})); return p;} const iF={}; DEFAULT_CATEGORIES_CONFIG.forEach(c => {iF[c.id]=(c.folders||[]).map(f=>({id:f.id||createUniqueId('folder'),name:f.name,type:f.type||'task',order:f.order||0,tasks:f.type==='notes'?undefined:(f.tasks||[]).map(t=>typeof t==='string'?{id:createUniqueId('taskdef'),text:t}:{id:t.id||createUniqueId('taskdef'),text:t.text}),content:f.type==='notes'?(f.content||[]):undefined}));}); return iF; }
-function saveUserFolders(foldersByCatId) { localStorage.setItem(USER_FOLDERS_KEY, JSON.stringify(foldersByCatId)); }
-function migrateOldTaskStructureIfNeeded() { return false; } // Assuming migration already handled or not needed
-function initializeTaskCompletionStatusForNewDay() { /* ... existing ... */ }
-function getTaskCompletionStatus(taskDefinitionId, dateString) { return currentTaskCompletionStatus[getTaskCompletionStorageKey(taskDefinitionId, dateString)] || false; }
-function setTaskCompletionStatus(taskDefinitionId, dateString, isCompleted) { const key = getTaskCompletionStorageKey(taskDefinitionId, dateString); if (isCompleted) currentTaskCompletionStatus[key] = true; else delete currentTaskCompletionStatus[key]; localStorage.setItem(key, isCompleted.toString()); }
-function loadTaskCompletionForDate(dateString) { currentTaskCompletionStatus = {}; for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key && key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX) && key.endsWith(`_${dateString}`)) currentTaskCompletionStatus[key] = localStorage.getItem(key) === 'true'; } }
+// Category and Folder/Task Data Management
+function loadUserCategories() {
+    const storedCategories = localStorage.getItem(USER_CATEGORIES_KEY);
+    if (storedCategories) {
+        try {
+            return JSON.parse(storedCategories);
+        } catch (e) {
+            console.error("Error parsing stored categories:", e);
+        }
+    }
+    return DEFAULT_CATEGORIES_CONFIG.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        order: cat.order,
+        deletable: cat.deletable !== undefined ? cat.deletable : true, 
+    }));
+}
 
-// Progress Plan Data Management
-function loadProgressData() {
-    const storedPlan = localStorage.getItem(STORAGE_KEY_CURRENT_PROGRESS_PLAN);
-    if (storedPlan) currentProgressPlan = JSON.parse(storedPlan); else currentProgressPlan = null;
-    
-    const storedHistory = localStorage.getItem(STORAGE_KEY_PROGRESS_HISTORY);
-    if (storedHistory) progressHistory = JSON.parse(storedHistory); else progressHistory = [];
-    
-    if (currentProgressPlan && currentProgressPlan.targetWeeklyPoints) {
-        TARGET_POINTS_FOR_WEEKLY_VIEW = currentProgressPlan.targetWeeklyPoints;
-    } else {
-        TARGET_POINTS_FOR_WEEKLY_VIEW = 20000; // Default if no plan or old plan structure
+function saveUserCategories(categories) {
+    localStorage.setItem(USER_CATEGORIES_KEY, JSON.stringify(categories.sort((a,b) => a.order - b.order)));
+}
+
+function loadFoldersByCategoryId() {
+    const storedFolders = localStorage.getItem(APP_FOLDERS_KEY);
+    if (storedFolders) {
+        try {
+            return JSON.parse(storedFolders);
+        } catch (e) {
+            console.error("Error parsing stored folders:", e);
+        }
+    }
+    return {}; // Initialize as empty if not found
+}
+
+function saveFoldersByCategoryId(folders) {
+    localStorage.setItem(APP_FOLDERS_KEY, JSON.stringify(folders));
+}
+
+function migrateOldTaskStructure() {
+    const oldTasksData = localStorage.getItem(OLD_USER_DEFINED_TASKS_KEY);
+    if (!oldTasksData) return false; // No old data to migrate
+
+    console.log("Old task structure found. Migrating to new folder system...");
+    try {
+        const oldTasksByCatId = JSON.parse(oldTasksData);
+        const newFoldersByCatId = {};
+        const today = getTodayDateString(); // For migrating task states for today
+
+        currentCategories.forEach(category => {
+            const defaultFolderId = createUniqueId(`folder-${category.id}-default`);
+            const newFolder = {
+                id: defaultFolderId,
+                name: "Tasks", // Default folder name
+                type: "task",
+                categoryId: category.id,
+                order: 0,
+                content: [] // Task definitions
+            };
+
+            const categoryOldTasks = oldTasksByCatId[category.id] || [];
+            categoryOldTasks.forEach(oldTaskDef => {
+                const newTaskId = oldTaskDef.id || createUniqueId('task'); // Ensure ID exists
+                newFolder.content.push({
+                    id: newTaskId,
+                    text: oldTaskDef.text,
+                });
+
+                const oldTaskStatusKey = `${OLD_STORAGE_KEY_TASK_PREFIX}${newTaskId}_${today}`;
+                const oldStatus = localStorage.getItem(oldTaskStatusKey);
+                if (oldStatus === 'true') {
+                    localStorage.setItem(getTaskStateStorageKey(today, defaultFolderId, newTaskId), 'true');
+                }
+                localStorage.removeItem(oldTaskStatusKey); 
+            });
+            
+            newFoldersByCatId[category.id] = [newFolder];
+        });
+
+        foldersByCategoryId = newFoldersByCatId;
+        saveFoldersByCategoryId(foldersByCategoryId);
+        localStorage.removeItem(OLD_USER_DEFINED_TASKS_KEY); 
+        console.log("Migration complete.");
+        return true; 
+    } catch (e) {
+        console.error("Error migrating old task structure:", e);
+        return false;
     }
 }
 
-function saveProgressData() {
-    if (currentProgressPlan) localStorage.setItem(STORAGE_KEY_CURRENT_PROGRESS_PLAN, JSON.stringify(currentProgressPlan));
-    else localStorage.removeItem(STORAGE_KEY_CURRENT_PROGRESS_PLAN);
-    localStorage.setItem(STORAGE_KEY_PROGRESS_HISTORY, JSON.stringify(progressHistory));
-}
 
 function seedInitialDataIfNeeded() {
     currentCategories = loadUserCategories();
-    migrateOldTaskStructureIfNeeded();
-    userFoldersByCategoryId = loadUserFolders();
-    currentCategories.forEach(cat => {
-        if (!userFoldersByCategoryId[cat.id]) userFoldersByCategoryId[cat.id] = [];
-        userFoldersByCategoryId[cat.id].forEach(folder => { if (!folder.type) folder.type = 'task'; if (folder.type === 'task' && !folder.tasks) folder.tasks = []; if (folder.type === 'notes' && !folder.content) folder.content = []; });
-        if (editModes[cat.id] === undefined) editModes[cat.id] = false;
-        if (categoryViewMode[cat.id] === undefined) categoryViewMode[cat.id] = 'list_folders';
-        if (activeFolderIdForCategory[cat.id] === undefined) activeFolderIdForCategory[cat.id] = null;
+    
+    if (!localStorage.getItem(APP_FOLDERS_KEY) && localStorage.getItem(OLD_USER_DEFINED_TASKS_KEY)) {
+        migrateOldTaskStructure(); 
+    } else {
+        foldersByCategoryId = loadFoldersByCategoryId();
+    }
+
+    let categoriesUpdated = false;
+    let foldersUpdated = false;
+
+    if (!currentCategories || currentCategories.length === 0) {
+        currentCategories = DEFAULT_CATEGORIES_CONFIG.map(cat => ({
+            id: cat.id, name: cat.name, order: cat.order, deletable: cat.deletable !== undefined ? cat.deletable : true,
+        }));
+        categoriesUpdated = true;
+    }
+    
+    currentCategories.forEach(category => {
+        if (!foldersByCategoryId[category.id] || foldersByCategoryId[category.id].length === 0) {
+            const defaultFolderId = createUniqueId(`folder-${category.id}-default`);
+            const defaultFolder = {
+                id: defaultFolderId,
+                name: "Tasks",
+                type: "task",
+                categoryId: category.id,
+                order: 0,
+                content: [] 
+            };
+
+            const defaultConfigCat = DEFAULT_CATEGORIES_CONFIG.find(dc => dc.id === category.id);
+            if (defaultConfigCat && defaultConfigCat.tasks) {
+                defaultFolder.content = defaultConfigCat.tasks.map(taskText => ({
+                    id: createUniqueId('task'),
+                    text: taskText,
+                }));
+            }
+            foldersByCategoryId[category.id] = [defaultFolder];
+            foldersUpdated = true;
+        }
+        (foldersByCategoryId[category.id] || []).forEach(folder => {
+            if (folder.type === 'task' && currentFolderEditModes[folder.id] === undefined) {
+                currentFolderEditModes[folder.id] = false;
+            }
+        });
     });
-    saveUserCategories(currentCategories); saveUserFolders(userFoldersByCategoryId);
+
+    if (categoriesUpdated) saveUserCategories(currentCategories);
+    if (foldersUpdated) saveFoldersByCategoryId(foldersByCategoryId);
 }
-function saveDailyNote() { if (!domElements.dailyNoteInput) return; const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); const noteContent = domElements.dailyNoteInput.value; localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentActiveDate, noteContent); if (currentActiveDate === getTodayDateString() && currentModalDate === currentActiveDate) { const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentActiveDate; const historyDataString = localStorage.getItem(historyKey); if (historyDataString) { try { let historyEntry = JSON.parse(historyDataString); historyEntry.userNote = noteContent; localStorage.setItem(historyKey, JSON.stringify(historyEntry)); } catch (e) { console.warn("Could not live update history note", e); } } } if (domElements.saveNoteButton) { domElements.saveNoteButton.textContent = 'Note Saved!'; setTimeout(() => { if (domElements.saveNoteButton) domElements.saveNoteButton.textContent = 'Save Note'; }, 1500); } }
-function loadCurrentDayNote() { if (!domElements.dailyNoteInput) return; const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentActiveDate); domElements.dailyNoteInput.value = note || ''; }
-function saveDayToHistory(dateToSave) { const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateToSave; loadTaskCompletionForDate(dateToSave); const completedTasksHistory = {}; let tasksCompletedCount = 0; let totalTasksForDay = 0; currentCategories.forEach(cat => { completedTasksHistory[cat.id] = []; const foldersInCat = userFoldersByCategoryId[cat.id] || []; foldersInCat.forEach(folder => { if (folder.type === 'task') { folder.tasks.forEach(taskDef => { totalTasksForDay++; if (getTaskCompletionStatus(taskDef.id, dateToSave)) { completedTasksHistory[cat.id].push(taskDef.text); tasksCompletedCount++; } }); } }); }); const pointsPerTaskCalculation = totalTasksForDay > 0 ? DAILY_TARGET_POINTS / totalTasksForDay : 0; const finalPointsEarned = Math.round(tasksCompletedCount * pointsPerTaskCalculation); const finalPercentageCompleted = totalTasksForDay > 0 ? Math.round((tasksCompletedCount / totalTasksForDay) * 100) : 0; const noteFromDay = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave) || ""; const historyEntry = { date: dateToSave, completedTasks: completedTasksHistory, userNote: noteFromDay, pointsEarned: finalPointsEarned, percentageCompleted: finalPercentageCompleted, totalTasksOnDate: totalTasksForDay, dailyTargetPoints: DAILY_TARGET_POINTS }; localStorage.setItem(historyKey, JSON.stringify(historyEntry)); localStorage.removeItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave); currentCategories.forEach(cat => { const foldersInCat = userFoldersByCategoryId[cat.id] || []; foldersInCat.forEach(folder => { if (folder.type === 'task') { folder.tasks.forEach(taskDef => { localStorage.removeItem(getTaskCompletionStorageKey(taskDef.id, dateToSave)); }); } }); }); console.log(`History finalized and saved for ${dateToSave}:`, historyEntry); }
-function checkAndClearOldMonthlyData() { const currentMonthYear = getCurrentMonthYearString(); const lastProcessedMonthYear = localStorage.getItem(STORAGE_KEY_LAST_MONTH_PROCESSED); if (lastProcessedMonthYear && lastProcessedMonthYear !== currentMonthYear) { for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key && key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX)) { const parts = key.split('_'); if (parts.length > 2) { const datePart = parts.slice(2).join('_'); if (datePart.length >= 7) { const monthYearOfKey = datePart.substring(0, 7); if (monthYearOfKey === lastProcessedMonthYear) localStorage.removeItem(key); } } } } } localStorage.setItem(STORAGE_KEY_LAST_MONTH_PROCESSED, currentMonthYear); }
-function loadAppData() { seedInitialDataIfNeeded(); loadProgressData(); let lastVisitDateStr = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE); const currentDateStr = getTodayDateString(); if (lastVisitDateStr && lastVisitDateStr !== currentDateStr) { console.log(`Date changed from ${lastVisitDateStr} to ${currentDateStr}. Processing previous day.`); saveDayToHistory(lastVisitDateStr); initializeTaskCompletionStatusForNewDay(); } else if (!lastVisitDateStr) { console.log("First visit or no last visit date found. Initializing for today."); initializeTaskCompletionStatusForNewDay(); } else { console.log("Resuming session for today:", currentDateStr); loadTaskCompletionForDate(currentDateStr); } localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, currentDateStr); checkAndClearOldMonthlyData(); loadCurrentDayNote(); calendarDisplayDate = new Date(); calendarDisplayDate.setDate(1); calendarDisplayDate.setHours(0,0,0,0); pickerSelectedMonth = calendarDisplayDate.getMonth(); pickerSelectedYear = calendarDisplayDate.getFullYear(); scheduleMidnightTask(); }
-function handleMidnightReset() { console.log("Midnight reset triggered."); const dateThatJustEnded = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE); if (!dateThatJustEnded) { console.error("Cannot perform midnight reset: last visit date unknown."); scheduleMidnightTask(); return; } saveDayToHistory(dateThatJustEnded); const newCurrentDate = getTodayDateString(); localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, newCurrentDate); initializeTaskCompletionStatusForNewDay(); currentTaskCompletionStatus = {}; if (domElements.dailyNoteInput) domElements.dailyNoteInput.value = ''; loadCurrentDayNote(); if (domElements.todayPointsStat) domElements.todayPointsStat.classList.add('progress-value-resetting'); if (domElements.todayProgressFill) domElements.todayProgressFill.classList.add('progress-value-resetting'); updateAllProgress(); setTimeout(() => { if (domElements.todayPointsStat) domElements.todayPointsStat.classList.remove('progress-value-resetting'); if (domElements.todayProgressFill) domElements.todayProgressFill.classList.remove('progress-value-resetting'); }, 500); scheduleMidnightTask(); }
-function scheduleMidnightTask() { if (midnightTimer) clearTimeout(midnightTimer); const now = new Date(); const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1); tomorrow.setHours(0, 0, 1, 0); const msUntilMidnight = tomorrow.getTime() - now.getTime(); console.log(`Next midnight reset scheduled in ${msUntilMidnight / 1000 / 60} minutes.`); midnightTimer = setTimeout(handleMidnightReset, msUntilMidnight); }
-function getDragAfterElement(container, y, itemSelector) { const draggableElements = Array.from(container.querySelectorAll(`${itemSelector}:not(.dragging):not(.editing)`)); return draggableElements.reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = y - box.top - box.height / 2; if (offset < 0 && offset > closest.offset) return { offset: offset, element: child }; else return closest; }, { offset: Number.NEGATIVE_INFINITY, element: null }).element; }
-function toggleCategoryEditMode(categoryId) { editModes[categoryId] = !editModes[categoryId]; renderCategoryTasks(categoryId); }
-function showTempAddTaskForm(categoryId, folderId, position) { if (activeAddTaskForm) hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position, false); activeAddTaskForm = { categoryId, folderId, position }; const categorySection = document.getElementById(`category-section-${categoryId}`); if (!categorySection) return; const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom'; const formContainer = categorySection.querySelector(formContainerClass); if (!formContainer) return; const triggerButton = formContainer.querySelector('.add-item-trigger-button'); const form = formContainer.querySelector('.new-temp-task-form'); const input = formContainer.querySelector('.new-task-temp-input'); if (triggerButton) triggerButton.classList.add('hidden'); if (form) form.classList.remove('hidden'); if (input) input.focus(); }
-function hideTempAddTaskForm(categoryId, folderId, position, resetActiveForm = true) { const categorySection = document.getElementById(`category-section-${categoryId}`); if (!categorySection) return; const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom'; const formContainer = categorySection.querySelector(formContainerClass); if (!formContainer) return; const triggerButton = formContainer.querySelector('.add-item-trigger-button'); const form = formContainer.querySelector('.new-temp-task-form'); const input = formContainer.querySelector('.new-task-temp-input'); if (triggerButton) triggerButton.classList.remove('hidden'); if (form) form.classList.add('hidden'); if (input) input.value = ''; if (resetActiveForm) activeAddTaskForm = null; }
-function handleSaveTempTask(categoryId, folderId, position) { const categorySection = document.getElementById(`category-section-${categoryId}`); if (!categorySection) return; const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom'; const input = categorySection.querySelector(`${formContainerClass} .new-task-temp-input`); const taskText = input.value.trim(); if (taskText) { const newTaskDefinition = { id: createUniqueId('taskdef'), text: taskText }; const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder && folder.type === 'task') { if (position === 'top') folder.tasks.unshift(newTaskDefinition); else folder.tasks.push(newTaskDefinition); saveUserFolders(userFoldersByCategoryId); renderCategoryTasks(categoryId); updateAllProgress(); hideTempAddTaskForm(categoryId, folderId, position); } else alert('Error: Could not find the task folder or incorrect folder type.'); } else alert('Task text cannot be empty.'); }
-function getTaskDefinition(taskDefinitionId) { for (const catId in userFoldersByCategoryId) { const folders = userFoldersByCategoryId[catId]; for (const folder of folders) { if (folder.type === 'task' && folder.tasks) { const taskDef = folder.tasks.find(t => t.id === taskDefinitionId); if (taskDef) return { ...taskDef, categoryId: catId, folderId: folder.id }; } } } return null; }
-function startTaskEdit(taskItemElement, taskDef, categoryId, folderId) { if (taskItemElement.classList.contains('editing')) return; taskItemElement.classList.add('editing'); const taskTextSpan = taskItemElement.querySelector('.task-text'); if (taskTextSpan) taskTextSpan.style.display = 'none'; const editControlsTemplate = domElements.taskEditControlsTemplate; if (!editControlsTemplate) return; const editControls = editControlsTemplate.cloneNode(true); editControls.removeAttribute('id'); editControls.style.display = 'flex'; const input = editControls.querySelector('.task-edit-input'); const saveButton = editControls.querySelector('.task-edit-save'); const cancelButton = editControls.querySelector('.task-edit-cancel'); input.value = taskDef.text; saveButton.onclick = () => saveTaskEdit(taskDef.id, categoryId, folderId, input.value, taskItemElement, editControls); cancelButton.onclick = () => cancelTaskEdit(taskItemElement, editControls, taskTextSpan); const deleteButton = taskItemElement.querySelector('.task-delete-button-editmode'); if (deleteButton) taskItemElement.insertBefore(editControls, deleteButton); else taskItemElement.appendChild(editControls); input.focus(); input.select(); }
-function saveTaskEdit(taskDefinitionId, categoryId, folderId, newText, taskItemElement, editControls) { newText = newText.trim(); if (!newText) { alert("Task text cannot be empty."); return; } const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder && folder.type === 'task') { const taskDef = folder.tasks.find(t => t.id === taskDefinitionId); if (taskDef) { taskDef.text = newText; saveUserFolders(userFoldersByCategoryId); } } const taskTextSpan = taskItemElement.querySelector('.task-text'); if(taskTextSpan) { taskTextSpan.textContent = newText; taskTextSpan.style.display = ''; } taskItemElement.classList.remove('editing'); editControls.remove(); }
-function cancelTaskEdit(taskItemElement, editControls, taskTextSpan) { if (taskTextSpan) taskTextSpan.style.display = ''; taskItemElement.classList.remove('editing'); editControls.remove(); }
-function renderTaskItem(taskDef, categoryId, folderId) { const item = document.createElement('li'); item.className = 'task-item'; item.dataset.taskDefId = taskDef.id; item.setAttribute('role', 'listitem'); item.setAttribute('tabindex', '0'); const textSpan = document.createElement('span'); textSpan.className = 'task-text'; textSpan.textContent = taskDef.text; item.appendChild(textSpan); const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); const isCompleted = getTaskCompletionStatus(taskDef.id, today); const updateAriaAndClass = (completedState) => { item.setAttribute('aria-label', `${taskDef.text}, ${completedState ? 'completed' : 'not completed'}`); item.classList.toggle('completed', completedState); }; updateAriaAndClass(isCompleted); if (editModes[categoryId]) { const deleteButton = document.createElement('button'); deleteButton.className = 'task-delete-button-editmode icon-button'; deleteButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`; deleteButton.setAttribute('aria-label', `Delete task: ${taskDef.text}`); deleteButton.title = "Delete Task"; deleteButton.onclick = (e) => { e.stopPropagation(); showDeleteConfirmation('task', taskDef.id, `Are you sure you want to delete the task "${taskDef.text}"? This will remove it permanently.`, '', categoryId, folderId); }; item.appendChild(deleteButton); } item.addEventListener('click', (e) => { if (item.classList.contains('editing')) return; if (editModes[categoryId] && e.target === textSpan) { startTaskEdit(item, taskDef, categoryId, folderId); return; } if (!editModes[categoryId]) { const currentCompletion = getTaskCompletionStatus(taskDef.id, today); setTaskCompletionStatus(taskDef.id, today, !currentCompletion); updateAriaAndClass(!currentCompletion); item.classList.remove('animate-task-complete', 'animate-task-uncomplete'); void item.offsetWidth; item.classList.add(!currentCompletion ? 'animate-task-complete' : 'animate-task-uncomplete'); updateAllProgress(); } }); item.addEventListener('keydown', (e) => { if (item.classList.contains('editing')) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!editModes[categoryId]) item.click(); else if (editModes[categoryId] && document.activeElement === item) startTaskEdit(item, taskDef, categoryId, folderId); } }); if (editModes[categoryId] && !item.classList.contains('editing')) { item.draggable = true; item.addEventListener('dragstart', (e) => { if (!editModes[categoryId] || item.classList.contains('editing')) { e.preventDefault(); return; } draggedItemElement = item; setTimeout(() => item.classList.add('dragging'), 0); e.dataTransfer.effectAllowed = 'move'; }); item.addEventListener('dragend', () => { const taskListUl = item.closest('ul.task-list'); if (!taskListUl) return; item.classList.remove('dragging'); draggedItemElement = null; document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => { el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom'); }); const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder && folder.type === 'task') { const newTaskOrderIds = Array.from(taskListUl.querySelectorAll('.task-item')).map(el => el.dataset.taskDefId); folder.tasks = newTaskOrderIds.map(id => folder.tasks.find(t => t.id === id)).filter(Boolean); saveUserFolders(userFoldersByCategoryId); } }); } else item.draggable = false; return item; }
-function showDeleteConfirmation(type, id, message, nameForConfirmation = '', categoryId = null, folderId = null) { itemToDelete = { type, id, nameForConfirmation, categoryId, folderId }; if (domElements.deleteConfirmationModal) { if(domElements.deleteConfirmationMessage) domElements.deleteConfirmationMessage.textContent = message; if(domElements.deleteConfirmationTitle) domElements.deleteConfirmationTitle.textContent = `Confirm ${type.charAt(0).toUpperCase() + type.slice(1)} Deletion`; domElements.deleteConfirmationModal.classList.remove('hidden'); domElements.confirmDeleteButton.focus(); } }
-function confirmDeletion() { if (!itemToDelete) return; const { type, id, categoryId, folderId } = itemToDelete; if (type === 'task') { const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder && folder.type === 'task') { folder.tasks = folder.tasks.filter(t => t.id !== id); saveUserFolders(userFoldersByCategoryId); for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key && key.startsWith(getTaskCompletionStorageKey(id, ''))) localStorage.removeItem(key); } Object.keys(currentTaskCompletionStatus).forEach(key => { if (key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX + id + "_")) delete currentTaskCompletionStatus[key]; }); renderCategoryTasks(categoryId); } } else if (type === 'category') { const category = currentCategories.find(c => c.id === id); if (category && category.deletable === false) { alert(`Category "${category.name}" is a default category and cannot be deleted.`); hideDeleteConfirmation(); return; } currentCategories = currentCategories.filter(cat => cat.id !== id); saveUserCategories(currentCategories); delete userFoldersByCategoryId[id]; saveUserFolders(userFoldersByCategoryId); const tabButton = document.getElementById(`tab-button-${id}`); if (tabButton) tabButton.remove(); const categorySection = document.getElementById(`category-section-${id}`); if (categorySection) categorySection.remove(); if (activeTabId === id) switchTab('dashboard'); } else if (type === 'folder') { const foldersInCat = userFoldersByCategoryId[categoryId]; if (foldersInCat) { const folderToDelete = foldersInCat.find(f => f.id === id); if (folderToDelete && folderToDelete.type === 'task') { folderToDelete.tasks.forEach(taskDef => { for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key && key.startsWith(getTaskCompletionStorageKey(taskDef.id, ''))) localStorage.removeItem(key); } Object.keys(currentTaskCompletionStatus).forEach(key => { if (key.startsWith(STORAGE_KEY_TASK_COMPLETION_PREFIX + taskDef.id + "_")) delete currentTaskCompletionStatus[key]; }); }); } else if (folderToDelete && folderToDelete.type === 'notes') {} userFoldersByCategoryId[categoryId] = foldersInCat.filter(f => f.id !== id); saveUserFolders(userFoldersByCategoryId); renderCategoryTasks(categoryId); } } else if (type === 'noteItem') { const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder && folder.type === 'notes') { folder.content = folder.content.filter(item => item.id !== id); saveUserFolders(userFoldersByCategoryId); renderNotesFolderContent(folder, categoryId, document.querySelector(`#category-section-${categoryId} .notes-folder-content-wrapper`)); } } updateAllProgress(); hideDeleteConfirmation(); }
-function hideDeleteConfirmation() { if (domElements.deleteConfirmationModal) domElements.deleteConfirmationModal.classList.add('hidden'); itemToDelete = null; }
-function renderCategoryTasks(categoryId) { const categorySection = document.getElementById(`category-section-${categoryId}`); if (!categorySection) return; const category = currentCategories.find(c => c.id === categoryId); if (!category) return; const categoryContentArea = categorySection.querySelector('.category-content-area'); const taskListUl = categorySection.querySelector('ul.task-list'); const notesFolderWrapper = categorySection.querySelector('.notes-folder-content-wrapper'); const addTaskFormTop = categorySection.querySelector('.add-task-form-top'); const addTaskFormBottom = categorySection.querySelector('.add-task-form-bottom'); const categoryHeader = categorySection.querySelector('.category-header'); const categoryTitleText = categoryHeader.querySelector('.category-title-text'); const categoryHeaderControls = categoryHeader.querySelector('.category-header-controls'); categoryContentArea.innerHTML = ''; taskListUl.innerHTML = ''; taskListUl.classList.add('hidden'); notesFolderWrapper.classList.add('hidden'); notesFolderWrapper.querySelector('.notes-content-display-area').innerHTML = ''; const activeFolder = userFoldersByCategoryId[categoryId]?.find(f => f.id === activeFolderIdForCategory[categoryId]); const isTaskFolderView = categoryViewMode[categoryId] === 'view_folder_content' && activeFolder?.type === 'task'; const isNotesFolderView = categoryViewMode[categoryId] === 'view_folder_content' && activeFolder?.type === 'notes'; [addTaskFormTop, addTaskFormBottom].forEach(form => form.style.display = (isTaskFolderView && editModes[categoryId]) ? 'block' : 'none'); if (categoryHeaderControls) { const editButton = categoryHeaderControls.querySelector('.edit-mode-toggle-button'); const undoButton = categoryHeaderControls.querySelector('.undo-category-button'); const saveNotesButton = notesFolderWrapper.querySelector('#save-notes-folder-button'); if (isTaskFolderView) { if(editButton) editButton.style.display = 'flex'; if(undoButton) undoButton.style.display = 'flex'; if(saveNotesButton) saveNotesButton.style.display = 'none'; } else if (isNotesFolderView) { if(editButton) editButton.style.display = 'none'; if(undoButton) undoButton.style.display = 'none'; } else { if(editButton) editButton.style.display = 'none'; if(undoButton) undoButton.style.display = 'none'; if(saveNotesButton) saveNotesButton.style.display = 'none'; } } let backButton = categoryHeader.querySelector('.back-to-folders-button'); if (categoryViewMode[categoryId] === 'view_folder_content') { if (!backButton) { const buttonTemplate = domElements.backToFoldersButtonTemplate.content.cloneNode(true); backButton = buttonTemplate.querySelector('.back-to-folders-button'); backButton.onclick = () => { categoryViewMode[categoryId] = 'list_folders'; activeFolderIdForCategory[categoryId] = null; if (activeAddTaskForm?.categoryId === categoryId) hideTempAddTaskForm(categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position); renderCategoryTasks(categoryId); }; categoryHeader.prepend(backButton); } backButton.style.display = 'flex'; categoryTitleText.textContent = activeFolder ? activeFolder.name : category.name; categoryHeader.classList.add('has-back-button');} else { if (backButton) backButton.style.display = 'none'; categoryTitleText.textContent = category.name; categoryHeader.classList.remove('has-back-button'); } const editModeButton = categoryHeader.querySelector('.edit-mode-toggle-button'); if (editModeButton) { editModeButton.classList.toggle('active-glow', !!editModes[categoryId]); editModeButton.setAttribute('aria-pressed', !!editModes[categoryId]); } if (categoryViewMode[categoryId] === 'list_folders') { const folders = (userFoldersByCategoryId[categoryId] || []).sort((a,b) => a.order - b.order); const folderDisplayContainer = document.createElement('div'); folderDisplayContainer.className = 'task-folders-grid'; if (folders.length > 0) folders.forEach(folder => folderDisplayContainer.appendChild(renderFolderBox(folder, categoryId))); const addNewFolderPlusButton = document.createElement('button'); addNewFolderPlusButton.className = 'add-new-folder-plus-button'; addNewFolderPlusButton.title = "Add a new folder to this category"; addNewFolderPlusButton.setAttribute('aria-label', "Add new folder"); addNewFolderPlusButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>`; addNewFolderPlusButton.onclick = () => openAddFolderModal(categoryId); folderDisplayContainer.appendChild(addNewFolderPlusButton); categoryContentArea.appendChild(folderDisplayContainer); if (folders.length === 0) { const emptyMessage = document.createElement('p'); emptyMessage.className = 'empty-tasks-message'; emptyMessage.textContent = 'No folders yet. Click the "+" button to add one.'; categoryContentArea.appendChild(emptyMessage); } } else if (isTaskFolderView) { taskListUl.classList.remove('hidden'); if (activeFolder && activeFolder.tasks.length > 0) activeFolder.tasks.forEach(taskDef => taskListUl.appendChild(renderTaskItem(taskDef, categoryId, activeFolder.id))); else { const emptyMessage = document.createElement('p'); emptyMessage.className = 'empty-tasks-message'; emptyMessage.textContent = editModes[categoryId] ? 'This folder is empty. Click "Add Item" to create tasks.' : 'This folder is empty.'; if (editModes[categoryId]) emptyMessage.classList.add('edit-mode-empty'); taskListUl.appendChild(emptyMessage); } categoryContentArea.appendChild(taskListUl); } else if (isNotesFolderView) { notesFolderWrapper.classList.remove('hidden'); renderNotesFolderContent(activeFolder, categoryId, notesFolderWrapper); categoryContentArea.appendChild(notesFolderWrapper); } }
-function renderFolderBox(folder, categoryId) { const wrapper = document.createElement('div'); wrapper.className = 'task-folder-box-wrapper'; wrapper.dataset.folderId = folder.id; wrapper.setAttribute('role', 'button'); wrapper.setAttribute('tabindex', '0'); wrapper.setAttribute('aria-label', `Open folder: ${folder.name}`); const squareBox = document.createElement('div'); squareBox.className = 'task-folder-square-box'; const symbolSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); symbolSvg.setAttribute('class', 'task-folder-symbol'); symbolSvg.setAttribute('viewBox', '0 0 24 24'); if (folder.type === 'notes') { squareBox.classList.add('notes-folder-icon-box'); wrapper.classList.add('notes-folder-label'); symbolSvg.innerHTML = `<path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 14H8v-2h8v2zm0-4H8v-2h8v2zm0-4H8V6h8v2z"></path>`; } else symbolSvg.innerHTML = `<path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/><path d="M7.035 14.854l-1.889-1.889-1.061 1.061 2.95 2.95 5.869-5.869-1.061-1.061z"/>`; squareBox.appendChild(symbolSvg); wrapper.appendChild(squareBox); const label = document.createElement('span'); label.className = 'task-folder-label-text'; label.textContent = folder.name; wrapper.appendChild(label); const optionsIcon = document.createElement('div'); optionsIcon.className = 'folder-options-icon entity-options-icon'; optionsIcon.innerHTML = `<span></span><span></span><span></span>`; optionsIcon.setAttribute('aria-label', `Options for folder ${folder.name}`); optionsIcon.setAttribute('role', 'button'); optionsIcon.tabIndex = 0; optionsIcon.onclick = (e) => { e.stopPropagation(); showFolderContextMenu(folder.id, categoryId, optionsIcon); }; optionsIcon.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); showFolderContextMenu(folder.id, categoryId, optionsIcon); }}; wrapper.appendChild(optionsIcon); let folderLongPressTimer; wrapper.addEventListener('touchstart', (e) => { if (e.target === optionsIcon || optionsIcon.contains(e.target)) return; clearTimeout(folderLongPressTimer); optionsIcon.classList.remove('visible'); const touchMoveHandler = () => clearTimeout(folderLongPressTimer); wrapper.addEventListener('touchmove', touchMoveHandler, { once: true }); folderLongPressTimer = setTimeout(() => { optionsIcon.classList.add('visible'); wrapper.removeEventListener('touchmove', touchMoveHandler); }, LONG_PRESS_DURATION); }, {passive: true}); wrapper.addEventListener('touchend', () => clearTimeout(folderLongPressTimer)); wrapper.addEventListener('touchcancel', () => clearTimeout(folderLongPressTimer)); wrapper.onclick = (e) => { if (e.target === optionsIcon || optionsIcon.contains(e.target) || wrapper.querySelector('.folder-inline-rename-input')) return; categoryViewMode[categoryId] = 'view_folder_content'; activeFolderIdForCategory[categoryId] = folder.id; renderCategoryTasks(categoryId); }; wrapper.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && (e.target !== optionsIcon && !optionsIcon.contains(e.target)) && !wrapper.querySelector('.folder-inline-rename-input')) { e.preventDefault(); categoryViewMode[categoryId] = 'view_folder_content'; activeFolderIdForCategory[categoryId] = folder.id; renderCategoryTasks(categoryId); } }; return wrapper; }
-function renderNotesFolderContent(folder, categoryId, notesFolderWrapperElement) { const displayArea = notesFolderWrapperElement.querySelector('.notes-content-display-area'); const controls = notesFolderWrapperElement.querySelector('.notes-editor-controls'); displayArea.innerHTML = ''; if (!folder.content || folder.content.length === 0) { const emptyMsg = document.createElement('p'); emptyMsg.className = 'empty-tasks-message'; emptyMsg.textContent = 'This notes folder is empty. Use the controls above to add content.'; displayArea.appendChild(emptyMsg); } else folder.content.forEach(item => displayArea.appendChild(renderNoteItem(item, folder.id, categoryId))); controls.querySelector('[data-action="add-text"]').onclick = () => addNoteItem(folder.id, categoryId, 'text'); controls.querySelector('[data-action="add-link"]').onclick = () => addNoteItem(folder.id, categoryId, 'link'); controls.querySelector('[data-action="add-image"]').onclick = () => addNoteItem(folder.id, categoryId, 'image'); controls.querySelector('#save-notes-folder-button').onclick = () => saveAllNotesInFolder(folder.id, categoryId); }
-function renderNoteItem(item, folderId, categoryId, isEditing = false) { const template = domElements.noteItemTemplate.content.cloneNode(true); const noteItemElement = template.querySelector('.note-item'); noteItemElement.dataset.itemId = item.id; const contentDiv = noteItemElement.querySelector('.note-item-content'); if (isEditing) contentDiv.appendChild(createNoteItemEditForm(item, folderId, categoryId)); else { switch (item.type) { case 'text': const p = document.createElement('p'); p.textContent = item.value || ""; contentDiv.appendChild(p); break; case 'link': const a = document.createElement('a'); a.href = item.value.url; a.textContent = item.value.text || item.value.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; contentDiv.appendChild(a); break; case 'image': const img = document.createElement('img'); img.src = item.value.dataUrl; img.alt = item.value.alt || 'User image'; contentDiv.appendChild(img); break; } } noteItemElement.querySelector('.edit-note-item').onclick = (e) => { e.stopPropagation(); startNoteItemEdit(item.id, folderId, categoryId, noteItemElement); }; noteItemElement.querySelector('.delete-note-item').onclick = (e) => { e.stopPropagation(); showDeleteConfirmation('noteItem', item.id, `Delete this ${item.type} item?`, '', categoryId, folderId); }; noteItemElement.draggable = true; noteItemElement.addEventListener('dragstart', (e) => { if (noteItemElement.classList.contains('editing')) { e.preventDefault(); return; } draggedItemElement = noteItemElement; setTimeout(() => noteItemElement.classList.add('dragging'), 0); e.dataTransfer.effectAllowed = 'move'; }); noteItemElement.addEventListener('dragend', () => { const displayArea = noteItemElement.closest('.notes-content-display-area'); if (!displayArea) return; noteItemElement.classList.remove('dragging'); draggedItemElement = null; document.querySelectorAll('.drag-over-indicator-note, .drag-over-indicator-note-bottom').forEach(el => { el.classList.remove('drag-over-indicator-note', 'drag-over-indicator-note-bottom'); }); const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder && folder.type === 'notes') { const newOrderItemIds = Array.from(displayArea.querySelectorAll('.note-item')).map(el => el.dataset.itemId); folder.content = newOrderItemIds.map(id => folder.content.find(contentItem => contentItem.id === id)).filter(Boolean); saveUserFolders(userFoldersByCategoryId); } }); return noteItemElement; }
-function addNoteItem(folderId, categoryId, type) { const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (!folder || folder.type !== 'notes') return; let newItem; switch (type) { case 'text': newItem = { id: createUniqueId('noteitem'), type: 'text', value: "" }; break; case 'link': newItem = { id: createUniqueId('noteitem'), type: 'link', value: { url: "", text: "" } }; break; case 'image': newItem = { id: createUniqueId('noteitem'), type: 'image', value: { dataUrl: "", alt: "" } }; break; default: return; } folder.content.push(newItem); const displayArea = document.querySelector(`#category-section-${categoryId} .notes-content-display-area`); if (displayArea) { const newItemElement = renderNoteItem(newItem, folderId, categoryId, true); displayArea.appendChild(newItemElement); const inputToFocus = newItemElement.querySelector('textarea, input[type="url"], input[type="file"]'); if (inputToFocus) inputToFocus.focus(); } }
-function startNoteItemEdit(itemId, folderId, categoryId, itemElement) { if (currentEditingNoteItem && currentEditingNoteItem.itemId !== itemId) { const prevFolder = userFoldersByCategoryId[currentEditingNoteItem.categoryId]?.find(f => f.id === currentEditingNoteItem.folderId); const prevItem = prevFolder?.content.find(it => it.id === currentEditingNoteItem.itemId); if (prevFolder && prevItem && currentEditingNoteItem.itemElement) { const newPrevItemElement = renderNoteItem(prevItem, currentEditingNoteItem.folderId, currentEditingNoteItem.categoryId, false); currentEditingNoteItem.itemElement.replaceWith(newPrevItemElement); } } currentEditingNoteItem = { itemId, folderId, categoryId, itemElement }; itemElement.classList.add('editing'); const contentDiv = itemElement.querySelector('.note-item-content'); const originalContent = contentDiv.innerHTML; contentDiv.innerHTML = ''; const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); const item = folder?.content.find(it => it.id === itemId); if (!item) return; contentDiv.appendChild(createNoteItemEditForm(item, folderId, categoryId, originalContent)); }
-function createNoteItemEditForm(item, folderId, categoryId, originalDisplayHTML) { const formContainer = document.createElement('div'); formContainer.className = 'note-item-editing-form'; let templateId = ''; switch (item.type) { case 'text': templateId = 'note-item-edit-form-template-text'; break; case 'link': templateId = 'note-item-edit-form-template-link'; break; case 'image': templateId = 'note-item-edit-form-template-image'; break; } const formTemplate = document.getElementById(templateId).content.cloneNode(true); formContainer.appendChild(formTemplate); if (item.type === 'text') formContainer.querySelector('.note-edit-textarea').value = item.value || ""; else if (item.type === 'link') { formContainer.querySelector('.note-edit-link-url').value = item.value.url || ""; formContainer.querySelector('.note-edit-link-text').value = item.value.text || ""; } else if (item.type === 'image') { formContainer.querySelector('.note-edit-image-alt').value = item.value.alt || ""; const preview = formContainer.querySelector('.note-edit-image-preview'); if (item.value.dataUrl) { preview.src = item.value.dataUrl; preview.style.display = 'block'; } formContainer.querySelector('.note-edit-image-file').onchange = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (re) => { preview.src = re.target.result; preview.style.display = 'block'; }; reader.readAsDataURL(file); } }; } const actionsDiv = document.createElement('div'); actionsDiv.className = 'form-actions'; const saveBtn = document.createElement('button'); saveBtn.textContent = 'Save'; saveBtn.className = 'new-task-temp-save'; saveBtn.onclick = () => saveNoteItemEdit(item.id, folderId, categoryId, formContainer); const cancelBtn = document.createElement('button'); cancelBtn.textContent = 'Cancel'; cancelBtn.className = 'new-task-temp-cancel'; cancelBtn.onclick = () => cancelNoteItemEdit(item, folderId, categoryId, originalDisplayHTML); actionsDiv.appendChild(saveBtn); actionsDiv.appendChild(cancelBtn); formContainer.appendChild(actionsDiv); return formContainer; }
-function saveNoteItemEdit(itemId, folderId, categoryId, formContainerElement) { const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); const item = folder?.content.find(it => it.id === itemId); if (!item) return; if (item.type === 'text') item.value = formContainerElement.querySelector('.note-edit-textarea').value; else if (item.type === 'link') { item.value.url = formContainerElement.querySelector('.note-edit-link-url').value; item.value.text = formContainerElement.querySelector('.note-edit-link-text').value; } else if (item.type === 'image') { item.value.alt = formContainerElement.querySelector('.note-edit-image-alt').value; const fileInput = formContainerElement.querySelector('.note-edit-image-file'); const previewSrc = formContainerElement.querySelector('.note-edit-image-preview').src; if (previewSrc && previewSrc !== '#' && (!fileInput.files[0] || previewSrc.startsWith('data:image'))) item.value.dataUrl = previewSrc; } const itemElement = currentEditingNoteItem?.itemElement; if (itemElement) { const newItemElement = renderNoteItem(item, folderId, categoryId, false); itemElement.replaceWith(newItemElement); itemElement.classList.remove('editing'); } currentEditingNoteItem = null; }
-function cancelNoteItemEdit(item, folderId, categoryId, originalDisplayHTML) { const itemElement = currentEditingNoteItem?.itemElement; if (itemElement) { const isNewAndEmpty = (!originalDisplayHTML && !item.value && (item.type !== 'link' || (!item.value.url && !item.value.text)) && (item.type !== 'image' || (!item.value.dataUrl))); if (isNewAndEmpty) { const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if (folder) folder.content = folder.content.filter(i => i.id !== item.id); itemElement.remove(); } else { const newItemElement = renderNoteItem(item, folderId, categoryId, false); itemElement.replaceWith(newItemElement); itemElement.classList.remove('editing'); } } currentEditingNoteItem = null; }
-function saveAllNotesInFolder(folderId, categoryId) { saveUserFolders(userFoldersByCategoryId); const saveButton = document.querySelector(`#category-section-${categoryId} #save-notes-folder-button`); if (saveButton) { const originalText = saveButton.innerHTML; saveButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"></path></svg> Notes Saved!`; setTimeout(() => { saveButton.innerHTML = originalText; }, 2000); } const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId); if(folder) renderNotesFolderContent(folder, categoryId, document.querySelector(`#category-section-${categoryId} .notes-folder-content-wrapper`));}
-function renderAllCategorySections() { if (!domElements.tabContentsContainer || !domElements.categorySectionTemplate) return; domElements.tabContentsContainer.querySelectorAll('.category-section:not(#dashboard-content)').forEach(sec => sec.remove()); currentCategories.forEach(category => { if (category.id === 'dashboard') return; const sectionClone = domElements.categorySectionTemplate.content.cloneNode(true); const sectionElement = sectionClone.querySelector('.category-section'); sectionElement.id = `category-section-${category.id}`; sectionElement.setAttribute('aria-labelledby', `tab-button-${category.id}`); if (activeTabId !== category.id) sectionElement.classList.add('hidden'); sectionElement.querySelector('.category-title-text').textContent = category.name; const editModeButton = sectionElement.querySelector('.edit-mode-toggle-button'); editModeButton.onclick = () => toggleCategoryEditMode(category.id); sectionElement.querySelector('.undo-category-button').onclick = () => { const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); const currentFolderId = activeFolderIdForCategory[category.id]; const folder = userFoldersByCategoryId[category.id]?.find(f => f.id === currentFolderId); if (folder && folder.type === 'task') { folder.tasks.forEach(taskDef => setTaskCompletionStatus(taskDef.id, today, false)); renderCategoryTasks(category.id); updateAllProgress(); } }; ['top', 'bottom'].forEach(position => { const formContainer = sectionElement.querySelector(position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom'); if (formContainer) { formContainer.querySelector('.add-item-trigger-button').onclick = () => { const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]); if (currentFolder && currentFolder.type === 'task') showTempAddTaskForm(category.id, activeFolderIdForCategory[category.id], position); }; formContainer.querySelector('.new-task-temp-save').onclick = () => { const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]); if (currentFolder && currentFolder.type === 'task') handleSaveTempTask(category.id, activeFolderIdForCategory[category.id], position); }; formContainer.querySelector('.new-task-temp-cancel').onclick = () => { const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]); if (currentFolder && currentFolder.type === 'task') hideTempAddTaskForm(category.id, activeFolderIdForCategory[category.id], position); }; formContainer.querySelector('.new-task-temp-input').addEventListener('keypress', (e) => { const currentFolder = userFoldersByCategoryId[category.id]?.find(f => f.id === activeFolderIdForCategory[category.id]); if (e.key === 'Enter' && currentFolder && currentFolder.type === 'task') { e.preventDefault(); handleSaveTempTask(category.id, activeFolderIdForCategory[category.id], position); } }); } }); domElements.tabContentsContainer.appendChild(sectionElement); renderCategoryTasks(category.id); }); }
-function clearLongPressTimer(tabButton) { if (longPressTimer) clearTimeout(longPressTimer); longPressTimer = null; if (tabButton) { tabButton.removeEventListener('touchmove', preventScrollDuringLongPress); tabButton.removeEventListener('touchend', () => clearLongPressTimer(tabButton)); tabButton.removeEventListener('touchcancel', () => clearLongPressTimer(tabButton)); } }
-function preventScrollDuringLongPress(e) { clearTimeout(longPressTimer); }
-function renderTabs() { if (!domElements.tabsContainer) return; domElements.tabsContainer.querySelectorAll('.tab-button[data-category-id]').forEach(btn => btn.remove()); const addCatButton = domElements.addCategoryButton; currentCategories.sort((a, b) => a.order - b.order).forEach(category => { const tabButton = document.createElement('button'); tabButton.className = 'tab-button'; tabButton.id = `tab-button-${category.id}`; tabButton.dataset.categoryId = category.id; tabButton.textContent = category.name; tabButton.setAttribute('role', 'tab'); tabButton.setAttribute('aria-selected', activeTabId === category.id ? 'true' : 'false'); if (activeTabId === category.id) tabButton.classList.add('active'); const optionsIcon = document.createElement('div'); optionsIcon.className = 'tab-options-icon entity-options-icon'; optionsIcon.innerHTML = `<span></span><span></span><span></span>`; optionsIcon.setAttribute('aria-label', `Options for ${category.name}`); optionsIcon.setAttribute('role', 'button'); optionsIcon.tabIndex = 0; tabButton.appendChild(optionsIcon); optionsIcon.addEventListener('click', (e) => { e.stopPropagation(); showCategoryContextMenu(category.id, tabButton); }); optionsIcon.addEventListener('keydown', (e) => { if (e.key==='Enter'||e.key===' ') {e.preventDefault();e.stopPropagation();showCategoryContextMenu(category.id,tabButton);}}); tabButton.addEventListener('touchstart', (e) => { clearLongPressTimer(tabButton); tabButton.addEventListener('touchmove', preventScrollDuringLongPress); longPressTimer = setTimeout(() => { e.preventDefault(); optionsIcon.classList.add('visible'); showCategoryContextMenu(category.id, tabButton); clearLongPressTimer(tabButton); }, LONG_PRESS_DURATION); tabButton.addEventListener('touchend', () => clearLongPressTimer(tabButton)); tabButton.addEventListener('touchcancel', () => clearLongPressTimer(tabButton)); }); tabButton.addEventListener('click', (e) => { if (e.target === tabButton && !optionsIcon.contains(e.target)) { tabButton.classList.add('show-badge-highlight'); setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300); } switchTab(category.id) }); domElements.tabsContainer.insertBefore(tabButton, addCatButton); }); updateCategoryTabIndicators(); }
-function switchTab(categoryIdToActivate) { activeTabId = categoryIdToActivate; hideCategoryContextMenu(); hideFolderContextMenu(); domElements.tabsContainer.querySelectorAll('.tab-button').forEach(button => { const isCurrent = (button.id === `tab-button-${activeTabId}`) || (activeTabId === 'dashboard' && button.id === 'dashboard-tab-button'); button.classList.toggle('active', isCurrent); button.setAttribute('aria-selected', isCurrent.toString()); }); if (domElements.tabContentsContainer) domElements.tabContentsContainer.classList.toggle('main-area-scroll-hidden', categoryIdToActivate === 'dashboard'); domElements.tabContentsContainer.querySelectorAll('section[role="tabpanel"]').forEach(section => { const isCurrent = (section.id === `category-section-${activeTabId}`) || (activeTabId === 'dashboard' && section.id === 'dashboard-content'); section.classList.toggle('hidden', !isCurrent); }); if (activeTabId !== 'dashboard') renderCategoryTasks(activeTabId); if (activeAddTaskForm) hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position); currentEditingNoteItem = null; }
-function calculateProgress() { let completedCount = 0; let totalTasks = 0; const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); currentCategories.forEach(category => { const foldersInCat = userFoldersByCategoryId[category.id] || []; foldersInCat.forEach(folder => { if (folder.type === 'task' && folder.tasks) { folder.tasks.forEach(taskDef => { totalTasks++; if (getTaskCompletionStatus(taskDef.id, today)) completedCount++; }); } }); }); const percentage = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0; const pointsPerTask = totalTasks > 0 ? DAILY_TARGET_POINTS / totalTasks : 0; const pointsEarned = Math.round(completedCount * pointsPerTask); return { percentage, pointsEarned, completedCount, totalTasks }; }
-function updateDashboardSummaries() { if (!domElements.dashboardSummariesContainer) return; domElements.dashboardSummariesContainer.innerHTML = ''; const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); currentCategories.forEach(category => { if (category.id === 'dashboard') return; let categoryTotalTasks = 0; let categoryCompletedTasks = 0; const foldersInCat = userFoldersByCategoryId[category.id] || []; foldersInCat.forEach(folder => { if (folder.type === 'task' && folder.tasks) { folder.tasks.forEach(taskDef => { categoryTotalTasks++; if (getTaskCompletionStatus(taskDef.id, today)) categoryCompletedTasks++; }); } }); if (foldersInCat.some(f => f.type === 'task')) { const summaryDiv = document.createElement('div'); summaryDiv.className = 'dashboard-category-summary'; summaryDiv.innerHTML = `<h3>${category.name}</h3> <p class="category-stats">${categoryCompletedTasks} / ${categoryTotalTasks}</p>`; const statsP = summaryDiv.querySelector('.category-stats'); if (categoryTotalTasks > 0 && categoryCompletedTasks === categoryTotalTasks) statsP.classList.add('fully-completed'); else statsP.classList.remove('fully-completed'); domElements.dashboardSummariesContainer.appendChild(summaryDiv); } }); }
-function updateTodaysProgress() { const progress = calculateProgress(); if (domElements.todayProgressFill) { domElements.todayProgressFill.style.width = `${progress.percentage}%`; domElements.todayProgressFill.style.backgroundColor = getProgressFillColor(progress.percentage); domElements.todayProgressFill.textContent = `${progress.percentage}%`; domElements.todayProgressFill.setAttribute('aria-valuenow', progress.percentage.toString()); } if (domElements.todayPointsStat) domElements.todayPointsStat.textContent = `${progress.pointsEarned} / ${DAILY_TARGET_POINTS} points`; }
+
+
+function getTaskDefinitionsForFolder(folderId) {
+    for (const catId in foldersByCategoryId) {
+        const folder = (foldersByCategoryId[catId] || []).find(f => f.id === folderId);
+        if (folder && folder.type === 'task') {
+            return folder.content || [];
+        }
+    }
+    return [];
+}
+function getTasksForFolderForDay(folderId, dateString) {
+    const taskDefinitions = getTaskDefinitionsForFolder(folderId);
+    return taskDefinitions.map(taskDef => ({
+        ...taskDef,
+        completed: localStorage.getItem(getTaskStateStorageKey(dateString, folderId, taskDef.id)) === 'true'
+    }));
+}
+
+function saveTaskStatus(folderId, taskId, completed, dateString) {
+  localStorage.setItem(getTaskStateStorageKey(dateString, folderId, taskId), completed.toString());
+}
+
+function getCategoryNameById(categoryId) {
+    const category = currentCategories.find(cat => cat.id === categoryId);
+    return category ? category.name : "Unknown Category";
+}
+function getFolderNameById(folderId) {
+    for (const catId in foldersByCategoryId) {
+        const folder = (foldersByCategoryId[catId] || []).find(f => f.id === folderId);
+        if (folder) return folder.name;
+    }
+    return "Unknown Folder";
+}
+
+
+function saveDailyNote() { 
+    if (!domElements.dailyNoteInput) return;
+    const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    const noteContent = domElements.dailyNoteInput.value;
+    localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentActiveDate, noteContent);
+
+    if (currentActiveDate === getTodayDateString() && currentModalDate === currentActiveDate) {
+        const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentActiveDate;
+        const historyDataString = localStorage.getItem(historyKey);
+        if (historyDataString) {
+            try {
+                let historyEntry = JSON.parse(historyDataString);
+                historyEntry.userNote = noteContent; 
+                localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+            } catch (e) { console.warn("Could not live update history main reflection", e); }
+        }
+    }
+
+    if (domElements.saveNoteButton) {
+        domElements.saveNoteButton.textContent = 'Note Saved!';
+        setTimeout(() => {
+            if (domElements.saveNoteButton) domElements.saveNoteButton.textContent = 'Save Note';
+        }, 1500);
+    }
+}
+
+function loadCurrentDayNote() {
+    if (!domElements.dailyNoteInput) return;
+    const currentActiveDate = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentActiveDate);
+    domElements.dailyNoteInput.value = note || '';
+}
+
+function saveDayToHistory(dateToSave) {
+    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateToSave;
+    const { pointsEarned, percentageCompleted, totalTasks } = calculateProgressForDate(dateToSave);
+    
+    const completedTasksHistory = {}; 
+    currentCategories.forEach(cat => {
+      completedTasksHistory[cat.id] = {};
+      (foldersByCategoryId[cat.id] || []).forEach(folder => {
+        if (folder.type === 'task') {
+          completedTasksHistory[cat.id][folder.id] = { name: folder.name, tasks: [] };
+          const tasksInFolder = getTasksForFolderForDay(folder.id, dateToSave);
+          tasksInFolder.forEach(task => {
+            if (task.completed) {
+              completedTasksHistory[cat.id][folder.id].tasks.push(task.text);
+            }
+          });
+          if(completedTasksHistory[cat.id][folder.id].tasks.length === 0) {
+            delete completedTasksHistory[cat.id][folder.id];
+          }
+        }
+      });
+      if(Object.keys(completedTasksHistory[cat.id]).length === 0) {
+        delete completedTasksHistory[cat.id];
+      }
+    });
+
+    const mainReflection = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateToSave) || "";
+    
+    const historyEntry = {
+        date: dateToSave,
+        completedTaskStructure: completedTasksHistory, 
+        userNote: mainReflection, 
+        pointsEarned: pointsEarned,
+        percentageCompleted: percentageCompleted,
+        totalTasksOnDate: totalTasks,
+        dailyTargetPoints: DAILY_TARGET_POINTS
+    };
+
+    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+    
+    currentCategories.forEach(cat => {
+        (foldersByCategoryId[cat.id] || []).forEach(folder => {
+            if (folder.type === 'task') {
+                (folder.content || []).forEach(taskDef => {
+                    localStorage.removeItem(getTaskStateStorageKey(dateToSave, folder.id, taskDef.id));
+                });
+            }
+        });
+    });
+    
+    console.log(`History finalized and saved for ${dateToSave}:`, historyEntry);
+}
+
+
+function checkAndClearOldMonthlyData() {
+  const currentMonthYear = getCurrentMonthYearString();
+  const lastProcessedMonthYear = localStorage.getItem(STORAGE_KEY_LAST_MONTH_PROCESSED);
+
+  if (lastProcessedMonthYear && lastProcessedMonthYear !== currentMonthYear) {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(TASK_STATE_STORAGE_KEY_PREFIX)) {
+        const parts = key.split('_');
+        if (parts.length > 1) {
+            const datePart = parts[1];
+            if (datePart && datePart.length >= 7) { 
+                const monthYearOfKey = datePart.substring(0, 7); 
+                if (monthYearOfKey === lastProcessedMonthYear) { 
+                    localStorage.removeItem(key);
+                }
+            }
+        }
+      }
+    }
+  }
+  localStorage.setItem(STORAGE_KEY_LAST_MONTH_PROCESSED, currentMonthYear);
+}
+
+
+function loadAppData() {
+  seedInitialDataIfNeeded(); 
+
+  let lastVisitDateStr = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE);
+  const currentDateStr = getTodayDateString();
+
+  if (lastVisitDateStr && lastVisitDateStr !== currentDateStr) {
+    console.log(`Date changed from ${lastVisitDateStr} to ${currentDateStr}. Processing previous day.`);
+    saveDayToHistory(lastVisitDateStr);
+  } else if (!lastVisitDateStr) {
+    console.log("First visit or no last visit date found. Initializing for today.");
+  }
+  
+  localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, currentDateStr);
+  
+  checkAndClearOldMonthlyData();
+  loadCurrentDayNote(); 
+  
+  calendarDisplayDate = new Date(); 
+  calendarDisplayDate.setDate(1); 
+  calendarDisplayDate.setHours(0,0,0,0); 
+  pickerSelectedMonth = calendarDisplayDate.getMonth();
+  pickerSelectedYear = calendarDisplayDate.getFullYear();
+  scheduleMidnightTask();
+}
+
+function handleMidnightReset() {
+    console.log("Midnight reset triggered.");
+    const dateThatJustEnded = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE); 
+    
+    if (!dateThatJustEnded) {
+        console.error("Cannot perform midnight reset: last visit date unknown.");
+        scheduleMidnightTask(); 
+        return;
+    }
+
+    saveDayToHistory(dateThatJustEnded);
+
+    const newCurrentDate = getTodayDateString();
+    localStorage.setItem(STORAGE_KEY_LAST_VISIT_DATE, newCurrentDate);
+    
+    if (domElements.dailyNoteInput) domElements.dailyNoteInput.value = ''; 
+    loadCurrentDayNote();
+
+    if (domElements.todayPointsStat) domElements.todayPointsStat.classList.add('progress-value-resetting');
+    if (domElements.todayProgressFill) domElements.todayProgressFill.classList.add('progress-value-resetting');
+    
+    updateAllProgress(); 
+
+    setTimeout(() => {
+        if (domElements.todayPointsStat) domElements.todayPointsStat.classList.remove('progress-value-resetting');
+        if (domElements.todayProgressFill) domElements.todayProgressFill.classList.remove('progress-value-resetting');
+    }, 500); 
+    
+    scheduleMidnightTask(); 
+}
+
+function scheduleMidnightTask() {
+    if (midnightTimer) clearTimeout(midnightTimer);
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 1, 0); 
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+    console.log(`Next midnight reset scheduled in ${msUntilMidnight / 1000 / 60} minutes.`);
+    midnightTimer = setTimeout(handleMidnightReset, msUntilMidnight);
+}
+
+// Drag & Drop for tasks within a folder
+function getDragAfterElement(container, y) {
+    const draggableElements = Array.from(container.querySelectorAll('.task-item:not(.dragging):not(.editing)'));
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+}
+
+// Toggle edit mode for tasks within a specific task folder
+function toggleTaskFolderEditMode(folderId) {
+    currentFolderEditModes[folderId] = !currentFolderEditModes[folderId];
+    const folder = findFolderById(folderId);
+    if (folder) {
+        renderTaskFolderContents(folder.categoryId, folderId);
+    }
+}
+
+// Add Task form within a Task Folder
+function showTempAddTaskForm(categoryId, folderId, position) {
+    if (activeAddTaskForm) {
+        hideTempAddTaskForm(activeAddTaskForm.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position, false);
+    }
+    activeAddTaskForm = { categoryId, folderId, position };
+    const taskFolderContentEl = document.getElementById(`task-folder-content-${folderId}`);
+    if (!taskFolderContentEl) return;
+
+    const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
+    const formContainer = taskFolderContentEl.querySelector(formContainerClass);
+    if (!formContainer) return;
+    
+    formContainer.querySelector('.add-item-trigger-button')?.classList.add('hidden');
+    formContainer.querySelector('.new-temp-task-form')?.classList.remove('hidden');
+    formContainer.querySelector('.new-task-temp-input')?.focus();
+}
+
+function hideTempAddTaskForm(categoryId, folderId, position, resetActiveForm = true) {
+    const taskFolderContentEl = document.getElementById(`task-folder-content-${folderId}`);
+    if (!taskFolderContentEl) return;
+    const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
+    const formContainer = taskFolderContentEl.querySelector(formContainerClass);
+    if (!formContainer) return;
+
+    formContainer.querySelector('.add-item-trigger-button')?.classList.remove('hidden');
+    const form = formContainer.querySelector('.new-temp-task-form');
+    form?.classList.add('hidden');
+    const input = form.querySelector('.new-task-temp-input');
+    if (input) input.value = '';
+    if (resetActiveForm) activeAddTaskForm = null;
+}
+
+function handleSaveTempTask(categoryId, folderId, position) {
+    const taskFolderContentEl = document.getElementById(`task-folder-content-${folderId}`);
+    if (!taskFolderContentEl) return;
+    const formContainerClass = position === 'top' ? '.add-task-form-top' : '.add-task-form-bottom';
+    const input = taskFolderContentEl.querySelector(`${formContainerClass} .new-task-temp-input`);
+    const taskText = input.value.trim();
+
+    if (taskText) {
+        const newTaskDefinition = { id: createUniqueId('task'), text: taskText };
+        const categoryFolders = foldersByCategoryId[categoryId] || [];
+        const folder = categoryFolders.find(f => f.id === folderId);
+
+        if (folder && folder.type === 'task') {
+            if (!folder.content) folder.content = [];
+            if (position === 'top') {
+                folder.content.unshift(newTaskDefinition);
+            } else {
+                folder.content.push(newTaskDefinition);
+            }
+            saveFoldersByCategoryId(foldersByCategoryId);
+            renderTaskFolderContents(categoryId, folderId); 
+            updateAllProgress();
+            hideTempAddTaskForm(categoryId, folderId, position);
+        }
+    } else {
+        alert('Task text cannot be empty.');
+    }
+}
+
+function findFolderById(folderId) {
+    for (const catId in foldersByCategoryId) {
+        const folder = (foldersByCategoryId[catId] || []).find(f => f.id === folderId);
+        if (folder) return folder;
+    }
+    return null;
+}
+function getTaskDefinitionById(folderId, taskId) {
+    const folder = findFolderById(folderId);
+    if (folder && folder.type === 'task' && folder.content) {
+        return folder.content.find(taskDef => taskDef.id === taskId);
+    }
+    return null;
+}
+
+
+function startTaskEdit(taskItemElement, folderId, taskDef) {
+    if (taskItemElement.classList.contains('editing')) return;
+    taskItemElement.classList.add('editing');
+    
+    const taskTextSpan = taskItemElement.querySelector('.task-text');
+    if (taskTextSpan) taskTextSpan.style.display = 'none';
+
+    const editControls = domElements.taskEditControlsTemplate.cloneNode(true);
+    editControls.removeAttribute('id'); 
+    editControls.style.display = 'flex'; 
+
+    const input = editControls.querySelector('.task-edit-input');
+    input.value = taskDef.text;
+
+    editControls.querySelector('.task-edit-save').onclick = () => saveTaskEdit(folderId, taskDef.id, input.value, taskItemElement, editControls);
+    editControls.querySelector('.task-edit-cancel').onclick = () => cancelTaskEdit(taskItemElement, editControls, taskTextSpan);
+    
+    const deleteButton = taskItemElement.querySelector('.task-delete-button-editmode');
+    if (deleteButton) taskItemElement.insertBefore(editControls, deleteButton);
+    else taskItemElement.appendChild(editControls);
+    
+    input.focus();
+    input.select();
+}
+
+function saveTaskEdit(folderId, taskId, newText, taskItemElement, editControls) {
+    newText = newText.trim();
+    if (!newText) {
+        alert("Task text cannot be empty.");
+        return;
+    }
+    const folder = findFolderById(folderId);
+    if (folder && folder.type === 'task' && folder.content) {
+        const taskIndex = folder.content.findIndex(t => t.id === taskId);
+        if (taskIndex !== -1) {
+            folder.content[taskIndex].text = newText;
+            saveFoldersByCategoryId(foldersByCategoryId);
+        }
+    }
+    const taskTextSpan = taskItemElement.querySelector('.task-text');
+    if(taskTextSpan) {
+        taskTextSpan.textContent = newText; 
+        taskTextSpan.style.display = ''; 
+    }
+    taskItemElement.classList.remove('editing');
+    editControls.remove();
+}
+
+function cancelTaskEdit(taskItemElement, editControls, taskTextSpan) {
+    if (taskTextSpan) taskTextSpan.style.display = ''; 
+    taskItemElement.classList.remove('editing');
+    editControls.remove();
+}
+
+function renderTaskItem(task, folderId, categoryId) { 
+  const item = document.createElement('li');
+  item.className = 'task-item';
+  item.dataset.taskId = task.id;
+  item.dataset.folderId = folderId; 
+  item.setAttribute('role', 'listitem');
+  item.setAttribute('tabindex', '0'); 
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'task-text';
+  textSpan.textContent = task.text;
+  item.appendChild(textSpan);
+
+  const updateAriaLabel = () => {
+    item.setAttribute('aria-label', `${task.text}, ${item.classList.contains('completed') ? 'completed' : 'not completed'}`);
+  };
+
+  if (task.completed) item.classList.add('completed');
+  updateAriaLabel();
+
+  if (currentFolderEditModes[folderId]) {
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'task-delete-button-editmode icon-button';
+      deleteButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"></path></svg>`;
+      deleteButton.setAttribute('aria-label', `Delete task: ${task.text}`);
+      deleteButton.title = "Delete Task";
+      deleteButton.onclick = (e) => {
+          e.stopPropagation(); 
+          showDeleteConfirmation('task', task.id, `Are you sure you want to delete the task "${task.text}"? This will remove it permanently.`, task.text, categoryId, folderId);
+      };
+      item.appendChild(deleteButton);
+  }
+
+  item.addEventListener('click', (e) => {
+    if (item.classList.contains('editing')) return;
+    const taskDef = getTaskDefinitionById(folderId, task.id);
+    if (!taskDef) return;
+
+    if (currentFolderEditModes[folderId] && e.target === textSpan) {
+        startTaskEdit(item, folderId, taskDef);
+    } else if (!currentFolderEditModes[folderId]) {
+        task.completed = !task.completed;
+        saveTaskStatus(folderId, task.id, task.completed, localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString());
+        item.classList.toggle('completed');
+        updateAriaLabel();
+        item.classList.remove('animate-task-complete', 'animate-task-uncomplete');
+        void item.offsetWidth; 
+        item.classList.add(task.completed ? 'animate-task-complete' : 'animate-task-uncomplete');
+        updateAllProgress();
+    }
+  });
+
+  item.addEventListener('keydown', (e) => {
+    if (item.classList.contains('editing')) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const taskDef = getTaskDefinitionById(folderId, task.id);
+        if (!taskDef) return;
+        if (!currentFolderEditModes[folderId]) { 
+            item.click(); 
+        } else if (currentFolderEditModes[folderId] && document.activeElement === item) {
+             startTaskEdit(item, folderId, taskDef);
+        }
+    }
+  });
+
+  if (currentFolderEditModes[folderId] && !item.classList.contains('editing')) {
+    item.draggable = true;
+    item.addEventListener('dragstart', (e) => {
+        if (!currentFolderEditModes[folderId] || item.classList.contains('editing')) {
+            e.preventDefault();
+            return;
+        }
+        draggedTaskElement = item;
+        setTimeout(() => item.classList.add('dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        draggedTaskElement = null;
+        document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
+            el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
+        });
+        
+        const taskListElement = item.closest('.task-list');
+        if (taskListElement) {
+            const fId = taskListElement.dataset.folderId;
+            const newTaskOrderIds = Array.from(taskListElement.querySelectorAll('.task-item')).map(el => el.dataset.taskId);
+            
+            const folder = findFolderById(fId);
+            if (folder && folder.type === 'task') {
+                folder.content = newTaskOrderIds.map(id => folder.content.find(t => t.id === id)).filter(Boolean);
+                saveFoldersByCategoryId(foldersByCategoryId);
+            }
+        }
+    });
+  } else {
+    item.draggable = false;
+  }
+  return item;
+}
+
+
+function showDeleteConfirmation(type, id, message, nameForConfirmation = '', categoryId = null, folderId = null) {
+    itemToDelete = { type, id, nameForConfirmation, categoryId, folderId };
+    if (domElements.deleteConfirmationModal) {
+        if(domElements.deleteConfirmationMessage) domElements.deleteConfirmationMessage.textContent = message;
+        if(domElements.deleteConfirmationTitle) domElements.deleteConfirmationTitle.textContent = `Confirm ${type.charAt(0).toUpperCase() + type.slice(1)} Deletion`;
+        domElements.deleteConfirmationModal.classList.remove('hidden');
+        if (domElements.confirmDeleteButton) domElements.confirmDeleteButton.focus();
+    }
+}
+
+function confirmDeletion() {
+    if (!itemToDelete) return;
+    const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+
+    if (itemToDelete.type === 'task') {
+        const { id: taskId, categoryId, folderId } = itemToDelete;
+        const folder = findFolderById(folderId);
+        if (folder && folder.type === 'task' && folder.content) {
+            folder.content = folder.content.filter(t => t.id !== taskId);
+            saveFoldersByCategoryId(foldersByCategoryId);
+            localStorage.removeItem(getTaskStateStorageKey(today, folderId, taskId)); 
+            renderTaskFolderContents(categoryId, folderId);
+        }
+    } else if (itemToDelete.type === 'folder') {
+        const { id: folderId, categoryId } = itemToDelete;
+        if (foldersByCategoryId[categoryId]) {
+            foldersByCategoryId[categoryId] = foldersByCategoryId[categoryId].filter(f => f.id !== folderId);
+            saveFoldersByCategoryId(foldersByCategoryId);
+            renderFolderSystemForCategory(categoryId, document.querySelector(`#category-section-${categoryId} .category-content-area`));
+        }
+    } else if (itemToDelete.type === 'category') {
+        const categoryId = itemToDelete.id;
+        const category = currentCategories.find(c => c.id === categoryId);
+        if (category && category.deletable === false) {
+            alert(`Category "${category.name}" is a default category and cannot be deleted.`);
+        } else {
+            currentCategories = currentCategories.filter(cat => cat.id !== categoryId);
+            saveUserCategories(currentCategories);
+            delete foldersByCategoryId[categoryId]; 
+            saveFoldersByCategoryId(foldersByCategoryId);
+            
+            document.getElementById(`tab-button-${categoryId}`)?.remove();
+            document.getElementById(`category-section-${categoryId}`)?.remove();
+            if (activeTabId === categoryId) switchTab('dashboard');
+        }
+    }
+
+    updateAllProgress();
+    hideDeleteConfirmation();
+}
+
+function hideDeleteConfirmation() {
+    if (domElements.deleteConfirmationModal) {
+        domElements.deleteConfirmationModal.classList.add('hidden');
+    }
+    itemToDelete = null;
+}
+
+function renderCategorySectionContent(categoryId) {
+    const sectionElement = document.getElementById(`category-section-${categoryId}`);
+    if (!sectionElement) return;
+
+    let contentArea = sectionElement.querySelector('.category-content-area');
+    if (!contentArea) { 
+        contentArea = document.createElement('div');
+        contentArea.className = 'category-content-area';
+        sectionElement.querySelectorAll('.task-list, .add-task-form-container').forEach(el => el.remove());
+        sectionElement.appendChild(contentArea);
+    }
+    contentArea.innerHTML = ''; 
+
+    sectionElement.querySelector('.category-header-controls')?.classList.add('hidden');
+
+
+    if (currentCategoryView.categoryId === categoryId) {
+        if (currentCategoryView.mode === 'folders') {
+            renderFolderSystemForCategory(categoryId, contentArea);
+        } else if (currentCategoryView.mode === 'task_folder') {
+            renderTaskFolderContents(categoryId, currentCategoryView.folderId, contentArea);
+        } else if (currentCategoryView.mode === 'note_folder') {
+            renderNoteFolderContents(categoryId, currentCategoryView.folderId, contentArea);
+        }
+    }
+}
+
+function renderFolderSystemForCategory(categoryId, container) {
+    container.innerHTML = ''; 
+    
+    const foldersGrid = document.createElement('div');
+    foldersGrid.className = 'folders-grid';
+    
+    const folders = (foldersByCategoryId[categoryId] || []).sort((a,b) => a.order - b.order);
+    folders.forEach(folder => {
+        foldersGrid.appendChild(renderFolderBox(folder));
+    });
+
+    const addFolderBtn = document.createElement('button');
+    addFolderBtn.className = 'add-folder-button';
+    addFolderBtn.setAttribute('aria-label', 'Add new folder');
+    addFolderBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>`;
+    addFolderBtn.onclick = () => openChooseFolderTypeModal(categoryId);
+    foldersGrid.appendChild(addFolderBtn);
+
+    container.appendChild(foldersGrid);
+}
+
+function renderFolderBox(folder) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'folder-item-container';
+    wrapper.dataset.folderId = folder.id;
+    wrapper.dataset.categoryId = folder.categoryId;
+    wrapper.setAttribute('role', 'button');
+    wrapper.setAttribute('tabindex', '0');
+    wrapper.setAttribute('aria-label', `Open folder: ${folder.name}`);
+
+    const box = document.createElement('div'); 
+    box.className = 'folder-box';
+    
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'folder-box-icon';
+    if (folder.type === 'task') {
+        iconDiv.innerHTML = `<svg viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zm0-10V7h14v2H7z"></path></svg>`;
+    } else { 
+        iconDiv.innerHTML = `<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"></path></svg>`;
+    }
+    box.appendChild(iconDiv);
+
+    const optionsTrigger = document.createElement('div');
+    optionsTrigger.className = 'folder-options-trigger';
+    optionsTrigger.innerHTML = `<span></span><span></span><span></span>`;
+    optionsTrigger.setAttribute('aria-label', `Options for folder ${folder.name}`);
+    optionsTrigger.setAttribute('role', 'button');
+    optionsTrigger.tabIndex = 0; 
+    optionsTrigger.onclick = (e) => { e.stopPropagation(); showFolderContextMenu(folder, box); }; 
+    optionsTrigger.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); showFolderContextMenu(folder, box); }};
+    box.appendChild(optionsTrigger);
+    
+    wrapper.appendChild(box);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'folder-box-name';
+    nameSpan.textContent = folder.name;
+    wrapper.appendChild(nameSpan);
+    
+    wrapper.onclick = () => {
+        currentCategoryView = {
+            mode: folder.type === 'task' ? 'task_folder' : 'note_folder',
+            categoryId: folder.categoryId,
+            folderId: folder.id
+        };
+        renderCategorySectionContent(folder.categoryId);
+    };
+    wrapper.onkeydown = (e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); wrapper.click(); }};
+
+    return wrapper;
+}
+
+
+function renderTaskFolderContents(categoryId, folderId, container) {
+    if (!container) { 
+        const sectionElement = document.getElementById(`category-section-${categoryId}`);
+        if (!sectionElement) return;
+        container = sectionElement.querySelector('.category-content-area');
+        if (!container) return;
+    }
+    container.innerHTML = ''; 
+    const folder = findFolderById(folderId);
+    if (!folder) return;
+
+    const header = document.createElement('div');
+    header.className = 'folder-view-header';
+    
+    const backButton = document.createElement('button');
+    backButton.className = 'folder-back-button icon-button'; 
+    backButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>`; 
+    backButton.setAttribute('aria-label', 'Back to folders');
+    backButton.title = 'Back to Folders';
+    backButton.onclick = () => {
+        currentCategoryView = { mode: 'folders', categoryId: categoryId, folderId: null };
+        currentFolderEditModes[folderId] = false; 
+        renderCategorySectionContent(categoryId);
+    };
+    header.appendChild(backButton);
+
+    const title = document.createElement('h3');
+    title.className = 'folder-view-title';
+    title.textContent = folder.name;
+    header.appendChild(title);
+
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'folder-view-header-controls';
+
+    const editModeButton = document.createElement('button');
+    editModeButton.className = 'edit-mode-toggle-button icon-button';
+    editModeButton.title = 'Toggle Edit Mode for Tasks';
+    editModeButton.setAttribute('aria-pressed', currentFolderEditModes[folderId] ? 'true' : 'false');
+    editModeButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>`;
+    editModeButton.onclick = () => toggleTaskFolderEditMode(folderId);
+    if (currentFolderEditModes[folderId]) editModeButton.classList.add('active-glow');
+    controlsDiv.appendChild(editModeButton);
+
+    const undoButton = document.createElement('button');
+    undoButton.className = 'undo-folder-button icon-button'; 
+    undoButton.title = 'Uncheck All Tasks in this Folder';
+    undoButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>`;
+    undoButton.onclick = () => {
+        const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+        (folder.content || []).forEach(taskDef => {
+            saveTaskStatus(folderId, taskDef.id, false, today);
+        });
+        renderTaskFolderContents(categoryId, folderId, container); 
+        updateAllProgress();
+    };
+    controlsDiv.appendChild(undoButton);
+    header.appendChild(controlsDiv);
+    container.appendChild(header);
+
+    const taskFolderContentDiv = document.createElement('div');
+    taskFolderContentDiv.id = `task-folder-content-${folderId}`;
+    taskFolderContentDiv.className = 'task-folder-content';
+    if(currentFolderEditModes[folderId]) taskFolderContentDiv.classList.add('edit-mode-active');
+
+
+    const addTaskFormTop = createAddTaskForm(categoryId, folderId, 'top');
+    taskFolderContentDiv.appendChild(addTaskFormTop);
+
+    const taskListElement = document.createElement('ul');
+    taskListElement.className = 'task-list';
+    taskListElement.setAttribute('aria-live', 'polite');
+    taskListElement.dataset.folderId = folderId; 
+    taskListElement.dataset.categoryId = categoryId;
+
+
+    const tasksForDay = getTasksForFolderForDay(folderId, localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString());
+    if (tasksForDay.length === 0) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.textContent = currentFolderEditModes[folderId] ? 'No tasks defined. Click "Add Item" to create new tasks.' : 'No tasks for today in this folder.';
+        emptyMessage.className = 'empty-tasks-message';
+        if (currentFolderEditModes[folderId]) emptyMessage.classList.add('edit-mode-empty');
+        taskListElement.appendChild(emptyMessage);
+    } else {
+        tasksForDay.forEach(task => {
+            taskListElement.appendChild(renderTaskItem(task, folderId, categoryId));
+        });
+    }
+    taskFolderContentDiv.appendChild(taskListElement);
+
+    const addTaskFormBottom = createAddTaskForm(categoryId, folderId, 'bottom');
+    taskFolderContentDiv.appendChild(addTaskFormBottom);
+    
+    container.appendChild(taskFolderContentDiv);
+}
+
+function createAddTaskForm(categoryId, folderId, position) {
+    const formContainer = document.createElement('div');
+    formContainer.className = `add-task-form-container add-task-form-${position}`;
+
+    const triggerButton = document.createElement('button');
+    triggerButton.className = 'add-item-trigger-button icon-button';
+    triggerButton.dataset.position = position;
+    triggerButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg> Add Item`;
+    triggerButton.onclick = () => showTempAddTaskForm(categoryId, folderId, position);
+    formContainer.appendChild(triggerButton);
+
+    const formDiv = document.createElement('div');
+    formDiv.className = 'new-temp-task-form hidden';
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'new-task-temp-input';
+    input.placeholder = 'Enter task text...';
+    input.onkeypress = (e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveTempTask(categoryId, folderId, position); }};
+    formDiv.appendChild(input);
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'new-task-temp-save';
+    saveBtn.textContent = 'Save';
+    saveBtn.onclick = () => handleSaveTempTask(categoryId, folderId, position);
+    formDiv.appendChild(saveBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'new-task-temp-cancel';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = () => hideTempAddTaskForm(categoryId, folderId, position);
+    formDiv.appendChild(cancelBtn);
+    
+    formContainer.appendChild(formDiv);
+    return formContainer;
+}
+
+function renderNoteFolderContents(categoryId, folderId, container) {
+     if (!container) { 
+        const sectionElement = document.getElementById(`category-section-${categoryId}`);
+        if (!sectionElement) return;
+        container = sectionElement.querySelector('.category-content-area');
+        if (!container) return;
+    }
+    container.innerHTML = ''; 
+    const folder = findFolderById(folderId);
+    if (!folder || folder.type !== 'note') return;
+
+    const header = document.createElement('div');
+    header.className = 'folder-view-header';
+    
+    const backButton = document.createElement('button');
+    backButton.className = 'folder-back-button icon-button'; 
+    backButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>`; 
+    backButton.setAttribute('aria-label', 'Back to folders');
+    backButton.title = 'Back to Folders';
+    backButton.onclick = () => {
+        currentCategoryView = { mode: 'folders', categoryId: categoryId, folderId: null };
+        renderCategorySectionContent(categoryId);
+    };
+    header.appendChild(backButton);
+
+    const title = document.createElement('h3');
+    title.className = 'folder-view-title';
+    title.textContent = folder.name;
+    header.appendChild(title);
+    
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'folder-view-header-controls note-folder-controls'; 
+
+    const addImageButton = document.createElement('button');
+    addImageButton.className = 'add-image-button icon-button';
+    addImageButton.title = 'Add Image';
+    addImageButton.setAttribute('aria-label', 'Add image to note');
+    addImageButton.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"></path></svg>`;
+    
+    controlsDiv.appendChild(addImageButton);
+    header.appendChild(controlsDiv);
+    container.appendChild(header);
+
+    const noteContentWrapper = document.createElement('div');
+    noteContentWrapper.className = 'note-folder-content-wrapper';
+
+    const noteEditor = document.createElement('div');
+    noteEditor.className = 'note-editor'; 
+    noteEditor.setAttribute('contenteditable', 'true');
+    noteEditor.setAttribute('aria-label', `Note content for ${folder.name}`);
+    noteEditor.innerHTML = folder.content || ''; 
+    autoLinkText(noteEditor); 
+
+    addImageButton.onclick = () => {
+        if (domElements.imageUploadInput) {
+            domElements.imageUploadInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (readEvent) => {
+                        const img = document.createElement('img');
+                        img.src = readEvent.target.result;
+                        img.alt = "Uploaded Image";
+
+                        noteEditor.focus(); 
+                        const selection = window.getSelection();
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            range.deleteContents();
+                            range.insertNode(img);
+                            range.setStartAfter(img);
+                            range.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        } else {
+                            noteEditor.appendChild(img); 
+                        }
+                        noteEditor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                    };
+                    reader.readAsDataURL(file);
+                    domElements.imageUploadInput.value = ''; 
+                }
+            };
+            domElements.imageUploadInput.click();
+        }
+    };
+
+
+    noteEditor.addEventListener('input', () => {
+        folder.content = noteEditor.innerHTML;
+        saveFoldersByCategoryId(foldersByCategoryId);
+    });
+
+    noteEditor.addEventListener('blur', () => {
+        autoLinkText(noteEditor); 
+        folder.content = noteEditor.innerHTML; 
+        saveFoldersByCategoryId(foldersByCategoryId);
+    });
+    
+    ['paste', 'drop'].forEach(eventType => {
+        noteEditor.addEventListener(eventType, (event) => {
+            if (eventType === 'drop') event.preventDefault();
+            const items = (eventType === 'paste' ? event.clipboardData : event.dataTransfer)?.items;
+            if (!items) return;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        const reader = new FileReader();
+                        reader.onload = (e_reader) => {
+                            const img = document.createElement('img');
+                            img.src = e_reader.target.result;
+                            
+                            noteEditor.focus(); 
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                range.deleteContents();
+                                range.insertNode(img);
+                                range.setStartAfter(img);
+                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+
+                            } else {
+                                noteEditor.appendChild(img);
+                            }
+                            noteEditor.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+                        };
+                        reader.readAsDataURL(blob);
+                    }
+                    if (eventType === 'paste') event.preventDefault(); 
+                }
+            }
+        });
+    });
+    noteEditor.addEventListener('dragover', (event) => {
+        event.preventDefault(); 
+    });
+
+
+    noteContentWrapper.appendChild(noteEditor);
+    container.appendChild(noteContentWrapper);
+}
+
+function autoLinkText(element) {
+    const urlPattern = /(?<!href="|href='|">)(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(?<!href="|href='|">)(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])(?!.*?<\/a>)/ig;
+    const textNodes = [];
+    const collectTextNodes = (el) => {
+        for (const child of el.childNodes) {
+            if (child.nodeType === Node.TEXT_NODE) {
+                if (child.parentNode.nodeName.toUpperCase() !== 'A') {
+                    textNodes.push(child);
+                }
+            } else if (child.nodeType === Node.ELEMENT_NODE && child.nodeName.toUpperCase() !== 'A') {
+                collectTextNodes(child);
+            }
+        }
+    };
+    
+    collectTextNodes(element);
+    
+    let madeChangesOverall = false;
+    for (const node of textNodes) {
+        const text = node.nodeValue;
+        let newContentHTML = "";
+        let lastIndex = 0;
+        let matchFoundInNode = false;
+        
+        urlPattern.lastIndex = 0; 
+        let match;
+        while ((match = urlPattern.exec(text)) !== null) {
+            matchFoundInNode = true;
+            madeChangesOverall = true;
+            newContentHTML += text.substring(lastIndex, match.index);
+            let url = match[0];
+            if (!url.startsWith('http') && !url.startsWith('ftp') && !url.startsWith('file')) {
+                url = 'http://' + url;
+            }
+            newContentHTML += `<a href="${url}" target="_blank" rel="noopener noreferrer">${match[0]}</a>`;
+            lastIndex = match.index + match[0].length;
+        }
+        newContentHTML += text.substring(lastIndex);
+
+        if (matchFoundInNode) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = newContentHTML;
+            const parent = node.parentNode;
+            while (tempDiv.firstChild) {
+                parent.insertBefore(tempDiv.firstChild, node);
+            }
+            parent.removeChild(node);
+        }
+    }
+    return madeChangesOverall;
+}
+
+
+function renderAllCategorySections() {
+    if (!domElements.tabContentsContainer || !domElements.categorySectionTemplate) return;
+    
+    domElements.tabContentsContainer.querySelectorAll('.category-section:not(#dashboard-content)').forEach(sec => sec.remove());
+
+    currentCategories.forEach(category => {
+        if (category.id === 'dashboard') return; 
+
+        const sectionClone = domElements.categorySectionTemplate.content.cloneNode(true);
+        const sectionElement = sectionClone.querySelector('.category-section');
+        
+        sectionElement.id = `category-section-${category.id}`;
+        sectionElement.setAttribute('aria-labelledby', `tab-button-${category.id}`);
+        if (activeTabId !== category.id) {
+            sectionElement.classList.add('hidden');
+        }
+
+        sectionElement.querySelector('.category-title-text').textContent = category.name;
+        
+        if(activeTabId === category.id) { 
+             currentCategoryView = { mode: 'folders', categoryId: category.id, folderId: null };
+             renderCategorySectionContent(category.id);
+        }
+
+        domElements.tabContentsContainer.appendChild(sectionElement);
+    });
+}
+
+
+function renderTabs() {
+    if (!domElements.tabsContainer) return;
+    domElements.tabsContainer.querySelectorAll('.tab-button[data-category-id]').forEach(btn => btn.remove());
+    const addCatButton = domElements.addCategoryButton;
+
+    currentCategories.sort((a, b) => a.order - b.order).forEach(category => {
+        const tabButton = document.createElement('button');
+        tabButton.className = 'tab-button';
+        tabButton.id = `tab-button-${category.id}`;
+        tabButton.dataset.categoryId = category.id;
+        tabButton.textContent = category.name;
+        tabButton.setAttribute('role', 'tab');
+        tabButton.setAttribute('aria-selected', activeTabId === category.id ? 'true' : 'false');
+        if (activeTabId === category.id) tabButton.classList.add('active');
+
+        const optionsIcon = document.createElement('div');
+        optionsIcon.className = 'tab-options-icon';
+        optionsIcon.innerHTML = `<span></span><span></span><span></span>`;
+        optionsIcon.setAttribute('aria-label', `Options for ${category.name}`);
+        optionsIcon.setAttribute('role', 'button');
+        optionsIcon.tabIndex = 0; 
+        tabButton.appendChild(optionsIcon);
+        
+        optionsIcon.addEventListener('click', (e) => { 
+            e.stopPropagation(); 
+            showCategoryContextMenu(category.id, tabButton); 
+        });
+        optionsIcon.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' || e.key === ' ') { 
+                e.preventDefault(); 
+                e.stopPropagation(); 
+                showCategoryContextMenu(category.id, tabButton); 
+            }
+        });
+
+        let touchStartEvent = null; 
+
+        const clearTabLongPressState = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            tabButton.removeEventListener('touchmove', handleTabTouchMove);
+            tabButton.removeEventListener('touchend', handleTabTouchEndOrCancel);
+            tabButton.removeEventListener('touchcancel', handleTabTouchEndOrCancel);
+            touchStartEvent = null;
+        };
+
+        const handleTabTouchMove = () => {
+            clearTabLongPressState(); 
+        };
+
+        const handleTabTouchEndOrCancel = () => {
+            clearTabLongPressState();
+        };
+        
+        tabButton.addEventListener('touchstart', (e) => {
+            clearTabLongPressState(); 
+            touchStartEvent = e; 
+
+            tabButton.addEventListener('touchmove', handleTabTouchMove);
+            tabButton.addEventListener('touchend', handleTabTouchEndOrCancel);
+            tabButton.addEventListener('touchcancel', handleTabTouchEndOrCancel);
+
+            longPressTimer = setTimeout(() => {
+                if (touchStartEvent) { 
+                    touchStartEvent.preventDefault(); 
+                }
+                optionsIcon.classList.add('visible');
+                showCategoryContextMenu(category.id, tabButton);
+                longPressTimer = null; 
+                tabButton.removeEventListener('touchmove', handleTabTouchMove);
+                tabButton.removeEventListener('touchend', handleTabTouchEndOrCancel);
+                tabButton.removeEventListener('touchcancel', handleTabTouchEndOrCancel);
+            }, LONG_PRESS_DURATION);
+        });
+
+
+        tabButton.addEventListener('click', (e) => {
+            if (e.target === tabButton && !optionsIcon.contains(e.target)) { 
+                tabButton.classList.add('show-badge-highlight');
+                setTimeout(() => tabButton.classList.remove('show-badge-highlight'), 300);
+            }
+            switchTab(category.id);
+        });
+        if (addCatButton) {
+            domElements.tabsContainer.insertBefore(tabButton, addCatButton);
+        } else {
+            domElements.tabsContainer.appendChild(tabButton);
+        }
+    });
+    updateCategoryTabIndicators();
+}
+
+
+function switchTab(categoryIdToActivate) {
+    activeTabId = categoryIdToActivate;
+    hideCategoryContextMenu();
+    hideFolderContextMenu();
+
+    if (domElements.tabsContainer) {
+        domElements.tabsContainer.querySelectorAll('.tab-button').forEach(button => {
+            const isCurrentActive = (button.id === `tab-button-${activeTabId}`) || (activeTabId === 'dashboard' && button.id === 'dashboard-tab-button');
+            button.classList.toggle('active', isCurrentActive);
+            button.setAttribute('aria-selected', isCurrentActive.toString());
+        });
+    }
+    
+    if (domElements.tabContentsContainer) {
+        domElements.tabContentsContainer.classList.toggle('main-area-scroll-hidden', categoryIdToActivate === 'dashboard');
+        domElements.tabContentsContainer.querySelectorAll('section[role="tabpanel"]').forEach(section => {
+            const isCurrentActiveSection = (section.id === `category-section-${activeTabId}`) || (activeTabId === 'dashboard' && section.id === 'dashboard-content');
+            section.classList.toggle('hidden', !isCurrentActiveSection);
+        });
+    }
+    
+    if (activeTabId !== 'dashboard') {
+        currentCategoryView = { mode: 'folders', categoryId: activeTabId, folderId: null };
+        renderCategorySectionContent(activeTabId); 
+    } else {
+        currentCategoryView = { mode: 'dashboard', categoryId: null, folderId: null };
+    }
+
+    if (activeAddTaskForm) { 
+         const folder = findFolderById(activeAddTaskForm.folderId);
+         if(folder) hideTempAddTaskForm(folder.categoryId, activeAddTaskForm.folderId, activeAddTaskForm.position);
+    }
+}
+
+function calculateProgressForDate(dateString) {
+  let completedCount = 0;
+  let totalTasks = 0;
+
+  Object.values(foldersByCategoryId).forEach(foldersInCat => {
+    (foldersInCat || []).forEach(folder => {
+      if (folder.type === 'task' && folder.content) {
+        folder.content.forEach(taskDef => {
+          totalTasks++;
+          if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
+            completedCount++;
+          }
+        });
+      }
+    });
+  });
+
+  const percentage = totalTasks > 0 ? Math.round((completedCount / totalTasks) * 100) : 0;
+  const pointsPerTask = totalTasks > 0 ? DAILY_TARGET_POINTS / totalTasks : 0;
+  const pointsEarned = Math.round(completedCount * pointsPerTask);
+
+  return { percentage, pointsEarned, completedCount, totalTasks };
+}
+
+
+function updateDashboardSummaries() {
+  if (!domElements.dashboardSummariesContainer) return;
+  domElements.dashboardSummariesContainer.innerHTML = '';
+  const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+
+  currentCategories.forEach(category => {
+    if (category.id === 'dashboard') return; 
+
+    let tasksInCategory = 0;
+    let completedInCategory = 0;
+    (foldersByCategoryId[category.id] || []).forEach(folder => {
+        if (folder.type === 'task' && folder.content) {
+            tasksInCategory += folder.content.length;
+            folder.content.forEach(taskDef => {
+                if (localStorage.getItem(getTaskStateStorageKey(today, folder.id, taskDef.id)) === 'true') {
+                    completedInCategory++;
+                }
+            });
+        }
+    });
+
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'dashboard-category-summary';
+    summaryDiv.innerHTML = `
+      <h3>${category.name}</h3>
+      <p class="category-stats">${completedInCategory} / ${tasksInCategory}</p>
+    `;
+    const statsP = summaryDiv.querySelector('.category-stats');
+    if (tasksInCategory > 0 && completedInCategory === tasksInCategory) {
+        statsP.classList.add('fully-completed');
+    }
+    domElements.dashboardSummariesContainer.appendChild(summaryDiv);
+  });
+}
+
+function updateTodaysProgress() {
+  const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+  const progress = calculateProgressForDate(today); 
+  
+  if (domElements.todayProgressFill) {
+      domElements.todayProgressFill.style.width = `${progress.percentage}%`;
+      domElements.todayProgressFill.style.backgroundColor = getProgressFillColor(progress.percentage);
+      domElements.todayProgressFill.textContent = `${progress.percentage}%`;
+      domElements.todayProgressFill.setAttribute('aria-valuenow', progress.percentage.toString());
+  }
+  if (domElements.todayPointsStat) {
+      domElements.todayPointsStat.textContent = `${progress.pointsEarned} / ${DAILY_TARGET_POINTS} points`;
+  }
+}
 
 function updateCurrentWeekProgress() {
-    let targetWeeklyPoints = TARGET_POINTS_FOR_WEEKLY_VIEW;
-    let weekStartDate;
-    const todayNorm = getNormalizedDate(new Date());
+    const todayNormalized = getNormalizedDate(new Date());
+    let currentWeekStartDateString = localStorage.getItem(STORAGE_KEY_CURRENT_WEEK_START_DATE);
+    let currentWeekStartDate;
 
-    if (currentProgressPlan) {
-        targetWeeklyPoints = currentProgressPlan.targetWeeklyPoints || TARGET_POINTS_FOR_WEEKLY_VIEW;
-        const planStartDateNorm = getNormalizedDate(new Date(currentProgressPlan.startDate + 'T00:00:00')); // Ensure time is zeroed
-        const planStartDay = parseInt(currentProgressPlan.startDayOfWeek, 10);
-
-        let currentPotentialWeekStart = new Date(todayNorm);
-        while (currentPotentialWeekStart.getDay() !== planStartDay) {
-            currentPotentialWeekStart.setDate(currentPotentialWeekStart.getDate() - 1);
-        }
-        weekStartDate = getNormalizedDate(currentPotentialWeekStart);
-        
-        // If the calculated week's start is before the plan's absolute start, adjust.
-        if (weekStartDate < planStartDateNorm) {
-            weekStartDate = planStartDateNorm;
-        }
-
+    if (!currentWeekStartDateString) {
+        currentWeekStartDate = new Date(todayNormalized); 
+        localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
     } else {
-        // Default behavior if no plan: use localStorage or calculate based on today (Monday start).
-        let storedWeekStartDateString = localStorage.getItem(STORAGE_KEY_CURRENT_WEEK_START_DATE);
-        weekStartDate = new Date(todayNorm); // Start with today
-        // Default to Monday as start of week if no plan
-        const dayOfWeek = todayNorm.getDay(); // Sunday is 0, Monday is 1
-        const offsetToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        weekStartDate.setDate(todayNorm.getDate() - offsetToMonday);
-        weekStartDate = getNormalizedDate(weekStartDate);
-
-        if (storedWeekStartDateString) {
-            const storedDate = getNormalizedDate(new Date(storedWeekStartDateString));
-            // If today is within the week of the stored start date, use it. Otherwise, recalculate.
-            const diffDays = (todayNorm.getTime() - storedDate.getTime()) / (1000 * 60 * 60 * 24);
-            if (diffDays >= 0 && diffDays < 7) {
-                 weekStartDate = storedDate;
-            } else {
-                 localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, weekStartDate.toISOString().split('T')[0]);
-            }
-        } else {
-             localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, weekStartDate.toISOString().split('T')[0]);
+        currentWeekStartDate = getNormalizedDate(new Date(currentWeekStartDateString));
+        const daysPassed = (todayNormalized.getTime() - currentWeekStartDate.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysPassed >= 7) { 
+            currentWeekStartDate = new Date(todayNormalized); 
+            let dayOfWeek = todayNormalized.getDay(); 
+            let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; 
+            currentWeekStartDate.setDate(todayNormalized.getDate() + diffToMonday);
+            currentWeekStartDate = getNormalizedDate(currentWeekStartDate); 
+            localStorage.setItem(STORAGE_KEY_CURRENT_WEEK_START_DATE, currentWeekStartDate.toISOString().split('T')[0]);
         }
     }
     
     let totalPointsThisWeekCycle = 0;
-    let currentDateIter = new Date(weekStartDate);
-    const todayDateString = getTodayDateString();
+    let currentDateIter = new Date(currentWeekStartDate); 
+    const todayDateStringForLoop = getTodayDateString();
 
-    while (getNormalizedDate(currentDateIter) <= todayNorm) {
+    while (currentDateIter <= todayNormalized) {
         const dateStringForIter = `${currentDateIter.getFullYear()}-${(currentDateIter.getMonth() + 1).toString().padStart(2, '0')}-${currentDateIter.getDate().toString().padStart(2, '0')}`;
         let pointsForDay = 0;
-        if (dateStringForIter === todayDateString) {
-            pointsForDay = calculateProgress().pointsEarned;
-        } else {
-            const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateStringForIter);
+
+        if (dateStringForIter === todayDateStringForLoop) {
+            pointsForDay = calculateProgressForDate(dateStringForIter).pointsEarned;
+        } else { 
+            const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateStringForIter;
+            const historyDataString = localStorage.getItem(historyKey);
             if (historyDataString) {
-                try { pointsForDay = JSON.parse(historyDataString).pointsEarned || 0; } catch (e) { console.warn("Error parsing history for weekly progress:", e); }
+                try {
+                    pointsForDay = JSON.parse(historyDataString).pointsEarned || 0;
+                } catch (e) { /* ignore */ }
             }
         }
         totalPointsThisWeekCycle += pointsForDay;
         currentDateIter.setDate(currentDateIter.getDate() + 1);
     }
-    const weeklyCyclePercentage = targetWeeklyPoints > 0 ? Math.min(100, Math.round((totalPointsThisWeekCycle / targetWeeklyPoints) * 100)) : 0;
+
+    const weeklyCyclePercentage = TARGET_POINTS_FOR_WEEKLY_VIEW > 0 ? Math.min(100, Math.round((totalPointsThisWeekCycle / TARGET_POINTS_FOR_WEEKLY_VIEW) * 100)) : 0;
 
     if (domElements.currentWeekProgressFill) {
         domElements.currentWeekProgressFill.style.width = `${weeklyCyclePercentage}%`;
@@ -378,693 +1588,917 @@ function updateCurrentWeekProgress() {
         domElements.currentWeekProgressFill.textContent = `${weeklyCyclePercentage}%`;
         domElements.currentWeekProgressFill.setAttribute('aria-valuenow', weeklyCyclePercentage.toString());
     }
-    if (domElements.currentWeekPointsStat) domElements.currentWeekPointsStat.textContent = `${totalPointsThisWeekCycle} / ${targetWeeklyPoints} points`;
-    displayCurrentPlanNameOnDashboard();
-}
-
-
-function displayCurrentPlanNameOnDashboard() {
-    if (domElements.currentWeeklyPlanNameDisplay) {
-        if (currentProgressPlan && currentProgressPlan.name) {
-            domElements.currentWeeklyPlanNameDisplay.textContent = `${currentProgressPlan.name} (Weekly)`;
-        } else {
-            domElements.currentWeeklyPlanNameDisplay.textContent = "Weekly Progress";
-        }
+    if (domElements.currentWeekPointsStat) {
+        domElements.currentWeekPointsStat.textContent = `${totalPointsThisWeekCycle} / ${TARGET_POINTS_FOR_WEEKLY_VIEW} points`;
     }
 }
 
-function renderCalendar() { if (!domElements.calendarGrid || !domElements.calendarMonthYear) return; domElements.calendarGrid.innerHTML = ''; domElements.calendarMonthYear.textContent = `${calendarDisplayDate.toLocaleString('default', { month: 'long' })} ${calendarDisplayDate.getFullYear()}`; const month = calendarDisplayDate.getMonth(), year = calendarDisplayDate.getFullYear(); const firstDayOfMonth = new Date(year, month, 1), daysInMonth = new Date(year, month + 1, 0).getDate(); const startingDayOfWeek = firstDayOfMonth.getDay(); const todayNorm = getNormalizedDate(new Date()), todayDateString = getTodayDateString(); ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(dayName => { const dayHeader = document.createElement('div'); dayHeader.className = 'calendar-day-header'; dayHeader.textContent = dayName; domElements.calendarGrid.appendChild(dayHeader); }); for (let i = 0; i < startingDayOfWeek; i++) { const emptyCell = document.createElement('div'); emptyCell.className = 'calendar-day-cell empty'; domElements.calendarGrid.appendChild(emptyCell); } for (let day = 1; day <= daysInMonth; day++) { const cellDate = getNormalizedDate(new Date(year, month, day)); const dateString = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`; const cell = document.createElement('div'); cell.className = 'calendar-day-cell'; cell.dataset.date = dateString; const dayNumber = document.createElement('span'); dayNumber.className = 'calendar-day-number'; dayNumber.textContent = day.toString(); cell.appendChild(dayNumber); const fillDiv = document.createElement('div'); fillDiv.className = 'calendar-day-fill'; cell.appendChild(fillDiv); let percentageCompleted = 0, hasHistoryData = false; fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)'; if (dateString === todayDateString) { cell.classList.add('current-day'); percentageCompleted = calculateProgress().percentage; fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; if (percentageCompleted > 40) cell.classList.add('high-fill'); hasHistoryData = (calculateProgress().completedCount > 0) || !!localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString); } else { const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString); if (historyDataString) try { const historyEntry = JSON.parse(historyDataString); percentageCompleted = historyEntry.percentageCompleted || 0; if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)'; hasHistoryData = (historyEntry.completedTasks && Object.values(historyEntry.completedTasks).some(arr=>arr.length>0)) || !!historyEntry.userNote; } catch(e) { if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; } else if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; if (cellDate < todayNorm) cell.classList.add('calendar-day-past'); } if (hasHistoryData) cell.classList.add('has-history'); fillDiv.style.height = `${percentageCompleted}%`; cell.addEventListener('click', () => showHistoryModal(dateString)); domElements.calendarGrid.appendChild(cell); } }
-function showHistoryModal(dateString) { currentModalDate = dateString; if (!domElements.historyModal) return; const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString); let historyEntry = null; const isToday = dateString === getTodayDateString(); const isPastDay = new Date(dateString + 'T23:59:59') < getNormalizedDate(new Date()) && !isToday; if (isToday) { const progress = calculateProgress(); const completedTasksTodayFlat = []; currentCategories.forEach(cat => { const folders = userFoldersByCategoryId[cat.id] || []; folders.forEach(folder => { if (folder.type === 'task' && folder.tasks) folder.tasks.forEach(taskDef => { if(getTaskCompletionStatus(taskDef.id, dateString)) completedTasksTodayFlat.push(taskDef.text); }); }); }); const completedTasksTodayGrouped = {}; currentCategories.forEach(cat => { completedTasksTodayGrouped[cat.id] = []; const folders = userFoldersByCategoryId[cat.id] || []; folders.forEach(folder => { if (folder.type === 'task' && folder.tasks) folder.tasks.forEach(taskDef => { if(getTaskCompletionStatus(taskDef.id, dateString)) completedTasksTodayGrouped[cat.id].push(taskDef.text); }); }); }); const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || (domElements.dailyNoteInput ? domElements.dailyNoteInput.value : ""); historyEntry = { date: dateString, completedTasks: completedTasksTodayGrouped, userNote: note, pointsEarned: progress.pointsEarned, percentageCompleted: progress.percentage, totalTasksOnDate: progress.totalTasks, dailyTargetPoints: DAILY_TARGET_POINTS }; } else if (historyDataString) try { historyEntry = JSON.parse(historyDataString); } catch (e) {} domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); if (historyEntry) { const targetPoints = historyEntry.dailyTargetPoints || DAILY_TARGET_POINTS; domElements.historyModalPointsValue.textContent = historyEntry.pointsEarned !== undefined ? historyEntry.pointsEarned.toString() : 'N/A'; domElements.historyModalPointsTotal.textContent = targetPoints.toString(); const completionPercentage = historyEntry.percentageCompleted !== undefined ? historyEntry.percentageCompleted : 0; domElements.historyPercentageProgressFill.style.width = `${completionPercentage}%`; domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(completionPercentage); domElements.historyPercentageProgressFill.textContent = `${completionPercentage}%`; domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', completionPercentage); domElements.historyTasksList.innerHTML = ''; let hasCompletedTasks = false; if (historyEntry.completedTasks) { Object.keys(historyEntry.completedTasks).forEach(catId => { const tasksInCategory = historyEntry.completedTasks[catId]; if (tasksInCategory && tasksInCategory.length > 0) { hasCompletedTasks = true; const catGroup = document.createElement('div'); catGroup.className = 'history-category-group'; const catTitle = document.createElement('h5'); catTitle.className = 'history-category-title'; catTitle.textContent = getCategoryNameById(catId); catGroup.appendChild(catTitle); const ul = document.createElement('ul'); tasksInCategory.forEach(taskText => { const li = document.createElement('li'); const span = document.createElement('span'); span.textContent = taskText; li.appendChild(span); ul.appendChild(li); }); catGroup.appendChild(ul); domElements.historyTasksList.appendChild(catGroup); } }); } if (!hasCompletedTasks) domElements.historyTasksList.innerHTML = '<p>No tasks were completed on this day.</p>'; domElements.expandTasksButton.classList.toggle('hidden', !hasCompletedTasks); domElements.historyUserNoteDisplay.textContent = historyEntry.userNote || "No reflection recorded for this day."; domElements.historyUserNoteDisplay.classList.remove('hidden'); domElements.historyUserNoteEdit.value = historyEntry.userNote || ""; domElements.historyUserNoteEdit.classList.add('hidden'); domElements.historicalNoteControls.classList.add('hidden'); domElements.historicalNoteStatus.textContent = ''; domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote); if (isPastDay || isToday) domElements.historyUserNoteDisplay.ondblclick = () => { domElements.historyUserNoteDisplay.classList.add('hidden'); domElements.historyUserNoteEdit.classList.remove('hidden'); domElements.historicalNoteControls.classList.remove('hidden'); domElements.historyUserNoteEdit.focus(); }; else domElements.historyUserNoteDisplay.ondblclick = null; } else { domElements.historyModalPointsValue.textContent = 'N/A'; domElements.historyModalPointsTotal.textContent = DAILY_TARGET_POINTS.toString(); domElements.historyPercentageProgressFill.style.width = `0%`; domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(0); domElements.historyPercentageProgressFill.textContent = `0%`; domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', 0); domElements.historyTasksList.innerHTML = '<p>No data available for this day.</p>'; domElements.historyUserNoteDisplay.textContent = "No data available for this day."; domElements.historyUserNoteDisplay.classList.remove('hidden'); domElements.historyUserNoteEdit.classList.add('hidden'); domElements.historicalNoteControls.classList.add('hidden'); domElements.historicalNoteStatus.textContent = ''; domElements.expandTasksButton.classList.add('hidden'); domElements.expandReflectionButton.classList.add('hidden'); domElements.historyUserNoteDisplay.ondblclick = null; } domElements.historyModal.classList.remove('hidden'); }
-function closeHistoryModal() { if (domElements.historyModal) domElements.historyModal.classList.add('hidden'); currentModalDate = null; }
-function saveHistoricalNote() { if (!currentModalDate || !domElements.historyUserNoteEdit) return; const noteContent = domElements.historyUserNoteEdit.value; const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentModalDate; let historyEntry; const isToday = currentModalDate === getTodayDateString(); const existingHistoryStr = localStorage.getItem(historyKey); if (existingHistoryStr) historyEntry = JSON.parse(existingHistoryStr); else { const progress = isToday ? calculateProgress() : { pointsEarned: 0, percentageCompleted: 0, totalTasks: 0 }; const completedTasksForEntry = {}; if(isToday) currentCategories.forEach(cat => { completedTasksForEntry[cat.id] = []; const folders = userFoldersByCategoryId[cat.id] || []; folders.forEach(folder => { if (folder.type === 'task' && folder.tasks) folder.tasks.forEach(taskDef => { if(getTaskCompletionStatus(taskDef.id, currentModalDate)) completedTasksForEntry[cat.id].push(taskDef.text); }); }); }); else currentCategories.forEach(cat => completedTasksForEntry[cat.id] = []); historyEntry = { date: currentModalDate, completedTasks: completedTasksForEntry, userNote: "", pointsEarned: progress.pointsEarned, percentageCompleted: progress.percentageCompleted, totalTasksOnDate: progress.totalTasks, dailyTargetPoints: DAILY_TARGET_POINTS }; } historyEntry.userNote = noteContent; localStorage.setItem(historyKey, JSON.stringify(historyEntry)); if (isToday && domElements.dailyNoteInput) { domElements.dailyNoteInput.value = noteContent; localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent); } domElements.historyUserNoteDisplay.textContent = noteContent || "No reflection recorded for this day."; domElements.historyUserNoteDisplay.classList.remove('hidden'); domElements.historyUserNoteEdit.classList.add('hidden'); domElements.historicalNoteControls.classList.add('hidden'); domElements.historicalNoteStatus.textContent = 'Reflection saved!'; setTimeout(() => { domElements.historicalNoteStatus.textContent = ''; }, 2000); domElements.expandReflectionButton.classList.toggle('hidden', !noteContent); renderCalendar(); }
-function clearHistoricalNote() { if (domElements.historyUserNoteEdit) domElements.historyUserNoteEdit.value = "";}
-function populateMonthYearPicker() { if (!domElements.pickerMonthsGrid || !domElements.pickerYearsList) return; domElements.pickerMonthsGrid.innerHTML = ''; ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].forEach((month, index) => { const btn = document.createElement('button'); btn.className = 'month-option'; btn.textContent = month; btn.dataset.month = index.toString(); if (index === pickerSelectedMonth) btn.classList.add('selected'); btn.onclick = () => { pickerSelectedMonth = index; calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1); renderCalendar(); populateMonthYearPicker(); }; domElements.pickerMonthsGrid.appendChild(btn); }); domElements.pickerYearsList.innerHTML = ''; let yearToScrollTo = null; for (let year = 2000; year <= 2100; year++) { const btn = document.createElement('button'); btn.className = 'year-option'; btn.textContent = year.toString(); btn.dataset.year = year.toString(); if (year === pickerSelectedYear) { btn.classList.add('selected'); yearToScrollTo = btn; } btn.onclick = () => { pickerSelectedYear = year; calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1); renderCalendar(); populateMonthYearPicker(); }; domElements.pickerYearsList.appendChild(btn); } if (yearToScrollTo) yearToScrollTo.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
-function toggleMonthYearPicker() { isMonthYearPickerOpen = !isMonthYearPickerOpen; if (isMonthYearPickerOpen) { pickerSelectedMonth = calendarDisplayDate.getMonth(); pickerSelectedYear = calendarDisplayDate.getFullYear(); populateMonthYearPicker(); domElements.monthYearPickerModal.classList.remove('hidden'); } else domElements.monthYearPickerModal.classList.add('hidden'); }
-function closeMonthYearPicker() { isMonthYearPickerOpen = false; domElements.monthYearPickerModal.classList.add('hidden');}
-function updateCategoryTabIndicators() { const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString(); currentCategories.forEach(category => { const tabButton = document.getElementById(`tab-button-${category.id}`); if (!tabButton) return; const existingBadge = tabButton.querySelector('.notification-badge'); if (existingBadge) existingBadge.remove(); tabButton.classList.remove('category-complete-indicator'); let totalTasksInCat = 0, completedTasksInCat = 0; const folders = userFoldersByCategoryId[category.id] || []; folders.forEach(folder => { if (folder.type === 'task' && folder.tasks) { folder.tasks.forEach(taskDef => { totalTasksInCat++; if (getTaskCompletionStatus(taskDef.id, today)) completedTasksInCat++; }); } }); if (totalTasksInCat === 0) return; if (completedTasksInCat === totalTasksInCat) tabButton.classList.add('category-complete-indicator'); else if (totalTasksInCat - completedTasksInCat > 0) { const badge = document.createElement('span'); badge.className = 'notification-badge'; badge.textContent = (totalTasksInCat - completedTasksInCat).toString(); tabButton.appendChild(badge); } }); }
-function updateAllProgress() { updateDashboardSummaries(); updateTodaysProgress(); updateCurrentWeekProgress(); updateCategoryTabIndicators(); renderCalendar(); displayCurrentPlanNameOnDashboard();}
-function openFullscreenContentModal(type, date) { if (!domElements.fullscreenContentModal) return; const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + date); let historyEntry = null; const isToday = date === getTodayDateString(); if (isToday) { const progress = calculateProgress(); const completedTasksTodayGrouped = {}; currentCategories.forEach(cat => { completedTasksTodayGrouped[cat.id] = []; const folders = userFoldersByCategoryId[cat.id] || []; folders.forEach(folder => { if (folder.type === 'task' && folder.tasks) folder.tasks.forEach(taskDef => { if(getTaskCompletionStatus(taskDef.id, date)) completedTasksTodayGrouped[cat.id].push(taskDef.text); }); }); }); const note = localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || (domElements.dailyNoteInput ? domElements.dailyNoteInput.value : ""); historyEntry = { completedTasks: completedTasksTodayGrouped, userNote: note }; } else if (historyDataString) try { historyEntry = JSON.parse(historyDataString); } catch (e) {} if (!historyEntry) { domElements.fullscreenModalArea.innerHTML = '<p>No content available.</p>'; domElements.fullscreenContentModal.classList.remove('hidden'); return; } const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }); domElements.fullscreenModalArea.innerHTML = ''; if (type === 'tasks') { domElements.fullscreenModalTitle.textContent = `Completed Tasks for ${formattedDate}`; let hasContent = false; if (historyEntry.completedTasks) Object.keys(historyEntry.completedTasks).forEach(catId => { const tasksInCategory = historyEntry.completedTasks[catId]; if (tasksInCategory && tasksInCategory.length > 0) { hasContent = true; const catGroup = document.createElement('div'); catGroup.className = 'history-category-group'; const catTitle = document.createElement('h4'); catTitle.className = 'history-category-title'; catTitle.textContent = getCategoryNameById(catId); catGroup.appendChild(catTitle); const ul = document.createElement('ul'); tasksInCategory.forEach(taskText => { const li = document.createElement('li'); const span = document.createElement('span'); span.textContent = taskText; li.appendChild(span); ul.appendChild(li); }); catGroup.appendChild(ul); domElements.fullscreenModalArea.appendChild(catGroup); } }); if (!hasContent) domElements.fullscreenModalArea.innerHTML = '<p>No tasks were completed.</p>'; } else if (type === 'reflection') { domElements.fullscreenModalTitle.textContent = `Reflection for ${formattedDate}`; if (historyEntry.userNote) { const pre = document.createElement('pre'); pre.textContent = historyEntry.userNote; domElements.fullscreenModalArea.appendChild(pre); } else domElements.fullscreenModalArea.innerHTML = '<p>No reflection recorded.</p>'; } currentFullscreenContent = { type, date }; domElements.fullscreenContentModal.classList.remove('hidden'); }
+
+function renderCalendar() {
+  if (!domElements.calendarGrid || !domElements.calendarMonthYear) return;
+  domElements.calendarGrid.innerHTML = ''; 
+  const month = calendarDisplayDate.getMonth();
+  const year = calendarDisplayDate.getFullYear();
+  domElements.calendarMonthYear.textContent = `${calendarDisplayDate.toLocaleString('default', { month: 'long' })} ${year}`;
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startingDayOfWeek = firstDayOfMonth.getDay(); 
+  const todayNorm = getNormalizedDate(new Date());
+  const todayDateStr = getTodayDateString();
+
+  ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(dayName => {
+    const dayHeader = document.createElement('div');
+    dayHeader.className = 'calendar-day-header';
+    dayHeader.textContent = dayName;
+    domElements.calendarGrid.appendChild(dayHeader);
+  });
+
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    domElements.calendarGrid.appendChild(document.createElement('div')).className = 'calendar-day-cell empty';
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cellDate = getNormalizedDate(new Date(year, month, day));
+    const dateString = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const cell = document.createElement('div');
+    cell.className = 'calendar-day-cell';
+    cell.dataset.date = dateString;
+    cell.innerHTML = `<span class="calendar-day-number">${day}</span><div class="calendar-day-fill"></div>`;
+    
+    let percentageCompleted = 0;
+    let hasHistoryData = false;
+    const fillDiv = cell.querySelector('.calendar-day-fill');
+    fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)';
+
+    if (dateString === todayDateStr) { 
+        cell.classList.add('current-day');
+        const progress = calculateProgressForDate(dateString);
+        percentageCompleted = progress.percentage;
+        fillDiv.style.backgroundColor = 'hsl(185, 100%, 45%)'; 
+        if (percentageCompleted > 40) cell.classList.add('high-fill'); 
+        hasHistoryData = progress.completedCount > 0 || !!localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString);
+    } else {
+        const historyDataString = localStorage.getItem(STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString);
+        if (historyDataString) {
+            try {
+                const historyEntry = JSON.parse(historyDataString);
+                percentageCompleted = historyEntry.percentageCompleted || 0;
+                if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.7)';
+                hasHistoryData = (historyEntry.completedTaskStructure && Object.values(historyEntry.completedTaskStructure).some(cat => Object.values(cat).some(folder => folder.tasks.length > 0))) || !!historyEntry.userNote;
+            } catch(e) { 
+                if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)';
+            }
+        } else if (cellDate < todayNorm) {
+            fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)';
+        }
+        if (cellDate < todayNorm) cell.classList.add('calendar-day-past');
+    }
+    if (hasHistoryData) cell.classList.add('has-history');
+    fillDiv.style.height = `${percentageCompleted}%`;
+    cell.addEventListener('click', () => showHistoryModal(dateString));
+    domElements.calendarGrid.appendChild(cell);
+  }
+}
+
+function showHistoryModal(dateString) {
+  currentModalDate = dateString; 
+  if (!domElements.historyModal) return;
+
+  const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateString;
+  const historyDataString = localStorage.getItem(historyKey);
+  let historyEntry = null;
+  const isToday = dateString === getTodayDateString();
+  const isPastDay = new Date(dateString + 'T23:59:59') < getNormalizedDate(new Date()) && !isToday;
+
+  if (isToday) { 
+    const progress = calculateProgressForDate(dateString);
+    const completedTasksTodayStruct = {};
+    currentCategories.forEach(cat => {
+      completedTasksTodayStruct[cat.id] = {};
+      (foldersByCategoryId[cat.id] || []).forEach(folder => {
+        if (folder.type === 'task') {
+          const folderTasks = [];
+          (folder.content || []).forEach(taskDef => {
+            if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
+              folderTasks.push(taskDef.text);
+            }
+          });
+          if (folderTasks.length > 0) {
+             completedTasksTodayStruct[cat.id][folder.id] = { name: folder.name, tasks: folderTasks };
+          }
+        }
+      });
+      if(Object.keys(completedTasksTodayStruct[cat.id]).length === 0) delete completedTasksTodayStruct[cat.id];
+    });
+    
+    historyEntry = {
+        date: dateString,
+        completedTaskStructure: completedTasksTodayStruct,
+        userNote: localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || "",
+        pointsEarned: progress.pointsEarned,
+        percentageCompleted: progress.percentage,
+        totalTasksOnDate: progress.totalTasks,
+        dailyTargetPoints: DAILY_TARGET_POINTS
+    };
+  } else if (historyDataString) { 
+      try { historyEntry = JSON.parse(historyDataString); } catch (e) { console.error("Error parsing history for modal:", e); }
+  }
+
+  if (domElements.historyModalDate) domElements.historyModalDate.textContent = new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  if (historyEntry) {
+    if (domElements.historyModalPointsValue) domElements.historyModalPointsValue.textContent = historyEntry.pointsEarned !== undefined ? historyEntry.pointsEarned.toString() : 'N/A';
+    if (domElements.historyModalPointsTotal) domElements.historyModalPointsTotal.textContent = (historyEntry.dailyTargetPoints || DAILY_TARGET_POINTS).toString();
+    const completionPercentage = historyEntry.percentageCompleted !== undefined ? historyEntry.percentageCompleted : 0;
+    if (domElements.historyPercentageProgressFill) {
+        domElements.historyPercentageProgressFill.style.width = `${completionPercentage}%`;
+        domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(completionPercentage);
+        domElements.historyPercentageProgressFill.textContent = `${completionPercentage}%`;
+        domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', completionPercentage);
+    }
+
+    if (domElements.historyTasksList) {
+        domElements.historyTasksList.innerHTML = '';
+        let hasCompletedTasks = false;
+        if (historyEntry.completedTaskStructure) {
+            Object.keys(historyEntry.completedTaskStructure).forEach(catId => {
+                const categoryData = historyEntry.completedTaskStructure[catId];
+                if(Object.keys(categoryData).length === 0) return;
+
+                const categoryGroup = document.createElement('div');
+                categoryGroup.className = 'history-category-group';
+                const categoryTitle = document.createElement('h5');
+                categoryTitle.className = 'history-category-title';
+                categoryTitle.textContent = getCategoryNameById(catId);
+                categoryGroup.appendChild(categoryTitle);
+                
+                Object.values(categoryData).forEach(folderData => { 
+                    if (folderData.tasks && folderData.tasks.length > 0) {
+                        hasCompletedTasks = true;
+                        const folderTitle = document.createElement('h6'); 
+                        folderTitle.className = 'history-folder-title';
+                        folderTitle.textContent = folderData.name;
+                        categoryGroup.appendChild(folderTitle);
+
+                        const ul = document.createElement('ul');
+                        folderData.tasks.forEach(taskText => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<span>${taskText}</span>`;
+                            ul.appendChild(li);
+                        });
+                        categoryGroup.appendChild(ul);
+                    }
+                });
+                if(categoryGroup.querySelector('ul')) domElements.historyTasksList.appendChild(categoryGroup);
+            });
+        }
+        if (!hasCompletedTasks) domElements.historyTasksList.innerHTML = '<p>No tasks were completed on this day.</p>';
+    }
+    if (domElements.expandTasksButton) domElements.expandTasksButton.classList.toggle('hidden', !Object.values(historyEntry.completedTaskStructure || {}).some(cat => Object.values(cat).some(folder => folder.tasks && folder.tasks.length > 0)));
+
+    if (domElements.historyUserNoteDisplay) {
+        domElements.historyUserNoteDisplay.textContent = historyEntry.userNote || "No reflection recorded for this day.";
+        domElements.historyUserNoteDisplay.classList.remove('hidden');
+    }
+    if (domElements.historyUserNoteEdit) {
+        domElements.historyUserNoteEdit.value = historyEntry.userNote || "";
+        domElements.historyUserNoteEdit.classList.add('hidden'); 
+    }
+    if (domElements.historicalNoteControls) domElements.historicalNoteControls.classList.add('hidden');
+    if (domElements.historicalNoteStatus) domElements.historicalNoteStatus.textContent = '';
+    if (domElements.expandReflectionButton) domElements.expandReflectionButton.classList.toggle('hidden', !historyEntry.userNote);
+    
+    if (domElements.historyUserNoteDisplay && (isPastDay || isToday)) { 
+        domElements.historyUserNoteDisplay.ondblclick = () => {
+            if (domElements.historyUserNoteDisplay) domElements.historyUserNoteDisplay.classList.add('hidden');
+            if (domElements.historyUserNoteEdit) domElements.historyUserNoteEdit.classList.remove('hidden');
+            if (domElements.historicalNoteControls) domElements.historicalNoteControls.classList.remove('hidden');
+            if (domElements.historyUserNoteEdit) domElements.historyUserNoteEdit.focus();
+        };
+    } else if (domElements.historyUserNoteDisplay) {
+        domElements.historyUserNoteDisplay.ondblclick = null;
+    }
+  } else { 
+    if (domElements.historyModalPointsValue) domElements.historyModalPointsValue.textContent = 'N/A';
+    if (domElements.historyModalPointsTotal) domElements.historyModalPointsTotal.textContent = DAILY_TARGET_POINTS.toString();
+    if (domElements.historyPercentageProgressFill) {
+        domElements.historyPercentageProgressFill.style.width = `0%`;
+        domElements.historyPercentageProgressFill.style.backgroundColor = getProgressFillColor(0);
+        domElements.historyPercentageProgressFill.textContent = `0%`;
+        domElements.historyPercentageProgressFill.setAttribute('aria-valuenow', 0);
+    }
+    if (domElements.historyTasksList) domElements.historyTasksList.innerHTML = '<p>No data available for this day.</p>';
+    if (domElements.historyUserNoteDisplay) {
+        domElements.historyUserNoteDisplay.textContent = "No data available for this day.";
+        domElements.historyUserNoteDisplay.classList.remove('hidden');
+    }
+    if (domElements.historyUserNoteEdit) domElements.historyUserNoteEdit.classList.add('hidden');
+    if (domElements.historicalNoteControls) domElements.historicalNoteControls.classList.add('hidden');
+    if (domElements.historicalNoteStatus) domElements.historicalNoteStatus.textContent = '';
+    if (domElements.expandTasksButton) domElements.expandTasksButton.classList.add('hidden');
+    if (domElements.expandReflectionButton) domElements.expandReflectionButton.classList.add('hidden');
+    if (domElements.historyUserNoteDisplay) domElements.historyUserNoteDisplay.ondblclick = null;
+  }
+  domElements.historyModal.classList.remove('hidden');
+}
+
+
+function closeHistoryModal() {
+  if (domElements.historyModal) domElements.historyModal.classList.add('hidden');
+  currentModalDate = null; 
+}
+
+function saveHistoricalNote() { 
+    if (!currentModalDate || !domElements.historyUserNoteEdit || !domElements.historicalNoteStatus) return;
+    const noteContent = domElements.historyUserNoteEdit.value;
+    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + currentModalDate;
+    let historyEntry;
+    const isToday = currentModalDate === getTodayDateString();
+
+    const existingHistoryStr = localStorage.getItem(historyKey);
+    if (existingHistoryStr) {
+        historyEntry = JSON.parse(existingHistoryStr);
+    } else { 
+        const progress = isToday ? calculateProgressForDate(currentModalDate) : { pointsEarned: 0, percentageCompleted: 0, totalTasks: 0, completedTaskStructure: {} };
+        historyEntry = {
+            date: currentModalDate,
+            completedTaskStructure: progress.completedTaskStructure || {}, 
+            userNote: "",
+            pointsEarned: progress.pointsEarned,
+            percentageCompleted: progress.percentageCompleted,
+            totalTasksOnDate: progress.totalTasks,
+            dailyTargetPoints: DAILY_TARGET_POINTS 
+        };
+    }
+    historyEntry.userNote = noteContent; 
+    localStorage.setItem(historyKey, JSON.stringify(historyEntry));
+
+    if (isToday && domElements.dailyNoteInput) { 
+        domElements.dailyNoteInput.value = noteContent;
+        localStorage.setItem(STORAGE_KEY_DAILY_NOTE_PREFIX + currentModalDate, noteContent);
+    }
+
+    if (domElements.historyUserNoteDisplay) {
+        domElements.historyUserNoteDisplay.textContent = noteContent || "No reflection recorded for this day.";
+        domElements.historyUserNoteDisplay.classList.remove('hidden');
+    }
+    if (domElements.historyUserNoteEdit) domElements.historyUserNoteEdit.classList.add('hidden');
+    if (domElements.historicalNoteControls) domElements.historicalNoteControls.classList.add('hidden');
+    domElements.historicalNoteStatus.textContent = 'Reflection saved!';
+    setTimeout(() => { if (domElements.historicalNoteStatus) domElements.historicalNoteStatus.textContent = ''; }, 2000);
+    if (domElements.expandReflectionButton) domElements.expandReflectionButton.classList.toggle('hidden', !noteContent);
+    renderCalendar(); 
+}
+
+function clearHistoricalNote() {
+     if (!domElements.historyUserNoteEdit) return;
+    domElements.historyUserNoteEdit.value = "";
+}
+
+function populateMonthYearPicker() {
+    if (!domElements.pickerMonthsGrid || !domElements.pickerYearsList) return;
+    domElements.pickerMonthsGrid.innerHTML = '';
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    months.forEach((month, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'month-option';
+        btn.textContent = month;
+        btn.dataset.month = index.toString();
+        if (index === pickerSelectedMonth) btn.classList.add('selected');
+        btn.onclick = () => { pickerSelectedMonth = index; calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1); renderCalendar(); populateMonthYearPicker(); };
+        domElements.pickerMonthsGrid.appendChild(btn);
+    });
+    domElements.pickerYearsList.innerHTML = '';
+    let yearToScrollTo = null;
+    for (let year = 2000; year <= 2100; year++) {
+        const btn = document.createElement('button');
+        btn.className = 'year-option';
+        btn.textContent = year.toString();
+        btn.dataset.year = year.toString();
+        if (year === pickerSelectedYear) { btn.classList.add('selected'); yearToScrollTo = btn; }
+        btn.onclick = () => { pickerSelectedYear = year; calendarDisplayDate = new Date(pickerSelectedYear, pickerSelectedMonth, 1); renderCalendar(); populateMonthYearPicker(); };
+        domElements.pickerYearsList.appendChild(btn);
+    }
+    if (yearToScrollTo) yearToScrollTo.scrollIntoView({ block: 'nearest' });
+}
+
+function toggleMonthYearPicker() {
+    if (!domElements.monthYearPickerModal) return;
+    isMonthYearPickerOpen = !isMonthYearPickerOpen;
+    if (isMonthYearPickerOpen) {
+        pickerSelectedMonth = calendarDisplayDate.getMonth();
+        pickerSelectedYear = calendarDisplayDate.getFullYear();
+        populateMonthYearPicker();
+        domElements.monthYearPickerModal.classList.remove('hidden');
+    } else domElements.monthYearPickerModal.classList.add('hidden');
+}
+
+function closeMonthYearPicker() {
+    if (!domElements.monthYearPickerModal) return;
+    isMonthYearPickerOpen = false;
+    domElements.monthYearPickerModal.classList.add('hidden');
+}
+
+function updateCategoryTabIndicators() {
+    const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    currentCategories.forEach(category => {
+        const tabButton = document.getElementById(`tab-button-${category.id}`);
+        if (!tabButton) return;
+
+        tabButton.querySelector('.notification-badge')?.remove();
+        tabButton.classList.remove('category-complete-indicator');
+
+        let totalTasksInCat = 0;
+        let completedTasksInCat = 0;
+        (foldersByCategoryId[category.id] || []).forEach(folder => {
+            if (folder.type === 'task' && folder.content) {
+                totalTasksInCat += folder.content.length;
+                folder.content.forEach(taskDef => {
+                    if (localStorage.getItem(getTaskStateStorageKey(today, folder.id, taskDef.id)) === 'true') {
+                        completedTasksInCat++;
+                    }
+                });
+            }
+        });
+        
+        if (totalTasksInCat === 0) return; 
+        const isFullyCompleted = completedTasksInCat === totalTasksInCat;
+        const incompleteTasksCount = totalTasksInCat - completedTasksInCat;
+
+        if (isFullyCompleted) tabButton.classList.add('category-complete-indicator');
+        else if (incompleteTasksCount > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'notification-badge';
+            badge.textContent = incompleteTasksCount.toString();
+            tabButton.appendChild(badge);
+        }
+    });
+}
+
+
+function updateAllProgress() {
+  if (domElements.dashboardSummariesContainer) updateDashboardSummaries();
+  updateTodaysProgress();
+  updateCurrentWeekProgress();
+  updateCategoryTabIndicators();
+  renderCalendar(); 
+}
+
+
+function openFullscreenContentModal(type, date) {
+    if (!domElements.fullscreenContentModal || !domElements.fullscreenModalTitle || !domElements.fullscreenModalArea) return;
+    const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + date;
+    const historyDataString = localStorage.getItem(historyKey);
+    let historyEntry = null;
+    const isToday = date === getTodayDateString();
+
+    if (isToday) {
+        const progress = calculateProgressForDate(date);
+        const completedTasksTodayStruct = {}; 
+        currentCategories.forEach(cat => {
+          completedTasksTodayStruct[cat.id] = {};
+          (foldersByCategoryId[cat.id] || []).forEach(folder => {
+            if (folder.type === 'task') {
+              const folderTasks = [];
+              (folder.content || []).forEach(taskDef => {
+                if (localStorage.getItem(getTaskStateStorageKey(date, folder.id, taskDef.id)) === 'true') {
+                  folderTasks.push(taskDef.text);
+                }
+              });
+              if (folderTasks.length > 0) completedTasksTodayStruct[cat.id][folder.id] = { name: folder.name, tasks: folderTasks };
+            }
+          });
+          if(Object.keys(completedTasksTodayStruct[cat.id]).length === 0) delete completedTasksTodayStruct[cat.id];
+        });
+        historyEntry = { completedTaskStructure: completedTasksTodayStruct, userNote: localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + date) || "" };
+    } else if (historyDataString) {
+        try { historyEntry = JSON.parse(historyDataString); } catch (e) { console.error("Error parsing history for fullscreen:", e); return; }
+    }
+
+    if (!historyEntry) { domElements.fullscreenModalArea.innerHTML = '<p>No content.</p>'; domElements.fullscreenContentModal.classList.remove('hidden'); return; }
+
+    const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    domElements.fullscreenModalArea.innerHTML = ''; 
+
+    if (type === 'tasks') {
+        domElements.fullscreenModalTitle.textContent = `Completed Tasks for ${formattedDate}`;
+        let hasContent = false;
+        if (historyEntry.completedTaskStructure) {
+            Object.keys(historyEntry.completedTaskStructure).forEach(catId => {
+                const categoryData = historyEntry.completedTaskStructure[catId];
+                if(Object.keys(categoryData).length === 0) return;
+
+                const catGroup = document.createElement('div');
+                catGroup.className = 'history-category-group';
+                catGroup.innerHTML = `<h4 class="history-category-title">${getCategoryNameById(catId)}</h4>`;
+                
+                Object.values(categoryData).forEach(folderData => {
+                    if (folderData.tasks && folderData.tasks.length > 0) {
+                        hasContent = true;
+                        catGroup.innerHTML += `<h5 class="history-folder-title" style="margin-left:10px; color: #A09CB8;">${folderData.name}</h5>`;
+                        const ul = document.createElement('ul');
+                        ul.style.paddingLeft = '30px';
+                        folderData.tasks.forEach(taskText => {
+                            ul.innerHTML += `<li><span>${taskText}</span></li>`;
+                        });
+                        catGroup.appendChild(ul);
+                    }
+                });
+                 if(catGroup.querySelector('ul')) domElements.fullscreenModalArea.appendChild(catGroup);
+            });
+        }
+        if (!hasContent) domElements.fullscreenModalArea.innerHTML = '<p>No tasks completed.</p>';
+    } else if (type === 'reflection') {
+        domElements.fullscreenModalTitle.textContent = `Reflection for ${formattedDate}`;
+        if (historyEntry.userNote) {
+            const pre = document.createElement('pre');
+            pre.textContent = historyEntry.userNote; 
+            domElements.fullscreenModalArea.appendChild(pre);
+        } else domElements.fullscreenModalArea.innerHTML = '<p>No reflection recorded.</p>';
+    }
+    currentFullscreenContent = { type, date };
+    domElements.fullscreenContentModal.classList.remove('hidden');
+}
+
+
 function closeFullscreenContentModal() {
     if (domElements.fullscreenContentModal) domElements.fullscreenContentModal.classList.add('hidden');
     currentFullscreenContent = null;
 }
 
-function showCategoryContextMenu(categoryId, tabButton) {
-    hideFolderContextMenu(); // Hide folder menu if open
-    currentContextMenuTargetTab = tabButton;
-    const rect = tabButton.getBoundingClientRect();
-    const appRect = domElements.appContainer.getBoundingClientRect();
-    domElements.categoryTabContextMenu.style.top = `${rect.bottom - appRect.top}px`;
-    domElements.categoryTabContextMenu.style.left = `${rect.left - appRect.left}px`;
-    domElements.categoryTabContextMenu.classList.remove('hidden');
-    domElements.ctxRenameCategoryButton.focus();
-    // Disable delete for default categories
-    const category = currentCategories.find(c => c.id === categoryId);
-    domElements.ctxDeleteCategoryButton.disabled = (category && category.deletable === false);
-
-    // Make options icon visible while menu is open
-    const optionsIcon = tabButton.querySelector('.entity-options-icon');
-    if (optionsIcon) optionsIcon.classList.add('visible');
+function openChooseFolderTypeModal(categoryId) {
+    tempFolderCreationData = { categoryId };
+    if (domElements.chooseFolderTypeModal) domElements.chooseFolderTypeModal.classList.remove('hidden');
 }
-function hideCategoryContextMenu() {
-    if (currentContextMenuTargetTab) {
-        const optionsIcon = currentContextMenuTargetTab.querySelector('.entity-options-icon');
-        if (optionsIcon) optionsIcon.classList.remove('visible');
-    }
-    currentContextMenuTargetTab = null;
-    if (domElements.categoryTabContextMenu) domElements.categoryTabContextMenu.classList.add('hidden');
+function closeChooseFolderTypeModal() {
+    if (domElements.chooseFolderTypeModal) domElements.chooseFolderTypeModal.classList.add('hidden');
 }
-function renameCategory(categoryId) {
-    const category = currentCategories.find(cat => cat.id === categoryId);
-    if (!category) return;
-    const newName = prompt(`Rename category "${category.name}":`, category.name);
-    if (newName && newName.trim() !== "" && newName.trim() !== category.name) {
-        category.name = newName.trim();
-        saveUserCategories(currentCategories);
-        renderTabs();
-        renderAllCategorySections(); // To update titles in sections if displayed
-        if (activeTabId === categoryId) { // If renaming active tab, update its section title directly if it's visible
-            const sectionTitle = document.querySelector(`#category-section-${categoryId} .category-title-text`);
-            if (sectionTitle) sectionTitle.textContent = category.name;
-        }
-    }
+function openEnterFolderNameModal(type) { 
+    if (!tempFolderCreationData) return;
+    tempFolderCreationData.type = type;
+    if (domElements.enterFolderNameTitle) domElements.enterFolderNameTitle.textContent = `Name Your ${type === 'task' ? 'Task' : 'Note'} Folder`;
+    if (domElements.folderNameInput) domElements.folderNameInput.value = '';
+    if (domElements.enterFolderNameModal) domElements.enterFolderNameModal.classList.remove('hidden');
+    if (domElements.folderNameInput) domElements.folderNameInput.focus();
 }
-function showFolderContextMenu(folderId, categoryId, iconElement) {
-    hideCategoryContextMenu(); // Hide category menu if open
-    currentFolderOptionsMenu.element = iconElement;
-    currentFolderOptionsMenu.folderId = folderId;
-    currentFolderOptionsMenu.categoryId = categoryId;
-
-    const rect = iconElement.getBoundingClientRect();
-    const appRect = domElements.appContainer.getBoundingClientRect();
-    domElements.folderOptionsContextMenu.style.top = `${rect.bottom - appRect.top + 5}px`; // Add small offset
-    domElements.folderOptionsContextMenu.style.left = `${rect.left - appRect.left - domElements.folderOptionsContextMenu.offsetWidth + rect.width}px`; // Align to right of icon
-    domElements.folderOptionsContextMenu.classList.remove('hidden');
-    domElements.ctxRenameFolderButton.focus();
-
-    iconElement.classList.add('visible'); // Keep icon visible
-}
-function hideFolderContextMenu() {
-    if (currentFolderOptionsMenu.element) {
-        currentFolderOptionsMenu.element.classList.remove('visible');
-    }
-    currentFolderOptionsMenu = { element: null, folderId: null, categoryId: null };
-    if (domElements.folderOptionsContextMenu) domElements.folderOptionsContextMenu.classList.add('hidden');
-}
-function startFolderRename(folderId, categoryId, wrapperElement) {
-    const label = wrapperElement.querySelector('.task-folder-label-text');
-    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
-    if (!label || !folder) return;
-
-    label.style.display = 'none';
-    let input = wrapperElement.querySelector('.folder-inline-rename-input');
-    if (!input) {
-        input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'folder-inline-rename-input';
-        wrapperElement.appendChild(input); // Append directly to wrapper, after label if label was visible
-    }
-    input.value = folder.name;
-    input.style.display = 'block';
-    input.focus();
-    input.select();
-
-    const finishRenameHandler = (event) => {
-        if (event.type === 'keypress' && event.key !== 'Enter') return;
-        if (event.type === 'blur' && wrapperElement.contains(document.activeElement) && document.activeElement !== input) return;
-        finishFolderRename(folderId, categoryId, wrapperElement, input);
-        cleanup();
-    };
-    const cancelRenameHandler = (event) => {
-        if (event.key === 'Escape') {
-            cancelFolderRename(folderId, categoryId, wrapperElement, input);
-            cleanup();
-        }
-    };
-    const cleanup = () => {
-        input.removeEventListener('blur', finishRenameHandler);
-        input.removeEventListener('keypress', finishRenameHandler);
-        document.removeEventListener('keydown', cancelRenameHandler, true);
-    };
-
-    input.addEventListener('blur', finishRenameHandler);
-    input.addEventListener('keypress', finishRenameHandler);
-    document.addEventListener('keydown', cancelRenameHandler, true); // Use capture to catch Escape early
-}
-function finishFolderRename(folderId, categoryId, wrapperElement, inputElement) {
-    const newName = inputElement.value.trim();
-    const folder = userFoldersByCategoryId[categoryId]?.find(f => f.id === folderId);
-    const label = wrapperElement.querySelector('.task-folder-label-text');
-
-    if (folder && newName) {
-        folder.name = newName;
-        saveUserFolders(userFoldersByCategoryId);
-        if (label) label.textContent = newName;
-         // If this folder is currently active, update its title in the category header
-        if (activeFolderIdForCategory[categoryId] === folderId && categoryViewMode[categoryId] === 'view_folder_content') {
-            const categoryHeaderTitle = document.querySelector(`#category-section-${categoryId} .category-header .category-title-text`);
-            if (categoryHeaderTitle) categoryHeaderTitle.textContent = newName;
-        }
-    }
-    inputElement.style.display = 'none';
-    if (label) label.style.display = 'block';
-}
-function cancelFolderRename(folderId, categoryId, wrapperElement, inputElement) {
-    const label = wrapperElement.querySelector('.task-folder-label-text');
-    inputElement.style.display = 'none';
-    if(label) label.style.display = 'block';
+function closeEnterFolderNameModal() {
+    if (domElements.enterFolderNameModal) domElements.enterFolderNameModal.classList.add('hidden');
+    tempFolderCreationData = null;
 }
 
-function openAddFolderModal(categoryId) {
-    resetAddFolderModal();
-    domElements.addFolderModal.dataset.categoryId = categoryId;
-    domElements.addFolderModal.classList.remove('hidden');
-    domElements.selectTaskFolderTypeButton.focus();
-}
-function closeAddFolderModal() {
-    domElements.addFolderModal.classList.add('hidden');
-    delete domElements.addFolderModal.dataset.categoryId;
-}
-function resetAddFolderModal() {
-    domElements.addFolderStep1.classList.remove('hidden');
-    domElements.addFolderStep2.classList.add('hidden');
-    domElements.newFolderNameInput.value = '';
-    [domElements.selectTaskFolderTypeButton, domElements.selectNotesFolderTypeButton].forEach(btn => btn.classList.remove('selected-type'));
-}
-function handleFolderTypeSelection(type, categoryId) {
-    domElements.addFolderStep1.classList.add('hidden');
-    domElements.addFolderStep2.classList.remove('hidden');
-    domElements.selectedFolderTypeNameSpan.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-    domElements.addFolderModal.dataset.selectedType = type;
-    domElements.newFolderNameInput.focus();
-}
-function handleCreateFolder(categoryId) {
-    const folderName = domElements.newFolderNameInput.value.trim();
-    const folderType = domElements.addFolderModal.dataset.selectedType;
-    if (!folderName) { alert("Please enter a folder name."); return; }
-    if (!folderType) { alert("Folder type not selected. Please go back."); return; }
+function handleCreateFolder() {
+    if (!tempFolderCreationData || !domElements.folderNameInput) return;
+    const folderName = domElements.folderNameInput.value.trim();
+    if (!folderName) { alert("Folder name cannot be empty."); return; }
 
+    const { categoryId, type } = tempFolderCreationData;
+    if (!foldersByCategoryId[categoryId]) foldersByCategoryId[categoryId] = [];
+    
     const newFolder = {
         id: createUniqueId('folder'),
         name: folderName,
-        type: folderType,
-        order: (userFoldersByCategoryId[categoryId] || []).length,
+        type: type,
+        categoryId: categoryId,
+        order: foldersByCategoryId[categoryId].length,
+        content: type === 'task' ? [] : "" 
     };
-    if (folderType === 'task') newFolder.tasks = [];
-    else if (folderType === 'notes') newFolder.content = [];
+    foldersByCategoryId[categoryId].push(newFolder);
+    if (type === 'task') currentFolderEditModes[newFolder.id] = false; 
 
-    if (!userFoldersByCategoryId[categoryId]) userFoldersByCategoryId[categoryId] = [];
-    userFoldersByCategoryId[categoryId].push(newFolder);
-    saveUserFolders(userFoldersByCategoryId);
-    renderCategoryTasks(categoryId); // Re-render the current category to show the new folder
-    closeAddFolderModal();
+    saveFoldersByCategoryId(foldersByCategoryId);
+    const categoryContentArea = document.querySelector(`#category-section-${categoryId} .category-content-area`);
+    if (categoryContentArea) renderFolderSystemForCategory(categoryId, categoryContentArea);
+    closeEnterFolderNameModal();
+    updateAllProgress(); 
 }
 
-// Progress System UI Functions
-function switchProgressSystemTab(tabToActivate) {
-    if (tabToActivate === 'setup') {
-        domElements.progressTabSetup.classList.add('active');
-        domElements.progressTabSetup.setAttribute('aria-selected', 'true');
-        domElements.progressTabHistory.classList.remove('active');
-        domElements.progressTabHistory.setAttribute('aria-selected', 'false');
-        domElements.progressSetupContent.classList.remove('hidden');
-        domElements.progressHistoryContent.classList.add('hidden');
-        renderProgressSetupForm();
-    } else { // history
-        domElements.progressTabHistory.classList.add('active');
-        domElements.progressTabHistory.setAttribute('aria-selected', 'true');
-        domElements.progressTabSetup.classList.remove('active');
-        domElements.progressTabSetup.setAttribute('aria-selected', 'false');
-        domElements.progressHistoryContent.classList.remove('hidden');
-        domElements.progressSetupContent.classList.add('hidden');
-        renderProgressHistory();
+function handleRenameFolder(folder) {
+    const newName = prompt(`Enter new name for folder "${folder.name}":`, folder.name);
+    if (newName && newName.trim() !== "" && newName.trim() !== folder.name) {
+        folder.name = newName.trim();
+        saveFoldersByCategoryId(foldersByCategoryId);
+        const categoryContentArea = document.querySelector(`#category-section-${folder.categoryId} .category-content-area`);
+        if (categoryContentArea) renderFolderSystemForCategory(folder.categoryId, categoryContentArea);
     }
 }
 
-function renderProgressSetupForm() {
-    if (currentProgressPlan) {
-        domElements.progressPlanNameInput.value = currentProgressPlan.name || '';
-        domElements.progressStartDateInput.value = currentProgressPlan.startDate || '';
-        domElements.progressStartDaySelect.value = currentProgressPlan.startDayOfWeek !== undefined ? currentProgressPlan.startDayOfWeek.toString() : '1'; // Default Monday
-        domElements.progressTargetWeeklyPointsInput.value = currentProgressPlan.targetWeeklyPoints || '';
-        domElements.endCurrentPlanButton.classList.remove('hidden');
-        renderActivePlanSummary();
-        domElements.activePlanSummary.classList.remove('hidden');
-        domElements.saveProgressPlanButton.textContent = 'Update Plan';
-    } else {
-        domElements.progressPlanNameInput.value = '';
-        const today = new Date();
-        const offset = today.getTimezoneOffset();
-        const todayLocal = new Date(today.getTime() - (offset*60*1000));
-        domElements.progressStartDateInput.value = todayLocal.toISOString().split('T')[0];
-        domElements.progressStartDaySelect.value = '1'; // Default Monday
-        domElements.progressTargetWeeklyPointsInput.value = TARGET_POINTS_FOR_WEEKLY_VIEW.toString();
-        domElements.endCurrentPlanButton.classList.add('hidden');
-        domElements.activePlanSummary.classList.add('hidden');
-        domElements.saveProgressPlanButton.textContent = 'Start New Plan';
-    }
+function handleDeleteFolder(folder) {
+    const message = (folder.type === 'task' && folder.content && folder.content.length > 0) || (folder.type === 'note' && folder.content && folder.content.trim() !== "")
+        ? `Folder "${folder.name}" contains data. Are you sure you want to delete it and all its contents?`
+        : `Are you sure you want to delete the folder "${folder.name}"?`;
+    showDeleteConfirmation('folder', folder.id, message, folder.name, folder.categoryId);
 }
 
-function renderActivePlanSummary() {
-    if (currentProgressPlan) {
-        domElements.activePlanNameDisplay.textContent = currentProgressPlan.name || 'N/A';
-        domElements.activePlanStartDateDisplay.textContent = currentProgressPlan.startDate ? new Date(currentProgressPlan.startDate + 'T00:00:00').toLocaleDateString() : 'N/A';
-        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        domElements.activePlanStartDayDisplay.textContent = currentProgressPlan.startDayOfWeek !== undefined ? dayNames[currentProgressPlan.startDayOfWeek] : 'N/A';
-        domElements.activePlanTargetPointsDisplay.textContent = currentProgressPlan.targetWeeklyPoints ? `${currentProgressPlan.targetWeeklyPoints} points` : 'N/A';
-    }
-}
-
-function handleSaveProgressPlan(event) {
-    event.preventDefault();
-    const planName = domElements.progressPlanNameInput.value.trim();
-    const startDate = domElements.progressStartDateInput.value;
-    const startDayOfWeek = parseInt(domElements.progressStartDaySelect.value, 10);
-    const targetWeeklyPoints = parseInt(domElements.progressTargetWeeklyPointsInput.value, 10);
-
-    if (!planName) { alert('Please enter a plan name.'); return; }
-    if (!startDate) { alert('Please select a start date.'); return; }
-    if (isNaN(targetWeeklyPoints) || targetWeeklyPoints <= 0) { alert('Please enter a valid target weekly points value (greater than 0).'); return; }
-
-    currentProgressPlan = {
-        name: planName,
-        startDate: startDate,
-        startDayOfWeek: startDayOfWeek,
-        targetWeeklyPoints: targetWeeklyPoints,
-    };
-    TARGET_POINTS_FOR_WEEKLY_VIEW = targetWeeklyPoints; // Update global for weekly view
-    saveProgressData();
-    renderProgressSetupForm(); // Re-render to show summary and update button text
-    updateCurrentWeekProgress(); // Recalculate weekly progress based on new plan
-    displayCurrentPlanNameOnDashboard(); // Update dashboard display
-    alert('Progress plan saved!');
-}
-
-function handleEndCurrentPlan() {
-    if (!currentProgressPlan) {
-        alert('No active plan to end.');
-        return;
-    }
-
-    if (!confirm(`Are you sure you want to end the current plan "${currentProgressPlan.name}"? This will move it to history.`)) {
-        return;
-    }
-    
-    const today = getTodayDateString();
-    const planDetailsForHistory = {
-        name: currentProgressPlan.name,
-        startDate: currentProgressPlan.startDate,
-        endDate: today, 
-        originalTargetWeeklyPoints: currentProgressPlan.targetWeeklyPoints,
-        // More detailed stats would be calculated here by iterating through the plan's duration.
-        // For simplicity, we'll store basic info.
-    };
-
-    progressHistory.push(planDetailsForHistory);
-    currentProgressPlan = null;
-    TARGET_POINTS_FOR_WEEKLY_VIEW = 20000; // Reset to default target
-    
-    saveProgressData();
-    renderProgressSetupForm(); 
-    updateCurrentWeekProgress(); 
-    displayCurrentPlanNameOnDashboard();
-    alert('Current plan ended and moved to history.');
-    if (currentView === 'progress') { 
-        switchProgressSystemTab('history');
-    }
-}
-
-function renderProgressHistory() {
-    domElements.progressHistoryList.innerHTML = '';
-    if (progressHistory.length === 0) {
-        domElements.noProgressHistoryMessage.classList.remove('hidden');
-        return;
-    }
-    domElements.noProgressHistoryMessage.classList.add('hidden');
-
-    progressHistory.slice().reverse().forEach(plan => { // Show newest first
-        const li = document.createElement('li');
-        
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'history-item-name';
-        nameDiv.textContent = plan.name;
-        li.appendChild(nameDiv);
-
-        const datesDiv = document.createElement('div');
-        datesDiv.className = 'history-item-dates';
-        const startDateFormatted = plan.startDate ? new Date(plan.startDate + 'T00:00:00').toLocaleDateString() : 'N/A';
-        const endDateFormatted = plan.endDate ? new Date(plan.endDate + 'T00:00:00').toLocaleDateString() : 'N/A';
-        datesDiv.textContent = `Duration: ${startDateFormatted} - ${endDateFormatted}`;
-        li.appendChild(datesDiv);
-
-        const statsDiv = document.createElement('div');
-        statsDiv.className = 'history-item-stats';
-        statsDiv.innerHTML = `<strong>Target:</strong> ${plan.originalTargetWeeklyPoints || 'N/A'} points/week`;
-        // Future: Could display achieved points/percentage if calculated and stored.
-        li.appendChild(statsDiv);
-
-        domElements.progressHistoryList.appendChild(li);
+function initializeApp() {
+    // Cache DOM elements
+    Object.keys(domElements).forEach(key => {
+        const id = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+        domElements[key] = document.getElementById(id);
     });
-}
 
-function showView(viewName) {
-    currentView = viewName;
-    if (viewName === 'dashboard') {
-        domElements.mainContentWrapper.classList.remove('view-hidden');
-        domElements.progressSystemView.classList.add('hidden');
-        domElements.sideMenuDashboardLink.classList.add('active-view');
-        domElements.sideMenuProgressLink.classList.remove('active-view');
-        domElements.appContainer.style.paddingTop = ''; 
-    } else if (viewName === 'progress') {
-        domElements.mainContentWrapper.classList.add('view-hidden');
-        domElements.progressSystemView.classList.remove('hidden');
-        domElements.sideMenuProgressLink.classList.add('active-view');
-        domElements.sideMenuDashboardLink.classList.remove('active-view');
-        domElements.appContainer.style.paddingTop = '0'; 
-        switchProgressSystemTab('setup'); 
-    }
-}
-
-
-function initDOM() {
-    domElements.appContainer = document.getElementById('app-container');
-    domElements.hamburgerMenuButton = document.getElementById('hamburger-menu-button');
-    domElements.sideMenu = document.getElementById('side-menu');
-    domElements.sideMenuDashboardLink = document.getElementById('side-menu-dashboard-link');
-    domElements.sideMenuProgressLink = document.getElementById('side-menu-progress-link');
-    domElements.mainContentWrapper = document.getElementById('main-content-wrapper');
-    domElements.progressSystemView = document.getElementById('progress-system-view');
-    domElements.progressSystemHeader = document.getElementById('progress-system-header');
-    domElements.progressSystemBackButton = document.getElementById('progress-system-back-button');
-    domElements.progressTabSetup = document.getElementById('progress-tab-setup');
-    domElements.progressTabHistory = document.getElementById('progress-tab-history');
-    domElements.progressSetupContent = document.getElementById('progress-setup-content');
-    domElements.progressHistoryContent = document.getElementById('progress-history-content');
-    domElements.progressSetupForm = document.getElementById('progress-setup-form');
-    domElements.progressPlanNameInput = document.getElementById('progress-plan-name');
-    domElements.progressStartDateInput = document.getElementById('progress-start-date');
-    domElements.progressStartDaySelect = document.getElementById('progress-start-day');
-    domElements.progressTargetWeeklyPointsInput = document.getElementById('progress-target-weekly-points');
-    domElements.saveProgressPlanButton = document.getElementById('save-progress-plan-button');
-    domElements.endCurrentPlanButton = document.getElementById('end-current-plan-button');
-    domElements.activePlanSummary = document.getElementById('active-plan-summary');
-    domElements.activePlanNameDisplay = document.getElementById('active-plan-name-display');
-    domElements.activePlanStartDateDisplay = document.getElementById('active-plan-start-date-display');
-    domElements.activePlanStartDayDisplay = document.getElementById('active-plan-start-day-display');
-    domElements.activePlanTargetPointsDisplay = document.getElementById('active-plan-target-points-display');
-    domElements.progressHistoryList = document.getElementById('progress-history-list');
-    domElements.noProgressHistoryMessage = document.getElementById('no-progress-history');
-
+    // Specific overrides for elements not matching the auto-generated ID
     domElements.tabsContainer = document.getElementById('tabs');
     domElements.tabContentsContainer = document.getElementById('tab-content');
-    domElements.addCategoryButton = document.getElementById('add-category-button');
     domElements.categorySectionTemplate = document.getElementById('category-section-template');
-    domElements.backToFoldersButtonTemplate = document.getElementById('back-to-folders-button-template');
     domElements.categoryTabContextMenu = document.getElementById('category-tab-context-menu');
     domElements.ctxRenameCategoryButton = document.getElementById('ctx-rename-category');
     domElements.ctxDeleteCategoryButton = document.getElementById('ctx-delete-category');
     domElements.folderOptionsContextMenu = document.getElementById('folder-options-context-menu');
     domElements.ctxRenameFolderButton = document.getElementById('ctx-rename-folder');
     domElements.ctxDeleteFolderButton = document.getElementById('ctx-delete-folder');
-
-    domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
-    domElements.todayProgressFill = document.getElementById('today-progress-fill');
-    domElements.todayPointsStat = document.getElementById('today-points-stat');
-    domElements.currentWeeklyPlanNameDisplay = document.getElementById('current-weekly-plan-name-display');
-    domElements.currentWeekProgressFill = document.getElementById('current-week-progress-fill');
-    domElements.currentWeekPointsStat = document.getElementById('current-week-points-stat');
-
-    domElements.calendarMonthYearButton = document.getElementById('calendar-month-year-button');
-    domElements.calendarMonthYear = document.getElementById('calendar-month-year');
-    domElements.calendarGrid = document.getElementById('calendar-grid');
-    domElements.calendarPrevMonthButton = document.getElementById('calendar-prev-month');
-    domElements.calendarNextMonthButton = document.getElementById('calendar-next-month');
-
-    domElements.monthYearPickerModal = document.getElementById('month-year-picker-modal');
-    domElements.monthYearPickerContent = document.getElementById('month-year-picker-content');
-    domElements.monthYearPickerCloseButton = document.getElementById('month-year-picker-close-button');
-    domElements.pickerMonthsGrid = document.getElementById('picker-months-grid');
-    domElements.pickerYearsList = document.getElementById('picker-years-list');
-
-    domElements.dailyNoteInput = document.getElementById('daily-note-input');
-    domElements.saveNoteButton = document.getElementById('save-note-button');
-
-    domElements.historyModal = document.getElementById('history-modal');
-    domElements.historyModalCloseButton = document.getElementById('history-modal-close-button');
-    domElements.historyModalDate = document.getElementById('history-modal-date');
-    domElements.historyModalPointsValue = document.getElementById('history-modal-points-value');
-    domElements.historyModalPointsTotal = document.getElementById('history-modal-points-total');
-    domElements.historyPercentageProgressFill = document.getElementById('history-percentage-progress-fill');
-    domElements.historyTasksList = document.getElementById('history-tasks-list');
-    domElements.expandTasksButton = document.getElementById('expand-tasks-button');
-    domElements.historicalReflectionWrapper = document.getElementById('historical-reflection-wrapper');
-    domElements.expandReflectionButton = document.getElementById('expand-reflection-button');
-    domElements.historyUserNoteDisplay = document.getElementById('history-user-note-display');
-    domElements.historyUserNoteEdit = document.getElementById('history-user-note-edit');
-    domElements.historicalNoteControls = document.getElementById('historical-note-controls');
-    domElements.saveHistoricalNoteButton = document.getElementById('save-historical-note-button');
-    domElements.clearHistoricalNoteButton = document.getElementById('clear-historical-note-button');
-    domElements.historicalNoteStatus = document.getElementById('historical-note-status');
-
+    domElements.dashboardColumnView = document.getElementById('dashboard-column');
     domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
+    domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
+
+
+    loadAppData();
+    renderTabs();
+    renderAllCategorySections(); 
+    switchTab('dashboard'); // Default to dashboard
+    updateAllProgress();
+
+    // Event Listeners with null checks
+    if (domElements.addCategoryButton) {
+        domElements.addCategoryButton.addEventListener('click', () => {
+            const categoryName = prompt('Enter new category name:');
+            if (categoryName && categoryName.trim() !== "") {
+                const newCategory = {
+                    id: createUniqueId('category'),
+                    name: categoryName.trim(),
+                    order: currentCategories.length,
+                    deletable: true
+                };
+                currentCategories.push(newCategory);
+                foldersByCategoryId[newCategory.id] = []; 
+                saveUserCategories(currentCategories);
+                saveFoldersByCategoryId(foldersByCategoryId);
+                renderTabs();
+                renderAllCategorySections();
+                switchTab(newCategory.id);
+                updateCategoryTabIndicators();
+            }
+        });
+    }
+
+    if (domElements.tabsContainer) {
+        domElements.tabsContainer.addEventListener('click', (event) => {
+            if (event.target.classList.contains('tab-button') && event.target.dataset.categoryId) {
+                switchTab(event.target.dataset.categoryId);
+            } else if (event.target.id === 'dashboard-tab-button') {
+                switchTab('dashboard');
+            }
+        });
+    }
     
-    domElements.deleteConfirmationModal = document.getElementById('delete-confirmation-modal');
-    domElements.deleteConfirmationTitle = document.getElementById('delete-confirmation-title');
-    domElements.deleteConfirmationMessage = document.getElementById('delete-confirmation-message');
-    domElements.deleteConfirmationCloseButton = document.getElementById('delete-confirmation-close-button');
-    domElements.confirmDeleteButton = document.getElementById('confirm-delete-button');
-    domElements.cancelDeleteButton = document.getElementById('cancel-delete-button');
+    document.addEventListener('dragover', (e) => {
+        if (e.target.classList.contains('task-list') || e.target.closest('.task-list')) {
+            e.preventDefault();
+            if (!draggedTaskElement) return;
 
-    domElements.fullscreenContentModal = document.getElementById('fullscreen-content-modal');
-    domElements.fullscreenModalTitle = document.getElementById('fullscreen-modal-title');
-    domElements.fullscreenModalArea = document.getElementById('fullscreen-modal-area');
-    domElements.fullscreenModalCloseButton = document.getElementById('fullscreen-modal-close-button');
+            const taskList = e.target.closest('.task-list');
+            if (!taskList) return;
 
-    domElements.addFolderModal = document.getElementById('add-folder-modal');
-    domElements.addFolderModalCloseButton = document.getElementById('add-folder-modal-close-button');
-    domElements.addFolderStep1 = document.getElementById('add-folder-step-1');
-    domElements.addFolderStep2 = document.getElementById('add-folder-step-2');
-    domElements.selectTaskFolderTypeButton = document.getElementById('select-task-folder-type');
-    domElements.selectNotesFolderTypeButton = document.getElementById('select-notes-folder-type');
-    domElements.addFolderBackButton = document.getElementById('add-folder-back-button');
-    domElements.selectedFolderTypeNameSpan = document.getElementById('selected-folder-type-name');
-    domElements.newFolderNameInput = document.getElementById('new-folder-name-input');
-    domElements.createFolderButton = document.getElementById('create-folder-button');
-    domElements.cancelAddFolderButton = document.getElementById('cancel-add-folder-button');
-    
-    domElements.noteItemTemplate = document.getElementById('note-item-template');
-    domElements.noteItemEditTextareaTemplate = document.getElementById('note-item-edit-form-template-text');
-    domElements.noteItemEditLinkTemplate = document.getElementById('note-item-edit-form-template-link');
-    domElements.noteItemEditImageTemplate = document.getElementById('note-item-edit-form-template-image');
+            taskList.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
+                el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
+            });
 
-    // Hamburger Menu
-    domElements.hamburgerMenuButton.addEventListener('click', () => {
-        const isExpanded = domElements.hamburgerMenuButton.getAttribute('aria-expanded') === 'true';
-        domElements.hamburgerMenuButton.setAttribute('aria-expanded', !isExpanded);
-        domElements.sideMenu.classList.toggle('open');
-        domElements.sideMenu.classList.toggle('hidden', isExpanded); // Toggle hidden based on NEW state
-        domElements.sideMenu.setAttribute('aria-hidden', isExpanded.toString()); // aria-hidden should reflect if it IS hidden
-    });
-
-    // Side Menu Navigation
-    domElements.sideMenuDashboardLink.addEventListener('click', () => {
-        showView('dashboard');
-        domElements.hamburgerMenuButton.click(); // Close menu
-    });
-    domElements.sideMenuProgressLink.addEventListener('click', () => {
-        showView('progress');
-        renderProgressSetupForm(); // Populate form with current plan
-        renderProgressHistory();   // Load and display history
-        domElements.hamburgerMenuButton.click(); // Close menu
-    });
-
-    // Progress System
-    domElements.progressSystemBackButton.addEventListener('click', () => showView('dashboard'));
-    domElements.progressTabSetup.addEventListener('click', () => switchProgressSystemTab('setup'));
-    domElements.progressTabHistory.addEventListener('click', () => switchProgressSystemTab('history'));
-    domElements.progressSetupForm.addEventListener('submit', handleSaveProgressPlan);
-    domElements.endCurrentPlanButton.addEventListener('click', handleEndCurrentPlan);
-
-    // Existing event listeners
-    domElements.addCategoryButton.addEventListener('click', () => {
-        const newCategoryName = prompt("Enter new category name:");
-        if (newCategoryName && newCategoryName.trim() !== "") {
-            const newCategory = {
-                id: createUniqueId('cat'),
-                name: newCategoryName.trim(),
-                order: currentCategories.length,
-                deletable: true
-            };
-            currentCategories.push(newCategory);
-            userFoldersByCategoryId[newCategory.id] = [];
-            saveUserCategories(currentCategories);
-            saveUserFolders(userFoldersByCategoryId);
-            renderTabs();
-            renderAllCategorySections();
-            switchTab(newCategory.id);
+            const afterElement = getDragAfterElement(taskList, e.clientY);
+            if (afterElement == null) {
+                const lastTask = taskList.querySelector('.task-item:not(.dragging):last-child');
+                if (lastTask && lastTask !== draggedTaskElement) {
+                     lastTask.classList.add('drag-over-indicator-task-bottom');
+                }
+            } else {
+                if (afterElement !== draggedTaskElement) {
+                     afterElement.classList.add('drag-over-indicator-task');
+                }
+            }
+            e.dataTransfer.dropEffect = 'move';
         }
     });
 
-    domElements.calendarPrevMonthButton.addEventListener('click', () => {
-        calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() - 1);
-        renderCalendar();
-    });
-    domElements.calendarNextMonthButton.addEventListener('click', () => {
-        calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() + 1);
-        renderCalendar();
-    });
-    domElements.calendarMonthYearButton.addEventListener('click', toggleMonthYearPicker);
-    domElements.monthYearPickerCloseButton.addEventListener('click', closeMonthYearPicker);
-    
-    domElements.saveNoteButton.addEventListener('click', saveDailyNote);
-    
-    domElements.historyModalCloseButton.addEventListener('click', closeHistoryModal);
-    domElements.saveHistoricalNoteButton.addEventListener('click', saveHistoricalNote);
-    domElements.clearHistoricalNoteButton.addEventListener('click', clearHistoricalNote);
-    domElements.expandTasksButton.addEventListener('click', () => openFullscreenContentModal('tasks', currentModalDate));
-    domElements.expandReflectionButton.addEventListener('click', () => openFullscreenContentModal('reflection', currentModalDate));
-    
-    domElements.fullscreenModalCloseButton.addEventListener('click', closeFullscreenContentModal);
-    
-    domElements.deleteConfirmationCloseButton.addEventListener('click', hideDeleteConfirmation);
-    domElements.confirmDeleteButton.addEventListener('click', confirmDeletion);
-    domElements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
+    document.addEventListener('drop', (e) => {
+        if (e.target.classList.contains('task-list') || e.target.closest('.task-list')) {
+            e.preventDefault();
+            if (!draggedTaskElement) return;
+            
+            const taskList = e.target.closest('.task-list');
+            if (!taskList) return;
 
-    domElements.addFolderModalCloseButton.addEventListener('click', closeAddFolderModal);
-    domElements.addFolderBackButton.addEventListener('click', () => {
-        domElements.addFolderStep2.classList.add('hidden');
-        domElements.addFolderStep1.classList.remove('hidden');
-    });
-    domElements.selectTaskFolderTypeButton.addEventListener('click', () => handleFolderTypeSelection('task', domElements.addFolderModal.dataset.categoryId));
-    domElements.selectNotesFolderTypeButton.addEventListener('click', () => handleFolderTypeSelection('notes', domElements.addFolderModal.dataset.categoryId));
-    domElements.createFolderButton.addEventListener('click', () => handleCreateFolder(domElements.addFolderModal.dataset.categoryId));
-    domElements.cancelAddFolderButton.addEventListener('click', closeAddFolderModal);
-
-    domElements.ctxRenameCategoryButton.addEventListener('click', () => {
-        if (currentContextMenuTargetTab) {
-            renameCategory(currentContextMenuTargetTab.dataset.categoryId);
+            const afterElement = getDragAfterElement(taskList, e.clientY);
+            if (afterElement == null) {
+                taskList.appendChild(draggedTaskElement);
+            } else {
+                taskList.insertBefore(draggedTaskElement, afterElement);
+            }
         }
-        hideCategoryContextMenu();
     });
-    domElements.ctxDeleteCategoryButton.addEventListener('click', () => {
+
+    if (domElements.calendarPrevMonthButton) domElements.calendarPrevMonthButton.addEventListener('click', () => {
+      calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() - 1);
+      renderCalendar();
+    });
+    if (domElements.calendarNextMonthButton) domElements.calendarNextMonthButton.addEventListener('click', () => {
+      calendarDisplayDate.setMonth(calendarDisplayDate.getMonth() + 1);
+      renderCalendar();
+    });
+    if (domElements.calendarMonthYearButton) domElements.calendarMonthYearButton.addEventListener('click', toggleMonthYearPicker);
+    if (domElements.monthYearPickerCloseButton) domElements.monthYearPickerCloseButton.addEventListener('click', closeMonthYearPicker);
+    
+    if (domElements.saveNoteButton) domElements.saveNoteButton.addEventListener('click', saveDailyNote);
+    if (domElements.dailyNoteInput) domElements.dailyNoteInput.addEventListener('input', () => {
+        if (domElements.saveNoteButton) domElements.saveNoteButton.textContent = 'Save Note'; 
+    });
+
+    if (domElements.historyModalCloseButton) domElements.historyModalCloseButton.addEventListener('click', closeHistoryModal);
+    if (domElements.saveHistoricalNoteButton) domElements.saveHistoricalNoteButton.addEventListener('click', saveHistoricalNote);
+    if (domElements.clearHistoricalNoteButton) domElements.clearHistoricalNoteButton.addEventListener('click', clearHistoricalNote);
+    if (domElements.expandTasksButton) domElements.expandTasksButton.addEventListener('click', () => openFullscreenContentModal('tasks', currentModalDate));
+    if (domElements.expandReflectionButton) domElements.expandReflectionButton.addEventListener('click', () => openFullscreenContentModal('reflection', currentModalDate));
+
+    if (domElements.fullscreenModalCloseButton) domElements.fullscreenModalCloseButton.addEventListener('click', closeFullscreenContentModal);
+
+    if (domElements.confirmDeleteButton) domElements.confirmDeleteButton.addEventListener('click', confirmDeletion);
+    if (domElements.cancelDeleteButton) domElements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
+    if (domElements.deleteConfirmationCloseButton) domElements.deleteConfirmationCloseButton.addEventListener('click', hideDeleteConfirmation);
+
+    if (domElements.chooseFolderTypeCloseButton) domElements.chooseFolderTypeCloseButton.addEventListener('click', closeChooseFolderTypeModal);
+    if (domElements.selectTaskFolderButton) domElements.selectTaskFolderButton.addEventListener('click', () => { openEnterFolderNameModal('task'); closeChooseFolderTypeModal(); });
+    if (domElements.selectNoteFolderButton) domElements.selectNoteFolderButton.addEventListener('click', () => { openEnterFolderNameModal('note'); closeChooseFolderTypeModal(); });
+
+    if (domElements.enterFolderNameCloseButton) domElements.enterFolderNameCloseButton.addEventListener('click', closeEnterFolderNameModal);
+    if (domElements.createFolderButton) domElements.createFolderButton.addEventListener('click', handleCreateFolder);
+    if (domElements.cancelCreateFolderButton) domElements.cancelCreateFolderButton.addEventListener('click', closeEnterFolderNameModal);
+    if (domElements.folderNameInput) domElements.folderNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleCreateFolder();
+        }
+    });
+
+    if (domElements.ctxRenameCategoryButton) domElements.ctxRenameCategoryButton.addEventListener('click', () => {
         if (currentContextMenuTargetTab) {
             const categoryId = currentContextMenuTargetTab.dataset.categoryId;
             const category = currentCategories.find(c => c.id === categoryId);
-            showDeleteConfirmation('category', categoryId, `Are you sure you want to delete the category "${category.name}" and all its contents? This action cannot be undone.`);
+            if (category) {
+                const newName = prompt(`Enter new name for category "${category.name}":`, category.name);
+                if (newName && newName.trim() !== "") {
+                    category.name = newName.trim();
+                    saveUserCategories(currentCategories);
+                    renderTabs();
+                    const catSectionTitle = document.querySelector(`#category-section-${categoryId} .category-title-text`);
+                    if(catSectionTitle) {
+                        catSectionTitle.textContent = category.name;
+                    }
+                }
+            }
         }
         hideCategoryContextMenu();
     });
-    domElements.ctxRenameFolderButton.addEventListener('click', () => {
-        if (currentFolderOptionsMenu && currentFolderOptionsMenu.folderId) {
-            const wrapper = document.querySelector(`.task-folder-box-wrapper[data-folder-id="${currentFolderOptionsMenu.folderId}"]`);
-            if(wrapper) startFolderRename(currentFolderOptionsMenu.folderId, currentFolderOptionsMenu.categoryId, wrapper);
+
+    if (domElements.ctxDeleteCategoryButton) domElements.ctxDeleteCategoryButton.addEventListener('click', () => {
+        if (currentContextMenuTargetTab) {
+            const categoryId = currentContextMenuTargetTab.dataset.categoryId;
+            const category = currentCategories.find(c => c.id === categoryId);
+            if (category) {
+                if (category.deletable === false) {
+                     alert(`Category "${category.name}" is a default category and cannot be deleted.`);
+                } else {
+                     showDeleteConfirmation('category', categoryId, `Are you sure you want to delete the category "${category.name}" and all its contents? This action cannot be undone.`, category.name);
+                }
+            }
         }
-        hideFolderContextMenu();
+        hideCategoryContextMenu();
     });
-    domElements.ctxDeleteFolderButton.addEventListener('click', () => {
-         if (currentFolderOptionsMenu && currentFolderOptionsMenu.folderId) {
-            const folder = userFoldersByCategoryId[currentFolderOptionsMenu.categoryId]?.find(f => f.id === currentFolderOptionsMenu.folderId);
-            if(folder) showDeleteConfirmation('folder', folder.id, `Are you sure you want to delete the folder "${folder.name}" and all its contents? This action cannot be undone.`, '', currentFolderOptionsMenu.categoryId);
+    
+    if (domElements.ctxRenameFolderButton) domElements.ctxRenameFolderButton.addEventListener('click', () => {
+        if (currentContextMenuTargetFolderBox) {
+            const folderItemContainer = currentContextMenuTargetFolderBox.closest('.folder-item-container');
+            if (folderItemContainer) {
+                const folderId = folderItemContainer.dataset.folderId;
+                const folder = findFolderById(folderId);
+                if (folder) handleRenameFolder(folder);
+            }
         }
         hideFolderContextMenu();
     });
 
-    domElements.tabsContainer.addEventListener('dragover', (e) => {
-        if (draggedItemElement && draggedItemElement.classList.contains('tab-button')) {
-            e.preventDefault();
-            const afterElement = getDragAfterElement(domElements.tabsContainer, e.clientX, '.tab-button:not(#add-category-button)');
-            if (afterElement == null) {
-                domElements.tabsContainer.insertBefore(draggedItemElement, domElements.addCategoryButton);
-            } else {
-                domElements.tabsContainer.insertBefore(draggedItemElement, afterElement);
+    if (domElements.ctxDeleteFolderButton) domElements.ctxDeleteFolderButton.addEventListener('click', () => {
+         if (currentContextMenuTargetFolderBox) {
+            const folderItemContainer = currentContextMenuTargetFolderBox.closest('.folder-item-container');
+            if (folderItemContainer) {
+                const folderId = folderItemContainer.dataset.folderId;
+                const folder = findFolderById(folderId);
+                if (folder) handleDeleteFolder(folder);
             }
         }
-    });
-    domElements.tabsContainer.addEventListener('drop', (e) => {
-        if (draggedItemElement && draggedItemElement.classList.contains('tab-button')) {
-            e.preventDefault();
-            const newOrder = Array.from(domElements.tabsContainer.querySelectorAll('.tab-button[data-category-id]'))
-                .map((tab, index) => ({ id: tab.dataset.categoryId, order: index }));
-            currentCategories.forEach(cat => {
-                const newOrderItem = newOrder.find(item => item.id === cat.id);
-                if (newOrderItem) cat.order = newOrderItem.order;
-            });
-            currentCategories.sort((a,b) => a.order - b.order);
-            saveUserCategories(currentCategories);
-            // renderTabs(); // Not strictly needed here as drop reorders visually. Save is key.
-        }
-    });
-
-    domElements.tabContentsContainer.addEventListener('dragover', (e) => {
-        const taskList = e.target.closest('ul.task-list');
-        if (taskList && draggedItemElement && draggedItemElement.classList.contains('task-item')) {
-            e.preventDefault();
-            document.querySelectorAll('.drag-over-indicator-task, .drag-over-indicator-task-bottom').forEach(el => {
-                el.classList.remove('drag-over-indicator-task', 'drag-over-indicator-task-bottom');
-            });
-            const afterElement = getDragAfterElement(taskList, e.clientY, '.task-item');
-            if (afterElement) {
-                const rect = afterElement.getBoundingClientRect();
-                if (e.clientY < rect.top + rect.height / 2) {
-                    afterElement.classList.add('drag-over-indicator-task');
-                } else {
-                    afterElement.classList.add('drag-over-indicator-task-bottom');
-                }
-                // taskList.insertBefore(draggedItemElement, afterElement); // visual move handled by dragend save
-            } else {
-                // taskList.appendChild(draggedItemElement); // visual move handled by dragend save
-            }
-        }
-        const notesArea = e.target.closest('.notes-content-display-area');
-        if (notesArea && draggedItemElement && draggedItemElement.classList.contains('note-item')) {
-            e.preventDefault();
-            document.querySelectorAll('.drag-over-indicator-note, .drag-over-indicator-note-bottom').forEach(el => {
-                el.classList.remove('drag-over-indicator-note', 'drag-over-indicator-note-bottom');
-            });
-            const afterElement = getDragAfterElement(notesArea, e.clientY, '.note-item');
-            if (afterElement) {
-                 const rect = afterElement.getBoundingClientRect();
-                if (e.clientY < rect.top + rect.height / 2) {
-                    afterElement.classList.add('drag-over-indicator-note');
-                } else {
-                    afterElement.classList.add('drag-over-indicator-note-bottom');
-                }
-                // notesArea.insertBefore(draggedItemElement, afterElement); // visual move handled by dragend save
-            } else {
-                // notesArea.appendChild(draggedItemElement); // visual move handled by dragend save
-            }
-        }
+        hideFolderContextMenu();
     });
     
     document.addEventListener('click', (e) => {
-        if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.classList.contains('hidden') && !domElements.categoryTabContextMenu.contains(e.target) && !e.target.closest('.tab-options-icon')) {
-            hideCategoryContextMenu();
-        }
-        if (domElements.folderOptionsContextMenu && !domElements.folderOptionsContextMenu.classList.contains('hidden') && !domElements.folderOptionsContextMenu.contains(e.target) && !e.target.closest('.folder-options-icon')) {
-            hideFolderContextMenu();
-        }
-        if (domElements.monthYearPickerModal && !domElements.monthYearPickerModal.classList.contains('hidden') && !domElements.monthYearPickerContent.contains(e.target) && e.target !== domElements.calendarMonthYearButton && !domElements.calendarMonthYearButton.contains(e.target)) {
+        if (domElements.categoryTabContextMenu && !domElements.categoryTabContextMenu.contains(e.target) && (!currentContextMenuTargetTab || !currentContextMenuTargetTab.contains(e.target))) hideCategoryContextMenu();
+        if (domElements.folderOptionsContextMenu && !domElements.folderOptionsContextMenu.contains(e.target) && (!currentContextMenuTargetFolderBox || !currentContextMenuTargetFolderBox.contains(e.target))) hideFolderContextMenu();
+        if (isMonthYearPickerOpen && domElements.monthYearPickerContent && !domElements.monthYearPickerContent.contains(e.target) && e.target !== domElements.calendarMonthYearButton && !domElements.calendarMonthYearButton?.contains(e.target)) {
             closeMonthYearPicker();
         }
-        if (domElements.sideMenu.classList.contains('open') && !domElements.sideMenu.contains(e.target) && e.target !== domElements.hamburgerMenuButton && !domElements.hamburgerMenuButton.contains(e.target)) {
-            domElements.hamburgerMenuButton.click(); 
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (domElements.historyModal && !domElements.historyModal.classList.contains('hidden')) closeHistoryModal();
+            else if (domElements.fullscreenContentModal && !domElements.fullscreenContentModal.classList.contains('hidden')) closeFullscreenContentModal();
+            else if (domElements.deleteConfirmationModal && !domElements.deleteConfirmationModal.classList.contains('hidden')) hideDeleteConfirmation();
+            else if (domElements.chooseFolderTypeModal && !domElements.chooseFolderTypeModal.classList.contains('hidden')) closeChooseFolderTypeModal();
+            else if (domElements.enterFolderNameModal && !domElements.enterFolderNameModal.classList.contains('hidden')) closeEnterFolderNameModal();
+            else if (domElements.monthYearPickerModal && !domElements.monthYearPickerModal.classList.contains('hidden')) closeMonthYearPicker();
+            else if (domElements.appMenuPanel && !domElements.appMenuPanel.classList.contains('hidden')) toggleMenu();
+            else if (currentContextMenuTargetTab) hideCategoryContextMenu();
+            else if (currentContextMenuTargetFolderBox) hideFolderContextMenu();
+
         }
     });
-} 
 
-// Helper: Get Category Name by ID
-function getCategoryNameById(categoryId) {
-    const category = currentCategories.find(c => c.id === categoryId);
-    return category ? category.name : 'Unknown Category';
+    if (domElements.menuToggleButton) domElements.menuToggleButton.addEventListener('click', toggleMenu);
+    if (domElements.menuItemProgress) domElements.menuItemProgress.addEventListener('click', () => showMenuSelectedView('Progress', domElements.progressView));
+    if (domElements.menuItemClock) domElements.menuItemClock.addEventListener('click', () => showMenuSelectedView('Live Clock', domElements.liveClockView, initializeAnalogClock));
+    if (domElements.menuItemDashboard) domElements.menuItemDashboard.addEventListener('click', () => showMenuSelectedView('Activity Dashboard', domElements.dashboardColumnView, updateDashboardSummaries));
+    if (domElements.closeMenuSelectedViewButton) domElements.closeMenuSelectedViewButton.addEventListener('click', showMainAppView);
+    
+    updateLayoutBasedOnScreenSize();
+    window.addEventListener('resize', updateLayoutBasedOnScreenSize);
+
+    if (domElements.tabsContainer && domElements.tabsContainer.querySelector('.active')) {
+        domElements.tabsContainer.querySelector('.active').focus();
+    }
 }
 
-// Entry Point
-document.addEventListener('DOMContentLoaded', () => {
-    initDOM();
-    loadAppData();
-    renderTabs();
-    renderAllCategorySections();
-    updateAllProgress();
-    switchTab(activeTabId); 
-    showView('dashboard'); 
-});
+// Menu System Functions
+function toggleMenu() {
+    if (!domElements.menuToggleButton || !domElements.appMenuPanel) return;
+    const isExpanded = domElements.menuToggleButton.getAttribute('aria-expanded') === 'true';
+    domElements.menuToggleButton.setAttribute('aria-expanded', !isExpanded);
+    domElements.appMenuPanel.classList.toggle('hidden');
+    domElements.appMenuPanel.setAttribute('aria-hidden', isExpanded.toString());
+    const firstMenuButton = domElements.appMenuPanel.querySelector('button');
+    if (!isExpanded && firstMenuButton) {
+        firstMenuButton.focus();
+    } else {
+        domElements.menuToggleButton.focus();
+    }
+}
+
+function showMenuSelectedView(title, viewElement, onShowCallback = null) {
+    if (liveClockInterval) {
+        clearInterval(liveClockInterval);
+        liveClockInterval = null;
+    }
+
+    if (domElements.menuSelectedContentTitle) domElements.menuSelectedContentTitle.textContent = title;
+    
+    if (domElements.dashboardColumnView) domElements.dashboardColumnView.classList.add('hidden');
+    if (domElements.liveClockView) domElements.liveClockView.classList.add('hidden');
+    if (domElements.progressView) domElements.progressView.classList.add('hidden');
+    
+    if (viewElement) viewElement.classList.remove('hidden');
+    
+    if (domElements.menuSelectedContentView) domElements.menuSelectedContentView.classList.remove('hidden');
+    if (domElements.appViewWrapper) domElements.appViewWrapper.classList.add('hidden'); 
+    if (domElements.menuToggleButton) domElements.menuToggleButton.classList.add('hidden'); 
+    
+    if (onShowCallback) {
+        onShowCallback();
+    }
+    if (domElements.appMenuPanel && !domElements.appMenuPanel.classList.contains('hidden')) {
+      toggleMenu(); 
+    }
+    if (domElements.closeMenuSelectedViewButton) domElements.closeMenuSelectedViewButton.focus();
+}
+
+function showMainAppView() {
+    if (liveClockInterval) {
+        clearInterval(liveClockInterval);
+        liveClockInterval = null;
+    }
+    if (domElements.menuSelectedContentView) domElements.menuSelectedContentView.classList.add('hidden');
+    if (domElements.appViewWrapper) domElements.appViewWrapper.classList.remove('hidden'); 
+    if (domElements.menuToggleButton) domElements.menuToggleButton.classList.remove('hidden'); 
+    
+    if (domElements.tabsContainer && domElements.tabContentsContainer) {
+        const currentActiveTabButton = domElements.tabsContainer.querySelector('.tab-button.active');
+        if(currentActiveTabButton) {
+            const activeSectionId = currentActiveTabButton.id === 'dashboard-tab-button' ? 'dashboard-content' : `category-section-${currentActiveTabButton.dataset.categoryId}`;
+            domElements.tabContentsContainer.querySelectorAll('section[role="tabpanel"]').forEach(section => {
+                 section.classList.toggle('hidden', section.id !== activeSectionId);
+            });
+        }
+    }
+    updateLayoutBasedOnScreenSize(); 
+    if (domElements.menuToggleButton) domElements.menuToggleButton.focus();
+}
+
+function initializeAnalogClock() {
+    if (liveClockInterval) clearInterval(liveClockInterval);
+    updateAnalogClock(); 
+    liveClockInterval = setInterval(updateAnalogClock, 1000);
+}
+
+function updateAnalogClock() {
+    const now = new Date();
+    const seconds = now.getSeconds();
+    const minutes = now.getMinutes();
+    const hours = now.getHours();
+
+    const secondDeg = (seconds / 60) * 360;
+    const minuteDeg = (minutes / 60) * 360 + (seconds / 60) * 6; 
+    const hourDeg = (hours / 12) * 360 + (minutes / 60) * 30; 
+
+    if (domElements.hourHand) domElements.hourHand.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
+    if (domElements.minuteHand) domElements.minuteHand.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
+    if (domElements.secondHand) domElements.secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
+}
+
+// PC Progress Sidebar Logic
+function updateLayoutBasedOnScreenSize() {
+    const isPCView = window.innerWidth >= 1025;
+    
+    if (!domElements.appProgressSidebar || !domElements.mobileProgressLocation || !domElements.todayProgressContainer || !domElements.currentWeekProgressContainer || !domElements.appViewWrapper || !domElements.mainContentWrapper || !domElements.menuToggleButton) {
+        return;
+    }
+
+    if (isPCView) {
+        domElements.appProgressSidebar.appendChild(domElements.todayProgressContainer);
+        domElements.appProgressSidebar.appendChild(domElements.currentWeekProgressContainer);
+        domElements.appProgressSidebar.style.display = 'flex';
+        domElements.mobileProgressLocation.style.display = 'none';
+        domElements.appViewWrapper.style.flexDirection = 'row';
+        domElements.mainContentWrapper.style.paddingLeft = '45px'; 
+    } else {
+        domElements.mobileProgressLocation.appendChild(domElements.todayProgressContainer);
+        domElements.mobileProgressLocation.appendChild(domElements.currentWeekProgressContainer);
+        domElements.appProgressSidebar.style.display = 'none';
+        domElements.mobileProgressLocation.style.display = 'block';
+        domElements.appViewWrapper.style.flexDirection = 'column';
+        const menuButtonVisible = !domElements.menuToggleButton.classList.contains('hidden');
+        domElements.mainContentWrapper.style.paddingLeft = menuButtonVisible ? (window.innerWidth <= 700 ? '50px' : '65px') : (window.innerWidth <= 700 ? '15px' : '30px'); // Adjusted default padding for smaller screens
+    }
+}
+
+
+function showCategoryContextMenu(categoryId, tabButton) {
+    hideFolderContextMenu(); 
+    currentContextMenuTargetTab = tabButton;
+    const rect = tabButton.getBoundingClientRect();
+    if (domElements.categoryTabContextMenu) {
+        domElements.categoryTabContextMenu.style.top = `${rect.bottom + window.scrollY}px`;
+        domElements.categoryTabContextMenu.style.left = `${rect.left + window.scrollX}px`;
+        domElements.categoryTabContextMenu.classList.remove('hidden');
+        const firstButtonInCtxMenu = domElements.categoryTabContextMenu.querySelector('button');
+        if (firstButtonInCtxMenu) firstButtonInCtxMenu.focus(); 
+    }
+    
+    const optionsIcon = tabButton.querySelector('.tab-options-icon');
+    if (optionsIcon) optionsIcon.classList.add('visible');
+}
+
+function hideCategoryContextMenu() {
+    if (currentContextMenuTargetTab) {
+        const optionsIcon = currentContextMenuTargetTab.querySelector('.tab-options-icon');
+        if (optionsIcon) optionsIcon.classList.remove('visible');
+    }
+    if (domElements.categoryTabContextMenu) {
+      domElements.categoryTabContextMenu.classList.add('hidden');
+    }
+    currentContextMenuTargetTab = null;
+}
+
+function showFolderContextMenu(folder, folderBoxElement) {
+    hideCategoryContextMenu();
+    currentContextMenuTargetFolderBox = folderBoxElement;
+    const rect = folderBoxElement.getBoundingClientRect();
+    
+    if (domElements.folderOptionsContextMenu) {
+        domElements.folderOptionsContextMenu.style.top = `${rect.bottom + window.scrollY}px`;
+        domElements.folderOptionsContextMenu.style.left = `${rect.left + window.scrollX}px`;
+        domElements.folderOptionsContextMenu.classList.remove('hidden');
+        const firstButtonInCtxMenu = domElements.folderOptionsContextMenu.querySelector('button');
+        if (firstButtonInCtxMenu) firstButtonInCtxMenu.focus();
+    }
+
+    const optionsTrigger = folderBoxElement.querySelector('.folder-options-trigger');
+    if (optionsTrigger) optionsTrigger.classList.add('visible');
+}
+
+function hideFolderContextMenu() {
+    if (currentContextMenuTargetFolderBox) {
+         const optionsTrigger = currentContextMenuTargetFolderBox.querySelector('.folder-options-trigger');
+        if (optionsTrigger) optionsTrigger.classList.remove('visible');
+    }
+    if (domElements.folderOptionsContextMenu) {
+      domElements.folderOptionsContextMenu.classList.add('hidden');
+    }
+    currentContextMenuTargetFolderBox = null;
+}
+
+
+// Start the application
+document.addEventListener('DOMContentLoaded', initializeApp);
