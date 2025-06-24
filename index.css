@@ -35,12 +35,11 @@ html {
 }
 
 /* Hide scrollbars for specific sections: Activity Dashboard and Daily Productivity column */
-#dashboard-column::-webkit-scrollbar,
+/* dashboard-column scrollbar will be handled by its new container if needed */
 #left-column::-webkit-scrollbar {
     display: none; /* For WebKit browsers */
 }
 
-#dashboard-column,
 #left-column {
     scrollbar-width: none; /* For Firefox */
     -ms-overflow-style: none; /* For IE and Edge (older versions) */
@@ -132,7 +131,7 @@ body {
     background: linear-gradient(125deg, #0D0C15, #141120, #0A0910, #141120, #0D0C15);
     background-size: 400% 400%;
     animation: animateBackgroundGradient 60s ease-in-out infinite;
-    overflow-x: hidden; /* Prevent horizontal scroll with side menu */
+    overflow-x: hidden; /* Prevent horizontal scroll from menu transitions */
 }
 
 #app-container {
@@ -148,282 +147,132 @@ body {
     flex-direction: column;
     height: calc(100vh - 60px);
     max-height: 900px;
+    overflow: hidden; /* Important for containing fixed/absolute menu elements */
 }
 
-/* Hamburger Menu and Side Navigation */
-#hamburger-menu-button {
+/* New Menu System Styles */
+#menu-toggle-button {
     position: absolute;
-    top: 25px; 
-    left: 25px;
-    z-index: 1100; /* Above most content, below modals */
+    top: 25px;
+    left: 30px; 
+    right: auto; 
+    z-index: 1100; 
     background: none;
     border: none;
     color: #00CFE8;
-    cursor: pointer;
     padding: 8px;
+    cursor: pointer;
     border-radius: 50%;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
-#hamburger-menu-button svg {
-    width: 28px;
-    height: 28px;
-    fill: currentColor;
-}
-#hamburger-menu-button:hover {
+#menu-toggle-button:hover {
     background-color: rgba(0, 207, 232, 0.1);
-    color: #7FFFD4;
+}
+#menu-toggle-button svg {
+    display: block; 
 }
 
-#side-menu {
-    position: fixed; /* Or absolute if #app-container is overflow:hidden */
+#app-menu-panel {
+    position: absolute;
     top: 0;
-    left: -280px; /* Hidden off-screen */
-    width: 260px;
+    left: 0; 
+    right: auto; 
+    width: 250px;
     height: 100%;
-    background-color: #1A1724; /* Slightly different from modal content for distinction */
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 5px 0 15px rgba(0,0,0,0.2);
-    padding: 70px 0 20px; /* Space for hamburger button and content */
-    z-index: 1090; /* Below hamburger button if it stays visible */
-    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    flex-direction: column;
+    background-color: #1A1724; 
+    border-right: 1px solid rgba(255, 255, 255, 0.1); 
+    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.25); 
+    z-index: 1090; 
+    transform: translateX(-100%); 
+    transition: transform 0.3s ease-in-out;
+    padding-top: 80px; 
+    padding-left: 20px;
+    padding-right: 20px;
 }
-#side-menu.open {
-    left: 0;
+#app-menu-panel:not(.hidden) {
+    transform: translateX(0);
 }
-#side-menu ul {
+#app-menu-panel ul {
     list-style: none;
     padding: 0;
     margin: 0;
 }
-#side-menu li .side-menu-link {
+#app-menu-panel li {
+    margin-bottom: 10px;
+}
+.menu-panel-button {
     display: block;
-    padding: 15px 25px;
-    color: #C5C1D6;
-    text-decoration: none;
-    font-size: 1.1em;
-    font-family: 'Poppins', sans-serif;
-    border: none;
-    background: none;
     width: 100%;
+    padding: 12px 15px;
+    background: none;
+    border: none;
+    color: #C5C1D6;
     text-align: left;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.05em;
+    font-weight: 500;
     cursor: pointer;
+    border-radius: 6px;
     transition: background-color 0.2s ease, color 0.2s ease;
 }
-#side-menu li .side-menu-link:hover,
-#side-menu li .side-menu-link.active-view {
+.menu-panel-button:hover {
     background-color: rgba(0, 207, 232, 0.1);
     color: #E0FFFF;
 }
 
-/* Progress System View */
-#progress-system-view {
-    flex-grow: 1; /* Takes up space if #main-content-wrapper is hidden */
+/* View wrapper for main app content + PC progress sidebar */
+#app-view-wrapper {
     display: flex;
-    flex-direction: column;
-    padding: 25px 30px; /* Consistent padding */
-    overflow-y: auto;
-    background-color: #12101A; /* Match app background */
-}
-#progress-system-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-#progress-system-header h2 {
-    font-size: 2em;
-    color: #BE93FD;
-    font-family: 'Playfair Display', serif;
-    font-weight: 600;
-}
-#progress-system-back-button {
-    font-size: 1em;
-    gap: 8px;
-}
-#progress-system-back-button svg {
-    width: 20px; height: 20px;
-}
-
-#progress-system-tabs {
-    display: flex;
-    margin-bottom: 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-.progress-tab-button {
+    flex-direction: column; /* Default for mobile */
     flex-grow: 1;
-    padding: 15px 10px;
-    cursor: pointer;
-    background-color: transparent;
-    border: none;
-    border-bottom: 3px solid transparent;
-    font-size: 1.1em;
-    color: #A09CB8;
-    font-family: 'Poppins', sans-serif;
-    transition: color 0.3s ease, border-bottom-color 0.3s ease;
-}
-.progress-tab-button.active,
-.progress-tab-button:hover {
-    color: #00E5FF;
-}
-.progress-tab-button.active {
-    border-bottom-color: #00E5FF;
-    font-weight: 600;
+    height: 100%; 
+    overflow: hidden; 
 }
 
-#progress-setup-form .form-group {
-    margin-bottom: 20px;
+/* PC Progress Sidebar */
+#app-progress-sidebar {
+    display: none; /* Hidden on mobile by default */
+    flex-direction: column;
+    padding: 40px 20px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    overflow-y: auto;
+    flex-shrink: 0; /* Prevents shrinking if main content is too wide */
+    width: 280px; /* Default PC width */
 }
-#progress-setup-form label {
-    display: block;
-    color: #BE93FD;
-    margin-bottom: 8px;
-    font-size: 1.05em;
-    font-weight: 500;
+#app-progress-sidebar .sidebar-title {
+    font-size: 2.2em;
+    font-weight: 700;
+    color: #00CFE8; /* Match main header */
+    animation: pulseHeaderGlow 3s infinite ease-in-out;
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: 0.5px;
+    margin-bottom: 30px;
+    text-align: center;
 }
-#progress-setup-form input[type="text"],
-#progress-setup-form input[type="date"],
-#progress-setup-form input[type="number"],
-#progress-setup-form select {
+/* Progress containers when inside the sidebar */
+#app-progress-sidebar #today-progress-container,
+#app-progress-sidebar #current-week-progress-container {
     width: 100%;
-    padding: 12px 15px;
-    background-color: rgba(0,0,0, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1em;
-    color: #C5C1D6;
+    margin-left: 0;
+    margin-right: 0;
 }
-#progress-setup-form input:focus,
-#progress-setup-form select:focus {
-    outline: none;
-    border-color: #00CFE8;
-    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.25);
-}
-#progress-setup-form select option {
-    background-color: #1A1724; /* Match modal background for dropdown options */
-    color: #C5C1D6;
-}
-#progress-form-actions {
-    display: flex;
-    gap: 15px;
-    margin-top: 25px;
-}
-#save-progress-plan-button,
-#end-current-plan-button {
-    padding: 12px 20px;
-    border: none;
-    border-radius: 8px;
-    font-family: 'Playfair Display', serif;
-    font-size: 1em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-}
-#save-progress-plan-button {
-    background-color: #00CFE8; color: #12101A;
-}
-#save-progress-plan-button:hover { background-color: #33DFFF; }
-#end-current-plan-button {
-    background-color: #FF6B6B; color: #FFFFFF;
-}
-#end-current-plan-button:hover { background-color: #FF8787; }
-
-#active-plan-summary {
-    margin-top: 30px;
-    padding: 20px;
-    background-color: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 10px;
-}
-#active-plan-summary h4 {
-    color: #00E5FF;
-    font-size: 1.3em;
-    margin-bottom: 15px;
-}
-#active-plan-summary p {
-    margin-bottom: 8px;
-    font-size: 1em;
-    color: #B0ACC9;
-}
-#active-plan-summary p strong {
-    color: #D5D0E5;
-    min-width: 130px;
-    display: inline-block;
-}
-
-
-#progress-history-content h3 {
-    font-size: 1.6em;
-    color: #BE93FD;
-    margin-bottom: 20px;
-}
-#progress-history-list {
-    list-style: none;
-    padding: 0;
-}
-#progress-history-list li {
-    background-color: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    padding: 18px 22px;
-    margin-bottom: 15px;
-    font-family: 'Poppins', sans-serif;
-}
-#progress-history-list .history-item-name {
-    font-size: 1.2em;
-    color: #00CFE8;
-    font-weight: 600;
-    margin-bottom: 8px;
-}
-#progress-history-list .history-item-dates,
-#progress-history-list .history-item-stats {
-    font-size: 0.95em;
-    color: #A09CB8;
-    margin-bottom: 5px;
-}
-#progress-history-list .history-item-stats strong {
-    color: #B0ACC9;
-}
-#no-progress-history {
-    text-align: center; padding: 30px 20px; color: #8A83A0; font-style: italic;
-    font-size: 1.05em;
-}
-/* End Progress System View Styles */
 
 
 #main-content-wrapper {
     display: flex;
     flex-grow: 1;
     overflow: hidden;
-    padding: 40px 45px 0; /* Default padding, adjust if hamburger takes space */
+    padding: 40px 45px 0;
+    padding-left: 75px; 
 }
-#main-content-wrapper.view-hidden { /* Used when progress view is active */
-    display: none;
-}
-
 
 #dashboard-column {
-    flex: 0 0 40%;
-    padding-right: 22.5px;
+    flex: 1; 
+    padding: 20px; 
     overflow-y: auto;
     height: 100%;
 }
-
-#left-column {
-    flex: 0 0 60%;
-    padding-left: 22.5px;
-    border-left: 1px solid rgba(255, 255, 255, 0.08);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-}
-
-
-#dashboard-column > h2 {
+#dashboard-column > h2 { 
     font-size: 2em;
     margin-bottom: 35px;
     color: #E0E0FF;
@@ -435,27 +284,35 @@ body {
 }
 
 
+#left-column {
+    flex: 0 0 100%; 
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+
 header {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 30px; /* Adjusted margin */
+    margin-bottom: 30px; 
 }
 
 #main-logo {
-    width: 70px; /* Adjust size as needed */
-    height: 70px; /* Adjust size as needed */
-    margin-bottom: 10px; /* Space between logo and title */
+    width: 70px; 
+    height: 70px; 
+    margin-bottom: 10px; 
 }
 
 header h1 {
-    font-size: 2.5em; /* Slightly adjust if needed with logo */
+    font-size: 2.5em; 
     font-weight: 700;
     color: #00CFE8;
     animation: pulseHeaderGlow 3s infinite ease-in-out;
     font-family: 'Poppins', sans-serif;
     letter-spacing: 0.5px;
-    margin-top: 0; /* Remove default top margin if any */
+    margin-top: 0; 
 }
 
 /* Tabs */
@@ -464,7 +321,7 @@ header h1 {
     margin-bottom: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
-    flex-wrap: wrap; /* Allow tabs to wrap if many categories are added */
+    flex-wrap: wrap; 
 }
 
 .tab-button {
@@ -482,13 +339,13 @@ header h1 {
     letter-spacing: 0.2px;
     white-space: nowrap;
     user-select: none;
-    position: relative; /* For checkmark and badge positioning */
+    position: relative; 
     transition: color 0.3s ease, border-bottom-color 0.3s ease, background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease, border-radius 0.2s ease;
 }
 
 #add-category-button {
-    flex-grow: 0; /* Don't let it grow like other tabs */
-    padding: 15px; /* Adjust padding for icon button */
+    flex-grow: 0; 
+    padding: 15px; 
     margin-left: 10px;
     border-radius: 8px;
     color: #7FFFD4;
@@ -509,7 +366,7 @@ header h1 {
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
     z-index: 2;
-    padding: 24px 15px; /* Increased vertical padding */
+    padding: 24px 15px; 
 }
 .tab-button.main-tab-highlight:hover:not(.active) {
     color: #E0FFFF;
@@ -584,23 +441,25 @@ header h1 {
     z-index: 4; 
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     pointer-events: none; 
-    opacity: 0.7; /* Default subtle state */
+    opacity: 0.7; 
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .tab-button:hover .notification-badge,
-.tab-button.show-badge-highlight .notification-badge, /* JS will add this class on tap for mobile */
-.tab-button:focus-within .notification-badge { /* More robust for keyboard nav */
+.tab-button.show-badge-highlight .notification-badge, 
+.tab-button:focus-within .notification-badge { 
     opacity: 1;
     transform: scale(1.1);
 }
 
 .tab-button.category-complete-indicator .notification-badge {
-    display: none; /* Hide badge if category is complete (checkmark shown) */
+    display: none; 
 }
 
-/* Generic Entity Options Icon (for Tabs and Folders) */
-.entity-options-icon {
+/* Category Tab Context Menu (three dots icon) */
+.tab-options-icon {
     position: absolute;
+    top: 6px;
+    right: 6px;
     width: 20px;
     height: 20px;
     display: flex;
@@ -608,44 +467,31 @@ header h1 {
     justify-content: space-around;
     align-items: center;
     cursor: pointer;
-    opacity: 0; /* Hidden by default */
+    opacity: 0; 
     transition: opacity 0.2s ease;
     z-index: 5;
-    padding: 2px; /* Clickable area */
+    padding: 2px; 
 }
-.entity-options-icon span {
+.tab-button:hover .tab-options-icon,
+.tab-button .tab-options-icon.visible { 
+    opacity: 0.8;
+}
+.tab-options-icon:hover {
+    opacity: 1;
+}
+.tab-options-icon span {
     display: block;
     width: 3.5px;
     height: 3.5px;
-    background-color: #A09CB8;
+    background-color: #A09CB8; 
     border-radius: 50%;
 }
-.entity-options-icon.visible,
-.tab-button:hover .entity-options-icon,
-.task-folder-box-wrapper:hover .entity-options-icon { /* Show on hover for parent */
-    opacity: 0.8;
-}
-.entity-options-icon:hover {
-    opacity: 1;
-}
-.entity-options-icon.visible span,
-.tab-button:hover .entity-options-icon span,
-.task-folder-box-wrapper:hover .entity-options-icon span {
+.tab-button:hover .tab-options-icon span,
+.tab-button .tab-options-icon.visible span {
     background-color: #C5C1D6;
 }
-/* Tab specific positioning for options icon */
-.tab-button .entity-options-icon {
-    top: 6px;
-    right: 6px;
-}
-/* Folder specific positioning for options icon */
-.task-folder-box-wrapper .entity-options-icon {
-    top: 5px;
-    right: 5px;
-}
 
-
-/* Shared Context Menu (for Tabs and Folders) */
+/* Shared Context Menu */
 .context-menu {
     position: absolute;
     background-color: #1F1C2C;
@@ -654,7 +500,7 @@ header h1 {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     padding: 8px 0;
     z-index: 1050; 
-    min-width: 160px; /* Slightly wider for longer text like "Rename Folder" */
+    min-width: 120px;
 }
 .context-menu button {
     display: block;
@@ -672,7 +518,8 @@ header h1 {
     background-color: rgba(0, 207, 232, 0.1);
     color: #E0FFFF;
 }
-.context-menu button[id*="delete"]:hover { /* Universal delete styling */
+.context-menu button#ctx-delete-category:hover,
+.context-menu button#ctx-delete-folder:hover {
     background-color: rgba(255, 107, 107, 0.1);
     color: #FF8787;
 }
@@ -687,6 +534,7 @@ main#tab-content {
 #tab-content section { padding: 0 5px; }
 #tab-content section.hidden { display: none; }
 
+/* Category Section Styling - Container for folders or folder content */
 .category-section .category-header {
     display: flex;
     justify-content: space-between;
@@ -694,7 +542,6 @@ main#tab-content {
     margin-bottom: 25px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     padding-bottom: 18px;
-    position: relative; /* For back button positioning */
 }
 .category-section .category-header .category-title-text { 
     font-size: 2em;
@@ -708,34 +555,14 @@ main#tab-content {
     margin: 0;
     border: none;
     padding: 0;
-    flex-grow: 1; /* Allow title to take space */
-    text-align: left; /* Default, overridden if back button present */
 }
-.category-header-controls { /* This div will be hidden when viewing folder list */
+
+.folder-view-header-controls {
     display: flex;
     gap: 10px; 
     align-items: center;
+    margin-left: auto; 
 }
-.back-to-folders-button {
-    color: #00CFE8;
-    margin-right: 15px; /* Space between back button and title */
-    font-size: 1em; /* Adjust as needed */
-    font-family: 'Poppins', sans-serif;
-    font-weight: 500;
-    gap: 6px;
-}
-.back-to-folders-button svg {
-    width: 20px;
-    height: 20px;
-}
-.back-to-folders-button:hover {
-    color: #7FFFD4;
-    background-color: rgba(0, 207, 232, 0.05);
-}
-.category-header.has-back-button .category-title-text {
-    text-align: center; /* Center title when back button is present */
-}
-
 
 .icon-button { 
     background: none;
@@ -755,19 +582,24 @@ main#tab-content {
     height: 22px;
     fill: currentColor;
 }
-.edit-mode-toggle-button,
-.undo-category-button { 
+.edit-mode-toggle-button, 
+.undo-category-button, 
+.add-image-button { 
     text-shadow: 0 0 5px rgba(0, 229, 255, 0.5), 0 0 10px rgba(0, 229, 255, 0.3);
 }
 .edit-mode-toggle-button:hover,
-.undo-category-button:hover {
+.undo-category-button:hover,
+.add-image-button:hover,
+#close-menu-selected-view-button:hover { 
     color: #7FFFD4;
     background-color: rgba(127, 255, 212, 0.1);
     text-shadow: 0 0 8px rgba(127, 255, 212, 0.7), 0 0 18px rgba(127, 255, 212, 0.5);
 }
 
 .edit-mode-toggle-button:active,
-.undo-category-button:active {
+.undo-category-button:active,
+.add-image-button:active,
+#close-menu-selected-view-button:active { 
     transform: scale(0.92);
 }
 .edit-mode-toggle-button.active-glow {
@@ -828,7 +660,7 @@ main#tab-content {
     border: 1px solid rgba(255, 255, 255, 0.07); padding: 20px;
     box-shadow: 0 2px 6px rgba(0,0,0, 0.08);
     position: relative; 
-    margin-top: 35px; /* Added margin-top to separate from items above */
+    margin-top: 35px; 
 }
 #calendar-header {
     display: flex;
@@ -887,11 +719,11 @@ main#tab-content {
 }
 .calendar-day-number {
     position: relative; z-index: 2; font-size: 0.95em; color: #A09CB8; padding: 5px;
-    font-family: 'Poppins', sans-serif; /* Poppins font for dates */
+    font-family: 'Poppins', sans-serif; 
 }
 .calendar-day-fill {
     position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
-    background-color: hsla(185, 75%, 50%, 0.3); /* Default subtle cyan fill */
+    background-color: hsla(185, 75%, 50%, 0.3); 
     transition: height 0.4s ease-out, background-color 0.3s ease;
     z-index: 1; border-radius: 0 0 4px 4px;
 }
@@ -908,7 +740,7 @@ main#tab-content {
 }
 .calendar-day-cell.current-day .calendar-day-number { font-weight: 700; color: #00E5FF; }
 .calendar-day-cell.current-day .calendar-day-fill {
-    background-color: hsl(185, 100%, 45%) !important; /* Vibrant cyan for current day */
+    background-color: hsl(185, 100%, 45%) !important; 
     box-shadow: none;
 }
 
@@ -922,7 +754,7 @@ main#tab-content {
 .calendar-day-cell.has-history:not(.current-day):hover { background-color: rgba(190, 147, 253, 0.1); border-color: rgba(190, 147, 253, 0.4); }
 
 .calendar-day-cell.calendar-day-past .calendar-day-fill {
-    background-color: hsla(185, 75%, 50%, 0.7); /* Muted cyan for past days with history */
+    background-color: hsla(185, 75%, 50%, 0.7); 
 }
 .calendar-day-cell.calendar-day-past {
     box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4); 
@@ -933,7 +765,7 @@ main#tab-content {
     background-color: rgba(0, 184, 212, 0.15); 
 }
 .calendar-day-cell.calendar-day-past:hover .calendar-day-fill {
-    background-color: hsla(185, 85%, 55%, 0.8); /* Slightly brighter cyan on hover for past */
+    background-color: hsla(185, 85%, 55%, 0.8); 
 }
 
 
@@ -1008,7 +840,7 @@ main#tab-content {
     margin-bottom: 6px; 
 }
 
-/* Dashboard Specific Styles */
+/* Dashboard Specific Styles (within #dashboard-column, when shown in menu view) */
 #dashboard-summaries {
     display: grid; grid-template-columns: repeat(2, 1fr); gap: 28px; margin-bottom: 40px;
 }
@@ -1049,16 +881,20 @@ main#tab-content {
 #today-progress-container { margin-top: 0; }
 #current-week-progress-container { margin-top: 30px; }
 
-#today-progress-container h3, 
-#current-week-progress-container h3.weekly-plan-name-title { /* Updated selector for weekly plan title */
-    font-size: 1.6em; color: #BE93FD; margin-bottom: 12px; /* Reduced bottom margin for plan name */
-    font-weight: 600; text-align: left; letter-spacing: 0.3px;
-    font-family: 'Playfair Display', serif;
+/* Styles for progress containers when in mobile location */
+#mobile-progress-location #today-progress-container,
+#mobile-progress-location #current-week-progress-container {
+    margin-left: 0;
+    margin-right: 0;
 }
-#current-week-progress-container .progress-bar-container {
-    margin-top: 10px; /* Add some space if plan name is shown */
-}
+#mobile-progress-location { display: block; } /* Default visible on mobile */
 
+
+#today-progress-container h3, #current-week-progress-container h3 {
+    font-size: 1.6em; color: #BE93FD; margin-bottom: 22px; font-weight: 600;
+    text-align: left; letter-spacing: 0.3px;
+    font-family: 'Playfair Display', serif; 
+}
 .progress-bar-container {
     background-color: rgba(0,0,0, 0.2); border-radius: 8px; overflow: hidden;
     height: 22px; border: 1px solid rgba(255,255,255,0.05);
@@ -1071,28 +907,252 @@ main#tab-content {
     transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.6s ease-in-out;
     text-align: right; line-height: 22px; color: #0A0A10; font-weight: 600;
     font-size: 0.85em; padding-right: 8px;
-    font-family: 'Poppins', sans-serif; /* Poppins for percentage text */
+    font-family: 'Poppins', sans-serif; 
 }
 .points-stat {
-    font-family: 'Poppins', sans-serif; /* Poppins for point values */
+    font-family: 'Poppins', sans-serif; 
     font-size: 1.1em; color: #D5D0E5; font-weight: 500;
     text-align: left; letter-spacing: 0.1px; margin-bottom: 0;
 }
-.history-points-text { margin-bottom: 12px; }
+
+.history-points-text {
+    margin-bottom: 12px; 
+}
 .history-percentage-label { 
-    font-family: 'Poppins', sans-serif; font-size: 1.1em; color: #D5D0E5; 
-    font-weight: 500; text-align: left; letter-spacing: 0.1px; margin-bottom: 8px; 
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.1em; color: #D5D0E5; font-weight: 500;
+    text-align: left; letter-spacing: 0.1px;
+    margin-bottom: 8px; 
+}
+
+/* Folder System Specific Styles */
+.category-section .category-content-area {
+    padding-top: 15px;
+}
+.folder-view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.folder-back-button {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1em;
+    color: #00CFE8;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px; 
+    border-radius: 50%; 
+    transition: background-color 0.2s ease, color 0.2s ease;
+    line-height: 1; 
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px; 
+}
+.folder-back-button:hover {
+    background-color: rgba(0, 207, 232, 0.1);
+    color: #7FFFD4;
+}
+.folder-back-button svg { 
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.folder-view-title {
+    font-size: 1.6em; 
+    color: #E0E0FF;
+    font-weight: 600;
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: 0.2px;
+    margin: 0; 
+    flex-grow: 1;
+    text-align: left;
+}
+.folders-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px; 
+    padding: 10px 0;
+}
+
+.folder-item-container { 
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    padding: 5px; 
+    border-radius: 4px; 
+}
+.folder-item-container:focus-visible {
+    outline: 2px solid #7FFFD4;
+    outline-offset: 0px;
+}
+.folder-item-container:focus-visible .folder-box {
+    box-shadow: 0 0 10px 2px rgba(0, 207, 232, 0.4), 0 0 18px 3px rgba(0, 207, 232, 0.3);
 }
 
 
-/* Add Task Form Elements (shown when inside a folder and in edit mode) */
+.folder-box { 
+    width: 80px; 
+    height: 80px;
+    background-color: #0c0a14; 
+    border: 1px solid #00CFE8;
+    border-radius: 12px;
+    box-shadow: 0 0 8px 1px rgba(0, 207, 232, 0.3), 0 0 15px 2px rgba(0, 207, 232, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px; 
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.folder-item-container:hover .folder-box {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 0 12px 2px rgba(0, 207, 232, 0.5), 0 0 20px 3px rgba(0, 207, 232, 0.35);
+}
+
+.folder-box-icon {
+    width: 50%; 
+    height: auto;
+}
+.folder-box-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: #00CFE8;
+}
+.folder-box-name { 
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: #C5C1D6;
+    word-break: break-word;
+    line-height: 1.2;
+    text-align: center;
+    margin-top: 6px; 
+    max-width: 80px; 
+}
+
+.add-folder-button { 
+    width: 80px; 
+    height: 80px;
+    border: 2px dashed rgba(0, 207, 232, 0.3);
+    border-radius: 12px;
+    color: rgba(0, 207, 232, 0.6);
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+    padding: 0; 
+}
+.add-folder-button svg {
+    width: 30px; 
+    height: 30px;
+    fill: currentColor;
+}
+.add-folder-button:hover {
+    border-color: #00CFE8;
+    color: #00CFE8;
+    background-color: rgba(0, 207, 232, 0.05);
+}
+
+.folder-options-trigger {
+    position: absolute;
+    top: 6px; 
+    right: 6px; 
+    width: 22px; 
+    height: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    cursor: pointer;
+    padding: 3px;
+    border-radius: 50%;
+    opacity: 0; 
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+.folder-item-container:hover .folder-options-trigger,
+.folder-options-trigger.visible { 
+    opacity: 1;
+}
+.folder-options-trigger:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+.folder-options-trigger span {
+    display: block;
+    width: 3.5px; 
+    height: 3.5px;
+    background-color: #A09CB8;
+    border-radius: 50%;
+}
+.folder-item-container:hover .folder-options-trigger span,
+.folder-options-trigger.visible span {
+    background-color: #C5C1D6;
+}
+
+
+/* Note Folder View Specifics */
+.note-folder-content-wrapper {
+}
+.note-editor { 
+    width: 100%;
+    min-height: 200px; 
+    padding: 15px;
+    background-color: rgba(0,0,0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1em;
+    color: #C5C1D6;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    margin-bottom: 15px;
+    white-space: pre-wrap; 
+    word-wrap: break-word; 
+}
+.note-editor:focus {
+    border-color: #00CFE8;
+    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.2);
+}
+.note-editor img { 
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin: 10px 0;
+    display: block; 
+    border: 1px solid rgba(255,255,255,0.1);
+    cursor: default; 
+}
+.note-editor a { 
+    color: #7FFFD4;
+    text-decoration: underline;
+}
+.note-editor a:hover {
+    color: #AFFFFF;
+}
+
+.note-folder-controls { 
+}
+
+/* Add Task Form Elements (within Task Folder View) */
 .add-task-form-container {
-    display: none; /* Hidden by default, JS controls visibility */
+    display: none; 
     margin-bottom: 20px;
     padding: 10px 5px;
     background-color: rgba(255, 255, 255, 0.02);
     border-radius: 8px;
     min-height: 44px; 
+}
+.task-folder-content.edit-mode-active .add-task-form-container {
+    display: block; 
 }
 
 .add-item-trigger-button {
@@ -1165,160 +1225,13 @@ main#tab-content {
 .new-task-temp-cancel:hover { background-color: #6B657D; }
 
 
-/* Category Content Area (holds folder grid or task list) */
-.category-content-area {
-    margin-bottom: 20px; /* Space before task list or bottom add button */
-    display: flex; /* For aligning grid and add folder button */
-    flex-direction: column; /* Stack grid then button */
-    gap: 20px; /* Space between grid and button if both present */
-    flex-grow: 1; /* Allow content area to take space if needed for notes */
-    overflow: hidden; /* For notes content scrolling */
-}
-
-/* Task Folder Grid & Individual Folder Box UI */
-.task-folders-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Responsive grid */
-    gap: 25px;
-    padding: 10px 0; /* Padding for the grid area */
-}
-
-.task-folder-box-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-    position: relative; /* For options icon positioning */
-    padding: 10px;
-    border-radius: 12px;
-    transition: background-color 0.2s ease;
-}
-.task-folder-box-wrapper:hover {
-    background-color: rgba(255,255,255,0.03);
-}
-
-.task-folder-square-box {
-    width: 80px;
-    height: 80px;
-    background-color: #0A0910; 
-    border: 2px solid #00CFE8; 
-    border-radius: 10px; 
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 7px rgba(0, 207, 232, 0.6), 
-                0 0 15px rgba(0, 207, 232, 0.4),
-                0 0 1px rgba(0, 207, 232, 0.8); 
-    transition: transform 0.2s ease, box-shadow 0.25s ease;
-}
-.task-folder-box-wrapper:hover .task-folder-square-box {
-    transform: scale(1.03);
-    box-shadow: 0 0 10px rgba(0, 207, 232, 0.8), 
-                0 0 20px rgba(0, 207, 232, 0.6),
-                0 0 2px rgba(0, 207, 232, 1);
-}
-.task-folder-box-wrapper .task-folder-square-box.notes-folder-icon-box {
-    border-color: #BE93FD; /* Purple border for notes folders */
-     box-shadow: 0 0 7px rgba(190, 147, 253, 0.6), 
-                0 0 15px rgba(190, 147, 253, 0.4),
-                0 0 1px rgba(190, 147, 253, 0.8);
-}
-.task-folder-box-wrapper:hover .task-folder-square-box.notes-folder-icon-box {
-    box-shadow: 0 0 10px rgba(190, 147, 253, 0.8), 
-                0 0 20px rgba(190, 147, 253, 0.6),
-                0 0 2px rgba(190, 147, 253, 1);
-}
-
-
-.task-folder-symbol {
-    width: 38px; 
-    height: 38px;
-    fill: #00CFE8; 
-}
-.notes-folder-icon-box .task-folder-symbol {
-    fill: #BE93FD; /* Purple icon for notes */
-}
-
-
-.task-folder-label-text {
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.9em;
-    color: #00CFE8; 
-    margin-top: 8px;
-    font-weight: 500;
-    text-align: center;
-    word-break: break-word; /* Prevent long names from breaking layout */
-    min-height: 1.2em; /* Reserve space for text or input */
-    width: 100%; /* Ensure it takes width for centering if text is short */
-}
-.task-folder-box-wrapper.notes-folder-label .task-folder-label-text {
-    color: #BE93FD; /* Purple label for notes folders */
-}
-
-
-/* Inline Folder Rename Input */
-.folder-inline-rename-input {
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.9em;
-    color: #E0E0FF;
-    background-color: rgba(0,0,0, 0.2);
-    border: 1px solid #00CFE8;
-    border-radius: 4px;
-    padding: 4px 6px;
-    margin-top: 8px; /* Same as label's margin-top */
-    text-align: center;
-    width: 100%; /* Takes width of its container (task-folder-box-wrapper child) */
-    max-width: 100px; /* Prevent it from getting too wide if wrapper is wide, adjust as needed */
-    box-sizing: border-box;
-}
-.folder-inline-rename-input:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.3);
-}
-
-/* New Standalone Add Folder Button (Plus Icon) */
-.add-new-folder-plus-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 80px; /* Match folder box */
-    height: 80px; /* Match folder box */
-    background-color: transparent;
-    border: 2px dashed #00CFE8;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-.add-new-folder-plus-button svg {
-    width: 38px; /* Similar to folder symbol */
-    height: 38px;
-    fill: #00CFE8;
-    transition: fill 0.2s ease;
-}
-.add-new-folder-plus-button:hover {
-    background-color: rgba(0, 207, 232, 0.1);
-    border-color: #7FFFD4;
-    border-style: solid;
-}
-.add-new-folder-plus-button:hover svg {
-    fill: #7FFFD4;
-}
-
-
-/* Task List (ul.task-list is used when viewing TASK folder content) */
-.task-list { 
-    list-style: none; padding: 0; position: relative; 
-    margin-top: 10px; /* Space if tasks shown directly under header */
-}
-
-
+/* Task List (within Task Folder View) */
+.task-list { list-style: none; padding: 0; position: relative; }
 .empty-tasks-message {
     text-align: center; padding: 35px 25px; color: #8A83A0; font-style: italic;
     font-size: 1.05em; font-family: 'Open Sans', sans-serif;
     background-color: rgba(255, 255, 255, 0.02); border-radius: 10px;
     border: 1px dashed rgba(255, 255, 255, 0.08);
-    margin-top: 15px; 
 }
 .empty-tasks-message.edit-mode-empty {
     border-style: solid;
@@ -1337,9 +1250,7 @@ main#tab-content {
     font-size: 1.1em; color: #D5D0E5; font-weight: 500; line-height: 1.5;
     position: relative; user-select: none;
 }
-
-
-.category-section.edit-mode-active .task-item:not(.locked):not(.editing) {
+.task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) {
     cursor: grab;
 }
 .task-item .task-text {
@@ -1348,10 +1259,10 @@ main#tab-content {
     margin-right: 15px;
     cursor: default;
 }
-.category-section:not(.edit-mode-active) .task-item:not(.locked):not(.editing) {
+.task-folder-content:not(.edit-mode-active) .task-item:not(.locked):not(.editing) {
     cursor: pointer;
 }
-.category-section.edit-mode-active .task-item:not(.locked) .task-text {
+.task-folder-content.edit-mode-active .task-item:not(.locked) .task-text {
     cursor: text;
 }
 
@@ -1383,7 +1294,7 @@ main#tab-content {
     color: #12101A; font-size: 13px; text-align: center;
     line-height: 18px; font-weight: bold;
 }
-.task-item.locked {
+.task-item.locked { 
     opacity: 0.5; cursor: not-allowed; background-color: rgba(255, 255, 255, 0.015);
     border-color: rgba(255, 255, 255, 0.04); box-shadow: 0 1px 3px rgba(0,0,0, 0.05);
 }
@@ -1395,16 +1306,16 @@ main#tab-content {
     line-height: 18px; font-weight: bold;
 }
 
-/* Task Delete Button (in Edit Mode) */
+/* Task Delete Button (in Task Folder Edit Mode) */
 .task-delete-button-editmode {
     display: none;
     color: #FF6B6B;
     margin-left: 10px;
-    flex-shrink: 0; /* Prevent shrinking */
+    flex-shrink: 0; 
 }
-.task-delete-button-editmode svg { width: 18px; height: 18px; } /* Slightly smaller for task items */
+.task-delete-button-editmode svg { width: 18px; height: 18px; } 
 
-.category-section.edit-mode-active .task-item:not(.locked):not(.editing) .task-delete-button-editmode {
+.task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) .task-delete-button-editmode {
     display: flex;
 }
 .task-delete-button-editmode:hover {
@@ -1438,198 +1349,14 @@ main#tab-content {
 .task-edit-cancel:hover { background-color: #6B657D; }
 
 
-/* Notes Folder Specific Styles */
-.notes-folder-content-wrapper {
-    flex-grow: 1; /* Allow notes area to fill space */
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Parent will handle scroll if needed */
-    padding: 10px 0;
-}
-.notes-editor-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    padding: 10px 5px;
-    background-color: rgba(255, 255, 255, 0.02);
-    border-radius: 8px;
-    flex-wrap: wrap; /* Allow controls to wrap on smaller screens */
-}
-.notes-control-button {
-    background-color: #00CFE8;
-    color: #12101A;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-family: 'Poppins', sans-serif;
-    font-size: 0.9em;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-.notes-control-button svg {
-    width: 18px;
-    height: 18px;
-    fill: #12101A;
-}
-.notes-control-button:hover {
-    background-color: #33DFFF;
-}
-.notes-control-button.notes-save-button {
-    background-color: #7FFFD4; /* Aquamarine for save */
-    margin-left: auto; /* Push save button to the right */
-}
-.notes-control-button.notes-save-button:hover {
-    background-color: #AFFFFF;
-}
-
-.notes-content-display-area {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 5px; /* Padding inside the scrollable area */
-    background-color: rgba(0,0,0,0.1);
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.08);
-    min-height: 200px; /* Ensure it has some height */
-}
-.note-item {
-    background-color: rgba(255, 255, 255, 0.03);
-    padding: 15px;
-    margin-bottom: 15px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    position: relative;
-    font-family: 'Open Sans', sans-serif;
-    color: #C5C1D6;
-    line-height: 1.6;
-}
-.note-item:last-child {
-    margin-bottom: 0;
-}
-.note-item-content p {
-    margin: 0 0 10px 0;
-    white-space: pre-wrap; /* Preserve line breaks */
-    word-wrap: break-word;
-}
-.note-item-content p:last-child {
-    margin-bottom: 0;
-}
-.note-item-content a {
-    color: #7FFFD4;
-    text-decoration: none;
-    border-bottom: 1px dotted #7FFFD4;
-    word-break: break-all;
-}
-.note-item-content a:hover {
-    color: #AFFFFF;
-    border-bottom-style: solid;
-}
-.note-item-content img {
-    max-width: 100%;
-    height: auto;
-    border-radius: 6px;
-    margin-top: 10px;
-    border: 1px solid rgba(255,255,255,0.1);
-    cursor: pointer; /* For potential lightbox */
-}
-.note-item-actions {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    display: flex;
-    gap: 5px;
-    opacity: 0; /* Hidden by default */
-    transition: opacity 0.2s ease;
-}
-.note-item:hover .note-item-actions {
-    opacity: 1;
-}
-.note-item-action-button {
-    background: rgba(0,0,0,0.3);
-    border: none;
-    color: #A09CB8;
-    padding: 5px;
-    border-radius: 4px;
-    cursor: pointer;
-    line-height: 1;
-}
-.note-item-action-button svg {
-    width: 16px; height: 16px; fill: currentColor;
-}
-.note-item-action-button:hover {
-    color: #E0E0FF;
-    background: rgba(0,0,0,0.5);
-}
-.note-item-action-button.delete-note-item:hover {
-    color: #FF8787;
-}
-
-/* Note Item Editing Form Styles */
-.note-item-editing-form {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 10px;
-    background-color: rgba(0,0,0,0.1);
-    border-radius: 6px;
-    margin-top: 10px;
-}
-.note-item-editing-form textarea,
-.note-item-editing-form input[type="text"],
-.note-item-editing-form input[type="url"],
-.note-item-editing-form input[type="file"] {
-    width: 100%;
-    padding: 10px 12px;
-    background-color: rgba(0,0,0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
-    font-family: 'Open Sans', sans-serif;
-    font-size: 1em;
-    color: #C5C1D6;
-}
-.note-item-editing-form textarea {
-    min-height: 100px;
-    resize: vertical;
-}
-.note-item-editing-form input:focus,
-.note-item-editing-form textarea:focus {
-    outline: none;
-    border-color: #BE93FD; /* Purple focus for notes */
-    box-shadow: 0 0 0 2px rgba(190, 147, 253, 0.2);
-}
-.note-edit-image-preview {
-    max-width: 200px; max-height: 150px; border-radius: 4px; margin-top: 5px;
-    display: none; /* Shown by JS when there's an image */
-}
-.note-item-editing-form .form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-}
-.note-item-editing-form .form-actions button {
-    padding: 8px 15px;
-    font-family: 'Poppins', sans-serif;
-    font-weight: 500;
-}
-
-
 /* Drag and Drop Styles */
 .dragging { opacity: 0.5 !important; border: 2px dashed #00CFE8 !important; box-shadow: 0 5px 15px rgba(0, 207, 232, 0.2) !important; }
 .tab-button.dragging { background-color: rgba(0, 207, 232, 0.1) !important; color: #00CFE8 !important; }
-.task-list .task-item.drag-over-indicator-task { /* Target items in the actual task list */
+.task-item.drag-over-indicator-task {
     box-shadow: inset 0 3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important;
 }
 .task-list .task-item.drag-over-indicator-task-bottom {
     box-shadow: inset 0 -3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important;
-}
-.notes-content-display-area .note-item.drag-over-indicator-note {
-    box-shadow: inset 0 3px 0 #BE93FD, 0 2px 5px rgba(0,0,0, 0.08) !important;
-}
-.notes-content-display-area .note-item.drag-over-indicator-note-bottom {
-    box-shadow: inset 0 -3px 0 #BE93FD, 0 2px 5px rgba(0,0,0, 0.08) !important;
 }
 
 
@@ -1637,7 +1364,7 @@ main#tab-content {
 footer {
     text-align: center; padding: 25px 45px; border-top: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 0.9em; color: #8A83A0; font-weight: 400; flex-shrink: 0;
-    margin-top: auto; /* Helps keep footer at bottom in flex column */
+    margin-top: auto; 
 }
 
 /* Modal Styles */
@@ -1649,8 +1376,8 @@ footer {
 }
 .modal:not(.hidden) { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
 
-.modal-content { /* General style for the box INSIDE a modal overlay */
-    background-color: #1A1724; /* Base for most modals */
+.modal-content { 
+    background-color: #1A1724; 
     margin: auto;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 15px;
@@ -1658,9 +1385,9 @@ footer {
     position: relative;
     transform: scale(0.95);
     transition: transform 0.3s ease;
-    padding: 30px 35px; /* Default padding */
-    width: 90%; /* Default width */
-    max-width: 550px; /* Default max-width */
+    padding: 30px 35px; 
+    width: 90%; 
+    max-width: 550px; 
 }
 .modal:not(.hidden) .modal-content { transform: scale(1); }
 
@@ -1670,6 +1397,56 @@ footer {
     cursor: pointer; line-height: 1;
 }
 .close-button:hover, .close-button:focus { color: #E0E0FF; text-decoration: none; }
+
+.modal-title-text {
+    margin-top: 0; margin-bottom: 25px; color: #00E5FF; font-size: 1.7em; text-align: center;
+}
+.modal-input {
+    width: 100%;
+    padding: 12px 15px;
+    background-color: rgba(0,0,0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    font-family: 'Open Sans', sans-serif;
+    font-size: 1em;
+    color: #E0E0FF;
+    margin-bottom: 25px;
+}
+.modal-input::placeholder { color: #706A82; }
+.modal-input:focus {
+    outline: none; border-color: #00CFE8;
+    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.25);
+}
+.modal-actions-centered {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+}
+.modal-button, .modal-button-primary {
+    padding: 10px 25px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Playfair Display', serif;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+.modal-button { 
+    background-color: #454153;
+    color: #C5C1D6;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+.modal-button:hover { background-color: #5a556b; }
+.modal-button:active { transform: scale(0.98); background-color: #3a3647; }
+
+.modal-button-primary { 
+    background-color: #00CFE8;
+    color: #12101A;
+    box-shadow: 0 2px 5px rgba(0, 207, 232, 0.2);
+}
+.modal-button-primary:hover { background-color: #33DFFF; }
+.modal-button-primary:active { transform: scale(0.98); background-color: #00B8D4; }
 
 
 /* History Modal Specifics */
@@ -1691,11 +1468,11 @@ footer {
 .history-section-header h4 {
     color: #BE93FD;
     font-size: 1.25em;
-    margin: 0; /* Remove default margins as flex handles spacing */
+    margin: 0; 
 }
 .expand-section-button {
-    padding: 3px; /* Smaller padding for compact button */
-    color: #A09CB8; /* Subtler color */
+    padding: 3px; 
+    color: #A09CB8; 
 }
 .expand-section-button svg { width: 18px; height: 18px; }
 .expand-section-button:hover {
@@ -1703,7 +1480,7 @@ footer {
     background-color: rgba(0, 207, 232, 0.1);
 }
 
-#history-tasks-list { max-height: 180px; overflow-y: auto; padding-right: 10px; } /* Slightly less height */
+#history-tasks-list { max-height: 180px; overflow-y: auto; padding-right: 10px; } 
 #history-tasks-list .history-category-group { margin-bottom: 15px; }
 #history-tasks-list .history-category-title { font-size: 1.1em; font-weight: 600; color: #00CFE8; margin-bottom: 8px; }
 #history-tasks-list ul { list-style: none; padding-left: 0; }
@@ -1712,7 +1489,6 @@ footer {
     padding-left: 25px; font-family: 'Open Sans', sans-serif;
 }
 #history-tasks-list li::before { content: '✔'; color: #00CFE8; position: absolute; left: 0; top: 7px; font-weight: bold; }
-#history-tasks-list li span { }
 
 #historical-reflection-wrapper { margin-top: 0; } 
 .history-note-paragraph { background-color: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); min-height: 60px; color: #B0ACC9; font-size: 1em; line-height: 1.6; white-space: pre-wrap; margin-bottom: 15px; }
@@ -1758,7 +1534,7 @@ footer {
 .fullscreen-modal-scrollable-area {
     flex-grow: 1;
     overflow-y: auto;
-    padding-right: 15px; /* For scrollbar */
+    padding-right: 15px; 
     color: #C5C1D6;
     font-size: 1.05em;
     line-height: 1.7;
@@ -1774,7 +1550,6 @@ footer {
 .fullscreen-modal-scrollable-area li::before {
     content: '✔'; color: #00CFE8; position: absolute; left: 0; top: 10px; font-weight: bold; font-size: 1.1em;
 }
-.fullscreen-modal-scrollable-area li span { }
 .fullscreen-modal-scrollable-area pre { 
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -1799,102 +1574,239 @@ footer {
 #cancel-delete-button:hover { background-color: #5a556b; }
 #cancel-delete-button:active { transform: scale(0.98); background-color: #3a3647; }
 
-/* Add Folder Modal */
-.add-folder-modal-content { max-width: 480px; padding: 25px 30px; } /* Slightly wider for new step 1 */
-.add-folder-modal-content h4 {
-    color: #BE93FD;
-    font-size: 1.3em;
-    margin-bottom: 15px;
-    text-align: center;
-    font-family: 'Playfair Display', serif;
-}
-.folder-type-selection {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 20px;
-    justify-content: center;
-}
-.folder-type-button {
-    flex: 1;
-    padding: 15px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #C5C1D6;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family: 'Poppins', sans-serif;
-    font-size: 1em;
-    text-align: center;
-    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+
+/* Styles for Menu-Selected Content View */
+#menu-selected-content-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #12101A; 
+    z-index: 1080; 
     display: flex;
     flex-direction: column;
+    padding: 20px;
+    overflow: hidden;
+}
+#menu-selected-content-header {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 0 -20px 20px -20px; 
+    padding-left: 20px; /* Adjusted from 40px as menu icon is hidden here */
+    padding-right: 40px; 
+    flex-shrink: 0;
 }
-.folder-type-button:hover {
-    background-color: rgba(0, 207, 232, 0.1);
-    border-color: #00CFE8;
-    color: #E0FFFF;
-    transform: translateY(-2px);
-}
-.folder-type-button.selected-type { /* Style for selected type (if visual indication needed before next step) */
-    background-color: rgba(0, 207, 232, 0.2);
-    border-color: #00CFE8;
-}
-.folder-type-icon {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 5px;
-    fill: currentColor;
-}
-.folder-type-button small {
-    font-size: 0.8em;
-    color: #A09CB8;
-    line-height: 1.3;
-}
-.add-folder-back-button {
-    background: none;
-    border: none;
-    color: #00CFE8;
+#menu-selected-content-title {
+    font-size: 1.8em;
+    color: #00E5FF;
     font-family: 'Poppins', sans-serif;
-    font-size: 0.9em;
-    cursor: pointer;
-    margin-bottom: 15px;
-    padding: 5px;
+    font-weight: 600;
+    margin: 0;
 }
-.add-folder-back-button:hover {
-    color: #7FFFD4;
-    text-decoration: underline;
+#close-menu-selected-view-button {
 }
-.add-folder-modal-content label { display: block; margin-bottom: 8px; font-weight: 500; color: #BE93FD; }
-.add-folder-modal-content input[type="text"] {
-    width: 100%; padding: 10px 12px; margin-bottom: 20px;
-    background-color: rgba(0,0,0, 0.15); border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px; font-family: 'Open Sans', sans-serif; font-size: 1em; color: #C5C1D6;
+#close-menu-selected-view-button svg {
+    width: 28px; 
+    height: 28px;
 }
-.add-folder-modal-content input[type="text"]:focus {
-    outline: none; border-color: #00CFE8; box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.2);
+#menu-selected-content-area {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 0 20px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
 }
-#add-folder-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
-#add-folder-modal-actions button {
-    padding: 10px 20px; border: none; border-radius: 8px; font-family: 'Playfair Display', serif;
-    font-size: 1em; font-weight: 600; cursor: pointer; transition: background-color 0.25s ease, transform 0.1s ease;
+.menu-view-content { 
+    height: 100%; 
+    width: 100%; 
 }
-#create-folder-button { background-color: #00CFE8; color: #12101A; }
-#create-folder-button:hover { background-color: #33DFFF; }
-#cancel-add-folder-button { background-color: #454153; color: #C5C1D6; }
-#cancel-add-folder-button:hover { background-color: #5a556b; }
+
+#progress-view {
+    padding: 20px;
+    text-align: center;
+    font-size: 1.2em;
+}
+
+/* Analog Clock Styles */
+.analog-clock {
+    width: 80vmin; 
+    height: 80vmin;
+    max-width: 300px;
+    max-height: 300px;
+    position: relative;
+    margin: auto; 
+}
+
+.clock-face {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background-color: rgba(13, 12, 21, 0.7); 
+    border: 2px solid rgba(0, 207, 232, 0.4); 
+    box-shadow: 
+        inset 0 0 15px rgba(0, 207, 232, 0.3), 
+        0 0 25px rgba(190, 147, 253, 0.3), 
+        0 0 10px rgba(0, 207, 232, 0.5);   
+    position: relative;
+}
+
+.clock-face .hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: center bottom; 
+    border-radius: 6px 6px 0 0; 
+    transition: transform 0.5s cubic-bezier(0.4, 2.5, 0.6, 1); 
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+.clock-face .hour-hand {
+    width: 6px;
+    height: 28%; 
+    background-color: #BE93FD; 
+    transform: translateX(-50%) rotate(0deg);
+    z-index: 1;
+}
+.clock-face .minute-hand {
+    width: 4px;
+    height: 38%; 
+    background-color: #E0E0FF; 
+    transform: translateX(-50%) rotate(0deg);
+    z-index: 2;
+}
+.clock-face .second-hand {
+    width: 2px;
+    height: 42%; 
+    background-color: #7FFFD4; 
+    transform: translateX(-50%) rotate(0deg);
+    z-index: 3;
+}
+.clock-face .center-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    background-color: #7FFFD4; 
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    border: 2px solid #12101A;
+}
+
+.clock-face .hour-mark {
+    position: absolute;
+    width: 2px; 
+    height: 100%; 
+    left: calc(50% - 1px); 
+    top: 0;
+}
+.clock-face .hour-mark::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 8px; 
+    background-color: rgba(190, 147, 253, 0.7); 
+    top: 4%; 
+    border-radius: 1px;
+}
+.clock-face .hour-mark.major::before {
+    height: 14px;
+    background-color: rgba(0, 207, 232, 0.9); 
+    width: 3px;
+    left: -0.5px; 
+}
+
+.clock-face .mark-12 { transform: rotate(0deg); }
+.clock-face .mark-1  { transform: rotate(30deg); }
+.clock-face .mark-2  { transform: rotate(60deg); }
+.clock-face .mark-3  { transform: rotate(90deg); }
+.clock-face .mark-4  { transform: rotate(120deg); }
+.clock-face .mark-5  { transform: rotate(150deg); }
+.clock-face .mark-6  { transform: rotate(180deg); }
+.clock-face .mark-7  { transform: rotate(210deg); }
+.clock-face .mark-8  { transform: rotate(240deg); }
+.clock-face .mark-9  { transform: rotate(270deg); }
+.clock-face .mark-10 { transform: rotate(300deg); }
+.clock-face .mark-11 { transform: rotate(330deg); }
+
+/* Clock Numbers */
+.clock-number-wrapper {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none; /* So they don't interfere with clock interactions if any */
+}
+.clock-number {
+    position: absolute;
+    left: 50%;
+    top: 6%; /* Adjust distance from edge, e.g. 5%-10% */
+    transform: translateX(-50%); /* Center the number horizontally */
+    font-size: clamp(12px, 3.5vmin, 18px); /* Responsive font size */
+    color: #E0E0FF;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    width: 24px; /* Ensure numbers have some space, adjust if needed */
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* Counter-rotate each number individually (done via JS or individual styles) */
+/* Example for number 1 which is at 30deg from 12 o'clock */
+.clock-number.number-1  { transform: translateX(-50%) rotate(-30deg); }
+.clock-number.number-2  { transform: translateX(-50%) rotate(-60deg); }
+.clock-number.number-3  { transform: translateX(-50%) rotate(-90deg); }
+.clock-number.number-4  { transform: translateX(-50%) rotate(-120deg); }
+.clock-number.number-5  { transform: translateX(-50%) rotate(-150deg); }
+.clock-number.number-6  { transform: translateX(-50%) rotate(-180deg); }
+.clock-number.number-7  { transform: translateX(-50%) rotate(-210deg); }
+.clock-number.number-8  { transform: translateX(-50%) rotate(-240deg); }
+.clock-number.number-9  { transform: translateX(-50%) rotate(-270deg); }
+.clock-number.number-10 { transform: translateX(-50%) rotate(-300deg); }
+.clock-number.number-11 { transform: translateX(-50%) rotate(-330deg); }
+/* Number 12 needs no counter-rotation if its wrapper is at 0deg */
+.clock-number.number-12 { transform: translateX(-50%) rotate(0deg); }
 
 
 /* Accessibility */
 .hidden { display: none !important; }
 
 /* Responsive Design */
+@media (min-width: 1025px) { /* PC View - New Progress Sidebar and Layout */
+    #app-view-wrapper {
+        flex-direction: row; /* Sidebar and main content side-by-side */
+    }
+    #app-progress-sidebar {
+        display: flex; /* Show PC progress sidebar */
+    }
+    #mobile-progress-location {
+        display: none !important; /* Hide mobile progress location */
+    }
+    #main-content-wrapper {
+        padding-left: 45px; /* Adjust if menu button + sidebar cause overlap issues */
+    }
+    #left-column {
+       /* Takes full width of main-content-wrapper now */
+    }
+}
+
+
 @media (max-width: 1024px) { /* General Tablet + Smaller */
-    #app-container { height: auto; max-height: none; padding-bottom: 0; }
-    #main-content-wrapper { flex-direction: column; padding: 25px 30px 0; }
-    #dashboard-column { flex-basis: auto; padding-right: 0; border-left: none; padding-top: 30px; margin-bottom: 30px; height: auto; overflow-y: visible; }
+    #app-container { height: 100vh; max-height: none; padding-bottom: 0; } 
+    #main-content-wrapper { flex-direction: column; padding: 25px 30px 0; padding-left: 65px; } 
+    #app-progress-sidebar { display: none; } /* Ensure PC sidebar is hidden */
+    #mobile-progress-location { display: block; } /* Ensure mobile progress is shown */
+
+    #dashboard-column { padding: 15px; } 
     #dashboard-column > h2 { margin-top: 0; font-size: 1.9em; } 
+
     #left-column { flex-basis: auto; padding-left: 0; border-left: none; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 30px; overflow-y: visible; }
     main#tab-content { overflow-y: visible; }
     header { margin-bottom: 25px; }
@@ -1906,12 +1818,6 @@ footer {
     #add-category-button { padding: 14px; margin-left: 8px;}
     #add-category-button svg { width: 20px; height: 20px;}
 
-    #hamburger-menu-button { top: 15px; left: 15px; }
-    #hamburger-menu-button svg { width: 26px; height: 26px; }
-    #side-menu { padding-top: 60px; }
-    #progress-system-view { padding: 20px; }
-    #progress-system-header h2 { font-size: 1.8em; }
-
 
     .category-section .category-header .category-title-text { font-size: 1.9em; } 
     .dashboard-category-summary h3 { font-size: 1.4em; } 
@@ -1921,34 +1827,54 @@ footer {
     .task-item::before { width: 19px; height: 19px; margin-right: 16px; }
     .task-item.completed::before, .task-item.locked::before { font-size: 12px; line-height: 17px; }
 
-    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 20px; }
-    .task-folder-square-box { width: 75px; height: 75px; }
-    .add-new-folder-plus-button { width: 75px; height: 75px; }
-    .task-folder-symbol { width: 36px; height: 36px; }
-    .add-new-folder-plus-button svg { width: 36px; height: 36px;}
-    .task-folder-label-text { font-size: 0.88em; }
-    .folder-inline-rename-input { font-size: 0.88em; max-width: 90px;}
-
-    .notes-editor-controls { flex-direction: column; align-items: stretch;}
-    .notes-control-button.notes-save-button { margin-left: 0; }
-
-
     .fullscreen-modal-content-box { width: 95vw; height: 95vh; }
+
+    .folder-box { width: 90px; height: 90px; padding: 12px;}
+    .folder-box-name { max-width: 90px; font-size: 0.88em;}
+    .add-folder-button { width: 90px; height: 90px; }
+    .add-folder-button svg { width: 35px; height: 35px;}
+
+    #menu-toggle-button { top: 15px; left: 15px; } 
+    #app-menu-panel { width: 220px; padding-top: 60px; }
+    #menu-selected-content-header { padding: 10px 20px; padding-left: 20px; }
+    #menu-selected-content-title { font-size: 1.6em; }
+    #menu-selected-content-area { padding: 0 10px; }
+    
+    .analog-clock { max-width: 250px; max-height: 250px; }
 }
 
-@media (min-width: 768px) and (max-width: 1024px) { /* Specific Tablet Adjustments */
-    #dashboard-summaries { grid-template-columns: repeat(2, 1fr); /* Keep 2 columns on larger tablets */ }
-     .task-item { font-size: 1.15em; } /* Even slightly more spacious on tablets */
-    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-    .notes-editor-controls { flex-direction: row; flex-wrap: wrap; } /* Revert to row for wider tablets */
-    .notes-control-button.notes-save-button { margin-left: auto; }
+@media (min-width: 768px) and (max-width: 1024px) { 
+    #dashboard-summaries { grid-template-columns: repeat(2, 1fr);  }
+     .task-item { font-size: 1.15em; } 
+     .folders-grid { gap: 18px; }
+     .folder-box { width: 90px; height: 90px; } 
+     .folder-box-name { max-width: 90px; }
+     .add-folder-button { width: 90px; height: 90px; }
 }
 
 
 @media (max-width: 700px) { /* Mobile */
-    body { padding: 20px 15px; animation-duration: 70s; }
-    #main-content-wrapper { padding: 20px 25px 0; }
-    #main-content-wrapper.with-hamburger-offset { padding-top: 70px; }
+    body { padding: 15px 10px; animation-duration: 70s; } 
+    #app-container { height: 100vh; max-height: none; padding-bottom: 0; } 
+    #app-progress-sidebar { display: none; } /* Ensure PC sidebar is hidden */
+    #mobile-progress-location { display: block; } /* Ensure mobile progress is shown */
+
+
+    #menu-toggle-button { top: 12px; left: 12px; } 
+    #menu-toggle-button svg { width: 22px; height: 22px; }
+    #app-menu-panel { width: 200px; padding-top: 50px; }
+    .menu-panel-button { font-size: 1em; padding: 10px 12px; }
+
+    #menu-selected-content-view { padding: 15px; }
+    #menu-selected-content-header { padding: 8px 15px; margin: 0 -15px 15px -15px; padding-left:20px; padding-right:20px; }
+    #menu-selected-content-title { font-size: 1.4em; }
+    #close-menu-selected-view-button svg { width: 24px; height: 24px; }
+    #menu-selected-content-area { padding: 0 5px; }
+    #dashboard-column { padding: 10px; }
+    .analog-clock { max-width: 200px; max-height: 200px; }
+
+
+    #main-content-wrapper { padding: 20px 15px 0; padding-left: 50px; } 
     header { margin-bottom: 20px; }
     header h1 { font-size: 2em; }
     #main-logo { width: 55px; height: 55px; margin-bottom: 8px; }
@@ -1957,37 +1883,36 @@ footer {
     #add-category-button { padding: 12px; margin-left: 5px;}
     #add-category-button svg { width: 18px; height: 18px;}
 
-    #hamburger-menu-button { top: 12px; left: 12px; }
-    #hamburger-menu-button svg { width: 24px; height: 24px; }
-    #side-menu { width: 240px; left: -250px; padding-top: 55px; }
-    #progress-system-view { padding: 15px; }
-    #progress-system-header { flex-direction: column; align-items: flex-start; gap: 10px;}
-    #progress-system-header h2 { font-size: 1.6em; }
-    #progress-system-tabs { margin-bottom: 20px; }
-    .progress-tab-button { font-size: 1em; padding: 12px 8px; }
-    #progress-setup-form input, #progress-setup-form select { padding: 10px 12px; font-size: 0.95em; }
-    #progress-form-actions { flex-direction: column; }
-
-
     #dashboard-tab-button { margin-right: 10px; }
-    .tab-button.category-complete-indicator::before { top: 6px; right: 8px; font-size: 10px; }
-    .notification-badge { top: 5px; left: 6px; width: 16px; height: 16px; font-size: 9px; }
-    
-    .entity-options-icon { width: 18px; height: 18px; }
-    .entity-options-icon span { width: 3px; height: 3px; }
-    .tab-button .entity-options-icon { top: 4px; right: 4px; }
-    .task-folder-box-wrapper .entity-options-icon { top: 3px; right: 3px; }
+    .tab-button.category-complete-indicator::before {
+        top: 6px;
+        right: 8px; 
+        font-size: 10px;
+    }
+     .notification-badge {
+        top: 5px;
+        left: 6px;
+        width: 16px;
+        height: 16px;
+        font-size: 9px;
+    }
+    .tab-options-icon {
+        top: 4px;
+        right: 4px;
+        width: 18px;
+        height: 18px;
+    }
+    .tab-options-icon span { width: 3px; height: 3px; }
 
 
     .category-section .category-header .category-title-text { font-size: 1.8em; }
     .category-section .category-header { margin-bottom: 20px; padding-bottom: 15px; }
     .icon-button svg { width: 20px; height: 20px; }
-    .back-to-folders-button { font-size: 0.9em; margin-right: 10px; }
-    .back-to-folders-button svg { width: 18px; height: 18px; }
 
+    .folder-view-title { font-size: 1.4em; }
 
-    #dashboard-column > h2 { font-size: 1.8em; margin-bottom: 30px; padding-bottom: 15px; }
-    #dashboard-summaries { gap: 20px; margin-bottom: 35px; grid-template-columns: repeat(1, 1fr); } /* Single column for mobile */
+    #dashboard-column h2 { font-size: 1.8em; margin-bottom: 20px; padding-bottom: 15px; }
+    #dashboard-summaries { gap: 20px; margin-bottom: 35px; grid-template-columns: repeat(1, 1fr); } 
     .dashboard-category-summary { padding: 22px; }
     .dashboard-category-summary h3 { font-size: 1.3em; margin-bottom: 12px; padding-bottom: 10px; }
     .dashboard-category-summary .category-stats { font-size: 1em; }
@@ -2016,27 +1941,30 @@ footer {
 
     #today-progress-container, #current-week-progress-container { padding: 25px; }
     #current-week-progress-container { margin-top: 25px; }
-    #today-progress-container h3, #current-week-progress-container h3.weekly-plan-name-title { font-size: 1.4em; margin-bottom: 18px; }
+    #today-progress-container h3, #current-week-progress-container h3 { font-size: 1.4em; margin-bottom: 18px; }
     .progress-bar-container { height: 20px; margin-bottom: 16px; }
     .progress-bar-fill { line-height: 20px; font-size: 0.8em; }
     .points-stat { font-size: 1.05em; }
     .history-percentage-label { font-size: 1.05em; }
 
+    .folders-grid { gap: 15px; justify-content: space-around; } 
+    .folder-box { width: 75px; height: 75px; padding: 8px;}
+    .folder-box-icon { width: 50%; }
+    .folder-box-name { max-width: 75px; font-size: 0.8em; margin-top: 5px; }
+    .add-folder-button { width: 75px; height: 75px; }
+    .add-folder-button svg { width: 28px; height: 28px; }
+    .folder-options-trigger { top: 5px; right: 5px; width: 20px; height: 20px; }
+    .folder-options-trigger span { width: 3px; height: 3px; }
 
-    .new-temp-task-form { flex-direction: column; align-items: stretch; }
+    .add-task-form-container { }
+    .new-temp-task-form {
+      flex-direction: column; 
+      align-items: stretch; 
+    }
     .new-task-temp-input { font-size: 0.95em; margin-bottom: 8px; }
     .new-task-temp-save, .new-task-temp-cancel { font-size: 0.9em; }
     .add-item-trigger-button { font-size: 0.95em; }
     .add-item-trigger-button svg { width: 18px; height: 18px; }
-
-    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 15px;}
-    .task-folder-square-box { width: 70px; height: 70px; }
-    .add-new-folder-plus-button { width: 70px; height: 70px; }
-    .task-folder-symbol { width: 35px; height: 35px; }
-    .add-new-folder-plus-button svg { width: 35px; height: 35px; }
-    .task-folder-label-text { font-size: 0.85em; }
-    .folder-inline-rename-input { font-size: 0.85em; max-width: 80px;}
-
 
     .task-item { font-size: 1.05em; padding: 16px 18px; border-radius: 10px; margin-bottom: 18px; flex-wrap: wrap; }
     .task-item::before { width: 18px; height: 18px; margin-right: 15px; border-radius: 4px; }
@@ -2067,15 +1995,21 @@ footer {
     .fullscreen-modal-scrollable-area li::before { top: 7px; font-size: 1em; }
     .fullscreen-modal-scrollable-area pre { font-size: 1em; }
 
-    .folder-type-selection { flex-direction: column; } /* Stack type buttons on small mobile */
-
     footer { font-size: 0.85em; padding: 20px 25px; }
 }
 @media (max-width: 480px) {
-    body { padding: 15px 10px; }
-    #main-content-wrapper { padding: 15px 20px 0; }
-    #main-content-wrapper.with-hamburger-offset { padding-top: 60px; }
+    body { padding: 10px 5px; }
+    #app-container { height: 100vh; max-height: none; padding-bottom: 0; }
+    
+    #menu-toggle-button { top: 10px; left: 10px; } 
+    #app-menu-panel { width: 180px; padding-top: 45px; }
+    #menu-selected-content-view { padding: 10px; }
+    #menu-selected-content-header { padding: 6px 10px; margin: 0 -10px 10px -10px; padding-left:15px; padding-right:15px; }
+    #menu-selected-content-title { font-size: 1.3em; }
+    .analog-clock { max-width: 180px; max-height: 180px; }
 
+
+    #main-content-wrapper { padding: 15px 10px 0; padding-left: 45px; } 
     header { margin-bottom: 15px; }
     header h1 { font-size: 1.8em; }
     #main-logo { width: 50px; height: 50px; margin-bottom: 5px; }
@@ -2086,19 +2020,34 @@ footer {
 
 
     #dashboard-tab-button { margin-right: 8px; }
-    .tab-button.category-complete-indicator::before { top: 5px; right: 6px; font-size: 9px; }
-    .notification-badge { top: 4px; left: 5px; width: 15px; height: 15px; font-size: 8px; }
-    .tab-button .entity-options-icon { top: 3px; right: 3px; }
+    .tab-button.category-complete-indicator::before {
+        top: 5px;
+        right: 6px; 
+        font-size: 9px;
+    }
+    .notification-badge {
+        top: 4px;
+        left: 5px;
+        width: 15px;
+        height: 15px;
+        font-size: 8px;
+    }
+    .tab-options-icon {
+        top: 3px;
+        right: 3px;
+        width: 16px;
+        height: 16px;
+    }
+    .tab-options-icon span { width: 2.5px; height: 2.5px; }
 
 
     .category-section .category-header .category-title-text { font-size: 1.6em; }
     .category-section .category-header { margin-bottom: 18px; padding-bottom: 12px; }
     .icon-button svg { width: 18px; height: 18px; }
-    .back-to-folders-button { font-size: 0.85em; }
-    .back-to-folders-button svg { width: 16px; height: 16px; }
 
+    .folder-view-title { font-size: 1.3em; }
 
-    #dashboard-column > h2 { font-size: 1.6em; margin-bottom: 18px; padding-bottom: 12px; }
+    #dashboard-column h2 { font-size: 1.6em; margin-bottom: 18px; padding-bottom: 12px; }
     .dashboard-category-summary { padding: 20px; }
     .dashboard-category-summary h3 { font-size: 1.25em; margin-bottom: 10px; padding-bottom: 8px; }
     .dashboard-category-summary .category-stats { font-size: 0.95em; }
@@ -2126,7 +2075,7 @@ footer {
     .calendar-day-number { font-size: 0.85em; }
     #calendar-grid { gap: 4px; }
 
-    #today-progress-container h3, #current-week-progress-container h3.weekly-plan-name-title { font-size: 1.3em; margin-bottom: 15px; }
+    #today-progress-container h3, #current-week-progress-container h3 { font-size: 1.3em; margin-bottom: 15px; }
     #today-progress-container, #current-week-progress-container { padding: 22px; }
     #current-week-progress-container { margin-top: 22px; }
     .progress-bar-container { height: 18px; margin-bottom: 14px; }
@@ -2134,20 +2083,18 @@ footer {
     .points-stat { font-size: 0.95em; }
     .history-percentage-label { font-size: 0.95em; }
 
+    .folders-grid { gap: 12px; }
+    .folder-box { width: 70px; height: 70px; padding: 6px;}
+    .folder-box-icon { width: 45%; }
+    .folder-box-name { max-width: 70px; font-size: 0.75em; margin-top: 4px;}
+    .add-folder-button { width: 70px; height: 70px; }
+    .add-folder-button svg { width: 25px; height: 25px; }
+
 
     .new-task-temp-input { font-size: 0.9em; }
     .new-task-temp-save, .new-task-temp-cancel { font-size: 0.85em; }
     .add-item-trigger-button { font-size: 0.9em; }
     .add-item-trigger-button svg { width: 16px; height: 16px; }
-
-    .task-folders-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px;}
-    .task-folder-square-box { width: 60px; height: 60px; }
-    .add-new-folder-plus-button { width: 60px; height: 60px; }
-    .task-folder-symbol { width: 30px; height: 30px; }
-    .add-new-folder-plus-button svg { width: 30px; height: 30px; }
-    .task-folder-label-text { font-size: 0.8em; margin-top: 5px; }
-    .folder-inline-rename-input { font-size: 0.8em; max-width: 70px;}
-
 
     .task-item { font-size: 1em; padding: 15px 16px; margin-bottom: 16px; }
     .task-item::before { width: 16px; height: 16px; margin-right: 12px; }
@@ -2174,4 +2121,13 @@ footer {
     #historical-note-controls button { font-size: 0.9em; padding: 8px 15px; }
     #history-user-note-edit { font-size: 0.95em; }
     footer { padding: 15px 20px; }
+}
+
+/* Ensure modal input fields are styled appropriately */
+#choose-folder-type-modal .modal-content, 
+#enter-folder-name-modal .modal-content {
+    max-width: 400px;
+}
+#enter-folder-name-modal #folder-name-input {
+    margin-bottom: 25px; 
 }
