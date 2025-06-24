@@ -1,4 +1,5 @@
 
+
 /* Global Resets and Base Styles */
 * {
     box-sizing: border-box;
@@ -1777,6 +1778,14 @@ footer {
 
 /* Accessibility */
 .hidden { display: none !important; }
+
+/*
+    ========================================
+    RESPONSIVE DESIGN & MEDIA QUERIES
+    This section ensures the application adapts
+    to different screen sizes (PC, tablet, mobile).
+    ========================================
+*/
 
 /* Responsive Design */
 @media (min-width: 1025px) { /* PC View - New Progress Sidebar and Layout */
