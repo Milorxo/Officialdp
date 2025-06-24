@@ -289,7 +289,7 @@ body {
     flex: 0 0 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Changed from overflow-y: auto to make main#tab-content the sole scroller */
+    /* overflow: hidden; Removed to allow main#tab-content to scroll properly */
 }
 
 
@@ -1364,6 +1364,7 @@ main#tab-content {
 
 /* Footer */
 footer {
+    display: none; /* Removed footer as per request */
     text-align: center; padding: 25px 45px; border-top: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 0.9em; color: #8A83A0; font-weight: 400; flex-shrink: 0;
     margin-top: auto;
@@ -2006,16 +2007,6 @@ footer {
     .fullscreen-modal-scrollable-area pre { font-size: 1em; }
 
     footer { font-size: 0.85em; padding: 20px 25px; }
-
-    /* Make task list within a task folder scrollable */
-    .task-folder-content .task-list {
-        overflow-y: auto;
-        max-height: 40vh; /* Adjust as needed */
-        padding-right: 5px; /* Space for scrollbar */
-    }
-    .task-folder-content .task-list .empty-tasks-message {
-        min-height: 60px;
-    }
 }
 @media (max-width: 480px) {
     body { padding: 10px 5px; }
@@ -2141,16 +2132,6 @@ footer {
     #historical-note-controls button { font-size: 0.9em; padding: 8px 15px; }
     #history-user-note-edit { font-size: 0.95em; }
     footer { padding: 15px 20px; }
-
-    /* Make task list within a task folder scrollable */
-    .task-folder-content .task-list {
-        overflow-y: auto;
-        max-height: 35vh; /* Smaller max-height for very small screens */
-        padding-right: 5px; /* Space for scrollbar */
-    }
-     .task-folder-content .task-list .empty-tasks-message {
-        min-height: 50px;
-    }
 }
 
 /* Ensure modal input fields are styled appropriately */
