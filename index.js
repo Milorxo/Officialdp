@@ -1,5 +1,3 @@
-
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -65,36 +63,20 @@ let currentContextMenuTargetTab = null; // For category tabs
 let currentContextMenuTargetFolderBox = null; // For folder boxes (the visual square)
 let midnightTimer = null;
 let tempFolderCreationData = null; // { type: 'task' | 'note', categoryId: string }
-let liveClockInterval = null;
+// No liveClockInterval needed anymore
 
 
 // DOM Elements
 const domElements = {
-  // Menu System
-  menuToggleButton: null,
-  appMenuPanel: null,
-  menuItemProgress: null,
-  menuItemClock: null,
-  menuItemDashboard: null,
-  appViewWrapper: null,
-  menuSelectedContentView: null,
-  menuSelectedContentHeader: null,
-  menuSelectedContentTitle: null,
-  closeMenuSelectedViewButton: null,
-  menuSelectedContentArea: null,
-  dashboardColumnView: null, 
-  liveClockView: null,
-  hourHand: null, 
-  minuteHand: null, 
-  secondHand: null, 
-  progressView: null,
+  // Removed Menu System Elements
+  appViewWrapper: null, // Still used for main view
+  mainContentWrapper: null, // Still used
+  dashboardColumnView: null, // This is the Activity Dashboard, now part of main flow
 
-  // PC Progress Sidebar & Mobile Placeholder
-  appProgressSidebar: null,
+  // Progress Location (was mobile, now permanent)
   mobileProgressLocation: null,
-  mainContentWrapper: null, // To adjust padding
 
-  // Existing elements
+  // Existing elements (mostly unchanged, some might be referenced slightly differently if they were inside removed menu)
   tabsContainer: null,
   tabContentsContainer: null, 
   addCategoryButton: null,
@@ -111,8 +93,8 @@ const domElements = {
   todayPointsStat: null,
   currentWeekProgressFill: null,
   currentWeekPointsStat: null,
-  todayProgressContainer: null, // The actual element
-  currentWeekProgressContainer: null, // The actual element
+  todayProgressContainer: null, 
+  currentWeekProgressContainer: null, 
   calendarMonthYearButton: null,
   calendarMonthYear: null,
   calendarGrid: null,
@@ -1453,6 +1435,7 @@ function switchTab(categoryIdToActivate) {
         renderCategorySectionContent(activeTabId); 
     } else {
         currentCategoryView = { mode: 'dashboard', categoryId: null, folderId: null };
+        updateDashboardSummaries(); // Update dashboard summaries when switching to main tab
     }
 
     if (activeAddTaskForm) { 
@@ -1938,7 +1921,7 @@ function updateCategoryTabIndicators() {
 
 
 function updateAllProgress() {
-  if (domElements.dashboardSummariesContainer) updateDashboardSummaries();
+  if (domElements.dashboardSummariesContainer && activeTabId === 'dashboard') updateDashboardSummaries();
   updateTodaysProgress();
   updateCurrentWeekProgress();
   updateCategoryTabIndicators();
@@ -2107,9 +2090,10 @@ function initializeApp() {
     domElements.folderOptionsContextMenu = document.getElementById('folder-options-context-menu');
     domElements.ctxRenameFolderButton = document.getElementById('ctx-rename-folder');
     domElements.ctxDeleteFolderButton = document.getElementById('ctx-delete-folder');
-    domElements.dashboardColumnView = document.getElementById('dashboard-column');
+    domElements.dashboardColumnView = document.getElementById('dashboard-column'); // Activity Dashboard
     domElements.taskEditControlsTemplate = document.getElementById('task-edit-controls-template');
     domElements.dashboardSummariesContainer = document.getElementById('dashboard-summaries');
+    domElements.mobileProgressLocation = document.getElementById('mobile-progress-location');
 
 
     loadAppData();
@@ -2117,6 +2101,7 @@ function initializeApp() {
     renderAllCategorySections(); 
     switchTab('dashboard'); // Default to dashboard
     updateAllProgress();
+    updateLayoutBasedOnScreenSize(); // Initial call
 
     // Event Listeners with null checks
     if (domElements.addCategoryButton) {
@@ -2311,20 +2296,12 @@ function initializeApp() {
             else if (domElements.chooseFolderTypeModal && !domElements.chooseFolderTypeModal.classList.contains('hidden')) closeChooseFolderTypeModal();
             else if (domElements.enterFolderNameModal && !domElements.enterFolderNameModal.classList.contains('hidden')) closeEnterFolderNameModal();
             else if (domElements.monthYearPickerModal && !domElements.monthYearPickerModal.classList.contains('hidden')) closeMonthYearPicker();
-            else if (domElements.appMenuPanel && !domElements.appMenuPanel.classList.contains('hidden')) toggleMenu();
+            // No menu to close with Escape anymore
             else if (currentContextMenuTargetTab) hideCategoryContextMenu();
             else if (currentContextMenuTargetFolderBox) hideFolderContextMenu();
-
         }
     });
-
-    if (domElements.menuToggleButton) domElements.menuToggleButton.addEventListener('click', toggleMenu);
-    if (domElements.menuItemProgress) domElements.menuItemProgress.addEventListener('click', () => showMenuSelectedView('Progress', domElements.progressView));
-    if (domElements.menuItemClock) domElements.menuItemClock.addEventListener('click', () => showMenuSelectedView('Live Clock', domElements.liveClockView, initializeAnalogClock));
-    if (domElements.menuItemDashboard) domElements.menuItemDashboard.addEventListener('click', () => showMenuSelectedView('Activity Dashboard', domElements.dashboardColumnView, updateDashboardSummaries));
-    if (domElements.closeMenuSelectedViewButton) domElements.closeMenuSelectedViewButton.addEventListener('click', showMainAppView);
     
-    updateLayoutBasedOnScreenSize();
     window.addEventListener('resize', updateLayoutBasedOnScreenSize);
 
     if (domElements.tabsContainer && domElements.tabsContainer.querySelector('.active')) {
@@ -2332,114 +2309,23 @@ function initializeApp() {
     }
 }
 
-// Menu System Functions
-function toggleMenu() {
-    if (!domElements.menuToggleButton || !domElements.appMenuPanel) return;
-    const isExpanded = domElements.menuToggleButton.getAttribute('aria-expanded') === 'true';
-    domElements.menuToggleButton.setAttribute('aria-expanded', !isExpanded);
-    domElements.appMenuPanel.classList.toggle('hidden');
-    domElements.appMenuPanel.setAttribute('aria-hidden', isExpanded.toString());
-    const firstMenuButton = domElements.appMenuPanel.querySelector('button');
-    if (!isExpanded && firstMenuButton) {
-        firstMenuButton.focus();
-    } else {
-        domElements.menuToggleButton.focus();
-    }
-}
 
-function showMenuSelectedView(title, viewElement, onShowCallback = null) {
-    if (liveClockInterval) {
-        clearInterval(liveClockInterval);
-        liveClockInterval = null;
-    }
-
-    if (domElements.menuSelectedContentTitle) domElements.menuSelectedContentTitle.textContent = title;
-    
-    if (domElements.dashboardColumnView) domElements.dashboardColumnView.classList.add('hidden');
-    if (domElements.liveClockView) domElements.liveClockView.classList.add('hidden');
-    if (domElements.progressView) domElements.progressView.classList.add('hidden');
-    
-    if (viewElement) viewElement.classList.remove('hidden');
-    
-    if (domElements.menuSelectedContentView) domElements.menuSelectedContentView.classList.remove('hidden');
-    if (domElements.appViewWrapper) domElements.appViewWrapper.classList.add('hidden'); 
-    if (domElements.menuToggleButton) domElements.menuToggleButton.classList.add('hidden'); 
-    
-    if (onShowCallback) {
-        onShowCallback();
-    }
-    if (domElements.appMenuPanel && !domElements.appMenuPanel.classList.contains('hidden')) {
-      toggleMenu(); 
-    }
-    if (domElements.closeMenuSelectedViewButton) domElements.closeMenuSelectedViewButton.focus();
-}
-
-function showMainAppView() {
-    if (liveClockInterval) {
-        clearInterval(liveClockInterval);
-        liveClockInterval = null;
-    }
-    if (domElements.menuSelectedContentView) domElements.menuSelectedContentView.classList.add('hidden');
-    if (domElements.appViewWrapper) domElements.appViewWrapper.classList.remove('hidden'); 
-    if (domElements.menuToggleButton) domElements.menuToggleButton.classList.remove('hidden'); 
-    
-    if (domElements.tabsContainer && domElements.tabContentsContainer) {
-        const currentActiveTabButton = domElements.tabsContainer.querySelector('.tab-button.active');
-        if(currentActiveTabButton) {
-            const activeSectionId = currentActiveTabButton.id === 'dashboard-tab-button' ? 'dashboard-content' : `category-section-${currentActiveTabButton.dataset.categoryId}`;
-            domElements.tabContentsContainer.querySelectorAll('section[role="tabpanel"]').forEach(section => {
-                 section.classList.toggle('hidden', section.id !== activeSectionId);
-            });
-        }
-    }
-    updateLayoutBasedOnScreenSize(); 
-    if (domElements.menuToggleButton) domElements.menuToggleButton.focus();
-}
-
-function initializeAnalogClock() {
-    if (liveClockInterval) clearInterval(liveClockInterval);
-    updateAnalogClock(); 
-    liveClockInterval = setInterval(updateAnalogClock, 1000);
-}
-
-function updateAnalogClock() {
-    const now = new Date();
-    const seconds = now.getSeconds();
-    const minutes = now.getMinutes();
-    const hours = now.getHours();
-
-    const secondDeg = (seconds / 60) * 360;
-    const minuteDeg = (minutes / 60) * 360 + (seconds / 60) * 6; 
-    const hourDeg = (hours / 12) * 360 + (minutes / 60) * 30; 
-
-    if (domElements.hourHand) domElements.hourHand.style.transform = `translateX(-50%) rotate(${hourDeg}deg)`;
-    if (domElements.minuteHand) domElements.minuteHand.style.transform = `translateX(-50%) rotate(${minuteDeg}deg)`;
-    if (domElements.secondHand) domElements.secondHand.style.transform = `translateX(-50%) rotate(${secondDeg}deg)`;
-}
-
-// PC Progress Sidebar Logic
+// Simplified Layout Update (mainly for padding adjustments if needed, no element moving)
 function updateLayoutBasedOnScreenSize() {
-    const isPCView = window.innerWidth >= 1025;
-    
-    if (!domElements.appProgressSidebar || !domElements.mobileProgressLocation || !domElements.todayProgressContainer || !domElements.currentWeekProgressContainer || !domElements.appViewWrapper || !domElements.mainContentWrapper || !domElements.menuToggleButton) {
-        return;
-    }
+    // This function is now much simpler. 
+    // It no longer moves progress containers or the activity dashboard.
+    // It could be used for minor responsive CSS adjustments via JS if needed,
+    // but for now, CSS media queries handle most of this.
+    // Example: Adjust padding on main-content-wrapper if header size changes drastically
+    if (!domElements.mainContentWrapper) return;
 
-    if (isPCView) {
-        domElements.appProgressSidebar.appendChild(domElements.todayProgressContainer);
-        domElements.appProgressSidebar.appendChild(domElements.currentWeekProgressContainer);
-        domElements.appProgressSidebar.style.display = 'flex';
-        domElements.mobileProgressLocation.style.display = 'none';
-        domElements.appViewWrapper.style.flexDirection = 'row';
-        domElements.mainContentWrapper.style.paddingLeft = '45px'; 
+    const isMobile = window.innerWidth <= 700;
+    if (isMobile) {
+        domElements.mainContentWrapper.style.paddingLeft = '15px';
+        domElements.mainContentWrapper.style.paddingRight = '15px';
     } else {
-        domElements.mobileProgressLocation.appendChild(domElements.todayProgressContainer);
-        domElements.mobileProgressLocation.appendChild(domElements.currentWeekProgressContainer);
-        domElements.appProgressSidebar.style.display = 'none';
-        domElements.mobileProgressLocation.style.display = 'block';
-        domElements.appViewWrapper.style.flexDirection = 'column';
-        const menuButtonVisible = !domElements.menuToggleButton.classList.contains('hidden');
-        domElements.mainContentWrapper.style.paddingLeft = menuButtonVisible ? (window.innerWidth <= 700 ? '50px' : '65px') : (window.innerWidth <= 700 ? '15px' : '30px'); // Adjusted default padding for smaller screens
+        domElements.mainContentWrapper.style.paddingLeft = '45px';
+        domElements.mainContentWrapper.style.paddingRight = '45px';
     }
 }
 
