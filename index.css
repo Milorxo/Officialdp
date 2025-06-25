@@ -267,14 +267,9 @@ body {
     padding-left: 75px;
 }
 
-#dashboard-column {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    height: 100%;
-}
-#dashboard-column > h2 {
+.dashboard-section-title { 
     font-size: 2em;
+    margin-top: 35px; 
     margin-bottom: 35px;
     color: #E0E0FF;
     font-weight: 600;
@@ -286,10 +281,10 @@ body {
 
 
 #left-column {
-    flex: 0 0 100%;
+    flex: 1; 
     display: flex;
     flex-direction: column;
-    /* overflow: hidden; Removed to allow main#tab-content to scroll properly */
+    overflow: hidden; 
 }
 
 
@@ -531,7 +526,7 @@ main#tab-content {
     flex-grow: 1;
     overflow-y: auto;
     padding-top: 40px;
-    min-height: 0; /* Added for robust flex scrolling */
+    min-height: 0; 
 }
 #tab-content section { padding: 0 5px; }
 #tab-content section.hidden { display: none; }
@@ -559,7 +554,13 @@ main#tab-content {
     padding: 0;
 }
 
-.folder-view-header-controls {
+.category-header-controls { 
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.folder-view-header-controls { 
     display: flex;
     gap: 10px;
     align-items: center;
@@ -586,7 +587,7 @@ main#tab-content {
 }
 .edit-mode-toggle-button,
 .undo-category-button,
-.add-image-button {
+.add-image-button { 
     text-shadow: 0 0 5px rgba(0, 229, 255, 0.5), 0 0 10px rgba(0, 229, 255, 0.3);
 }
 .edit-mode-toggle-button:hover,
@@ -917,6 +918,8 @@ main#tab-content {
     text-align: left; letter-spacing: 0.1px; margin-bottom: 0;
 }
 
+/* #save-progress-button-container and #save-progress-button styles removed */
+
 .history-points-text {
     margin-bottom: 12px;
 }
@@ -927,11 +930,11 @@ main#tab-content {
     margin-bottom: 8px;
 }
 
-/* Folder System Specific Styles */
+/* Folder System Specific Styles (from original DPM spec, adapted) */
 .category-section .category-content-area {
-    padding-top: 15px;
+    padding-top: 15px; /* Space between header and folder grid/content */
 }
-.folder-view-header {
+.folder-view-header { /* This is for when a folder is OPEN */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -939,7 +942,7 @@ main#tab-content {
     padding-bottom: 15px;
     border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-.folder-back-button {
+.folder-back-button { /* Back button when folder is open */
     font-family: 'Poppins', sans-serif;
     font-size: 1em;
     color: #00CFE8;
@@ -949,7 +952,7 @@ main#tab-content {
     padding: 8px;
     border-radius: 50%;
     transition: background-color 0.2s ease, color 0.2s ease;
-    line-height: 1;
+    line-height: 1; /* For icon alignment */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -965,129 +968,150 @@ main#tab-content {
     fill: currentColor;
 }
 
-.folder-view-title {
-    font-size: 1.6em;
+.folder-view-title { /* Title when folder is open */
+    font-size: 1.6em; /* Slightly smaller than category title */
     color: #E0E0FF;
     font-weight: 600;
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Poppins', sans-serif; /* Consistent font */
     letter-spacing: 0.2px;
     margin: 0;
-    flex-grow: 1;
+    flex-grow: 1; /* Take remaining space */
     text-align: left;
 }
-.folders-grid {
-    display: flex;
+.folders-grid { /* Container for folder-item-containers */
+    display: flex; /* Changed from grid to flex for simpler wrapping */
     flex-wrap: wrap;
-    gap: 18px;
-    padding: 10px 0;
+    gap: 18px; /* Spacing between folder items */
+    padding: 10px 0; /* Padding around the grid */
 }
 
-.folder-item-container {
+.folder-item-container { /* Wrapper for a folder-box and its name */
     display: flex;
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    padding: 5px;
-    border-radius: 4px;
+    padding: 5px; /* Small padding to allow focus outline room */
+    border-radius: 4px; /* For focus outline */
 }
+/* Focus visible style for keyboard navigation */
 .folder-item-container:focus-visible {
-    outline: 2px solid #7FFFD4;
-    outline-offset: 0px;
+    outline: 2px solid #7FFFD4; /* Aquamarine outline */
+    outline-offset: 0px; /* Outline right on the edge */
 }
 .folder-item-container:focus-visible .folder-box {
+    /* Enhanced glow for focused folder */
     box-shadow: 0 0 10px 2px rgba(0, 207, 232, 0.4), 0 0 18px 3px rgba(0, 207, 232, 0.3);
 }
 
 
-.folder-box {
+.folder-box { /* The visual square box for a folder */
     width: 80px;
     height: 80px;
-    background-color: #0c0a14;
-    border: 1px solid #00CFE8;
+    background-color: #0c0a14; /* Darker, slightly purplish black */
+    border: 1px solid #00CFE8; /* Cyan neon border */
     border-radius: 12px;
-    box-shadow: 0 0 8px 1px rgba(0, 207, 232, 0.3), 0 0 15px 2px rgba(0, 207, 232, 0.2);
+    box-shadow: 0 0 8px 1px rgba(0, 207, 232, 0.3), /* Cyan glow */
+                0 0 15px 2px rgba(0, 207, 232, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px;
-    position: relative;
+    padding: 10px; /* Inner padding for the icon */
+    position: relative; /* For options trigger positioning */
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .folder-item-container:hover .folder-box {
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 0 12px 2px rgba(0, 207, 232, 0.5), 0 0 20px 3px rgba(0, 207, 232, 0.35);
+    transform: translateY(-3px) scale(1.02); /* Slight lift and scale on hover */
+    box-shadow: 0 0 12px 2px rgba(0, 207, 232, 0.5), /* Intensified glow */
+                0 0 20px 3px rgba(0, 207, 232, 0.35);
 }
 
 .folder-box-icon {
-    width: 50%;
+    width: 50%; /* Icon takes up half the box width */
     height: auto;
 }
 .folder-box-icon svg {
     width: 100%;
     height: 100%;
-    fill: #00CFE8;
+    fill: #00CFE8; /* Cyan icon */
 }
-.folder-box-name {
+.folder-box-name { /* Text label below the folder */
     font-family: 'Poppins', sans-serif;
     font-size: 0.85em;
     font-weight: 500;
     color: #C5C1D6;
-    word-break: break-word;
+    word-break: break-word; /* Prevent long names from breaking layout */
     line-height: 1.2;
     text-align: center;
-    margin-top: 6px;
-    max-width: 80px;
+    margin-top: 6px; /* Space between box and name */
+    max-width: 80px; /* Prevent name from being wider than box */
 }
 
-.add-folder-button {
+/* Special Category Folder Styling */
+.folder-item-container.special .folder-box {
+    border-color: #BE93FD; /* Purple border */
+    box-shadow: 0 0 8px 1px rgba(190, 147, 253, 0.4), /* Purple glow */
+                0 0 15px 2px rgba(190, 147, 253, 0.3);
+}
+.folder-item-container.special:hover .folder-box {
+    box-shadow: 0 0 12px 2px rgba(190, 147, 253, 0.6), /* Intensified purple glow */
+                0 0 20px 3px rgba(190, 147, 253, 0.45);
+}
+.folder-item-container.special .folder-box-icon svg {
+    fill: #BE93FD; /* Purple icon */
+}
+.folder-item-container.special .folder-box-name {
+    color: #D6B9FF; /* Lighter purple for text */
+}
+
+.add-folder-button { /* Special folder-box variant for adding new folders */
     width: 80px;
     height: 80px;
-    border: 2px dashed rgba(0, 207, 232, 0.3);
+    border: 2px dashed rgba(0, 207, 232, 0.3); /* Dashed cyan border */
     border-radius: 12px;
-    color: rgba(0, 207, 232, 0.6);
+    color: rgba(0, 207, 232, 0.6); /* Semi-transparent cyan icon */
     background-color: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
-    padding: 0;
+    padding: 0; /* Remove padding if icon is SVG and centered */
 }
 .add-folder-button svg {
-    width: 30px;
+    width: 30px; /* Size of the plus icon */
     height: 30px;
     fill: currentColor;
 }
 .add-folder-button:hover {
     border-color: #00CFE8;
     color: #00CFE8;
-    background-color: rgba(0, 207, 232, 0.05);
+    background-color: rgba(0, 207, 232, 0.05); /* Slight cyan bg on hover */
 }
 
-.folder-options-trigger {
+.folder-options-trigger { /* Three-dot icon on folder-box */
     position: absolute;
     top: 6px;
     right: 6px;
-    width: 22px;
+    width: 22px; /* Small clickable area */
     height: 22px;
     display: flex;
     flex-direction: column;
     justify-content: space-around;
     align-items: center;
     cursor: pointer;
-    padding: 3px;
+    padding: 3px; /* Padding inside the clickable area */
     border-radius: 50%;
-    opacity: 0;
+    opacity: 0; /* Hidden by default, shown on hover */
     transition: opacity 0.2s ease, background-color 0.2s ease;
 }
 .folder-item-container:hover .folder-options-trigger,
-.folder-options-trigger.visible {
+.folder-options-trigger.visible { /* .visible class can be toggled by JS */
     opacity: 1;
 }
 .folder-options-trigger:hover {
-    background-color: rgba(255,255,255,0.1);
+    background-color: rgba(255,255,255,0.1); /* Slight highlight on hover */
 }
-.folder-options-trigger span {
+.folder-options-trigger span { /* Individual dots */
     display: block;
     width: 3.5px;
     height: 3.5px;
@@ -1096,64 +1120,72 @@ main#tab-content {
 }
 .folder-item-container:hover .folder-options-trigger span,
 .folder-options-trigger.visible span {
-    background-color: #C5C1D6;
+    background-color: #C5C1D6; /* Brighter dots when trigger is active/hovered */
 }
 
+
+/* Task Folder Content View (inside an open Task Folder) */
+.task-folder-content {
+    /* Styles for the container of tasks when a task folder is open */
+}
 
 /* Note Folder View Specifics */
 .note-folder-content-wrapper {
+    /* Wrapper if needed for specific layout of note folder content */
 }
-.note-editor {
+.note-editor { /* The main text area for notes */
     width: 100%;
-    min-height: 200px;
+    min-height: 200px; /* Or use flex-grow if inside a flex container */
     padding: 15px;
-    background-color: rgba(0,0,0, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(0,0,0, 0.15); /* Dark input background */
+    border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle border */
     border-radius: 8px;
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Open Sans', sans-serif; /* Readable font for notes */
     font-size: 1em;
-    color: #C5C1D6;
+    color: #C5C1D6; /* Light text color */
     line-height: 1.6;
-    resize: vertical;
-    outline: none;
-    margin-bottom: 15px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    resize: vertical; /* Allow vertical resizing */
+    outline: none; /* Remove default focus outline */
+    margin-bottom: 15px; /* Space below editor if there are controls */
+    white-space: pre-wrap; /* Preserve line breaks and spaces */
+    word-wrap: break-word; /* Wrap long words */
 }
 .note-editor:focus {
-    border-color: #00CFE8;
-    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.2);
+    border-color: #00CFE8; /* Cyan border on focus */
+    box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.2); /* Cyan glow on focus */
 }
 .note-editor img {
-    max-width: 100%;
+    max-width: 100%; /* Responsive images */
     height: auto;
     border-radius: 6px;
-    margin: 10px 0;
-    display: block;
-    border: 1px solid rgba(255,255,255,0.1);
-    cursor: default;
+    margin: 10px 0; /* Space around images */
+    display: block; /* Ensure it's on its own line */
+    border: 1px solid rgba(255,255,255,0.1); /* Subtle border for images */
+    cursor: default; /* Default cursor for images */
 }
-.note-editor a {
-    color: #7FFFD4;
+.note-editor a { /* Style for auto-detected links */
+    color: #7FFFD4; /* Aquamarine for links */
     text-decoration: underline;
 }
 .note-editor a:hover {
-    color: #AFFFFF;
+    color: #AFFFFF; /* Lighter aquamarine on hover */
 }
 
-.note-folder-controls {
+.note-folder-controls { /* Container for buttons like 'Add Image' */
+    /* Add styling if needed, e.g., flex, space-between */
 }
+
 
 /* Add Task Form Elements (within Task Folder View) */
 .add-task-form-container {
-    display: none;
+    display: none; /* Hidden by default, shown in edit mode */
     margin-bottom: 20px;
     padding: 10px 5px;
     background-color: rgba(255, 255, 255, 0.02);
     border-radius: 8px;
-    min-height: 44px;
+    min-height: 44px; /* Prevent layout jump */
 }
-.task-folder-content.edit-mode-active .add-task-form-container {
+.task-folder-content.edit-mode-active .add-task-form-container { /* Assuming .task-folder-content is parent */
     display: block;
 }
 
@@ -1235,7 +1267,7 @@ main#tab-content {
     background-color: rgba(255, 255, 255, 0.02); border-radius: 10px;
     border: 1px dashed rgba(255, 255, 255, 0.08);
 }
-.empty-tasks-message.edit-mode-empty {
+.empty-tasks-message.edit-mode-empty { /* When in edit mode and list is empty */
     border-style: solid;
     border-color: rgba(0, 207, 232, 0.3);
     color: #00CFE8;
@@ -1246,29 +1278,29 @@ main#tab-content {
     background-color: rgba(255, 255, 255, 0.03); padding: 18px 22px;
     margin-bottom: 20px; border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.06);
-    cursor: default;
+    cursor: default; /* Default, overridden for clickable states */
     box-shadow: 0 2px 5px rgba(0,0,0, 0.08);
     transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease, opacity 0.25s ease;
     font-size: 1.1em; color: #D5D0E5; font-weight: 500; line-height: 1.5;
     position: relative; user-select: none;
 }
-.task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) {
-    cursor: grab;
+.task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) { /* Assuming parent */
+    cursor: grab; /* For drag and drop */
 }
 .task-item .task-text {
     position: relative; display: inline-block; letter-spacing: 0.1px;
     flex-grow: 1; font-family: 'Open Sans', sans-serif;
     margin-right: 15px;
-    cursor: default;
+    cursor: default; /* Default, overridden below */
 }
 .task-folder-content:not(.edit-mode-active) .task-item:not(.locked):not(.editing) {
-    cursor: pointer;
+    cursor: pointer; /* Click to complete/uncomplete */
 }
 .task-folder-content.edit-mode-active .task-item:not(.locked) .task-text {
-    cursor: text;
+    cursor: text; /* Click to edit text */
 }
 
-.task-item .task-text::after {
+.task-item .task-text::after { /* Strikethrough line */
     content: ''; position: absolute; left: 0; top: 54%; height: 1.5px;
     width: 100%; background-color: #817A99; transform: scaleX(0);
     transform-origin: left; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1285,7 +1317,7 @@ main#tab-content {
 .task-item.completed:not(.locked):not(.dragging):hover {
     background-color: rgba(255, 255, 255, 0.04); opacity: 0.75; transform: translateY(-1px);
 }
-.task-item::before {
+.task-item::before { /* Checkbox pseudo-element */
     content: ''; display: inline-block; width: 20px; height: 20px;
     border: 2px solid #00CFE8; border-radius: 5px; margin-right: 18px;
     flex-shrink: 0; transition: background-color 0.25s ease, border-color 0.25s ease;
@@ -1310,33 +1342,33 @@ main#tab-content {
 
 /* Task Delete Button (in Task Folder Edit Mode) */
 .task-delete-button-editmode {
-    display: none;
-    color: #FF6B6B;
-    margin-left: 10px;
-    flex-shrink: 0;
+    display: none; /* Hidden by default, shown in edit mode */
+    color: #FF6B6B; /* Red for delete */
+    margin-left: 10px; /* Space from task text/controls */
+    flex-shrink: 0; /* Prevent shrinking */
 }
 .task-delete-button-editmode svg { width: 18px; height: 18px; }
 
 .task-folder-content.edit-mode-active .task-item:not(.locked):not(.editing) .task-delete-button-editmode {
-    display: flex;
+    display: flex; /* Show when conditions met */
 }
 .task-delete-button-editmode:hover {
-    color: #FF8787;
-    background-color: rgba(255, 107, 107, 0.1);
+    color: #FF8787; /* Lighter red on hover */
+    background-color: rgba(255, 107, 107, 0.1); /* Subtle red background */
 }
-.task-item.locked .task-delete-button-editmode { display: none !important; }
+.task-item.locked .task-delete-button-editmode { display: none !important; } /* Never show for locked tasks */
 
 
 /* Inline Task Editing Styles */
 .task-item.editing { background-color: rgba(255, 255, 255, 0.06); cursor: default; }
-.task-item.editing .task-text { display: none; }
+.task-item.editing .task-text { display: none; } /* Hide original text when editing */
 
-#task-edit-controls-template { display: flex; align-items: center; gap: 8px; width: 100%;}
+#task-edit-controls-template { display: flex; align-items: center; gap: 8px; width: 100%;} /* Template is hidden, clone shown */
 .task-edit-input {
     flex-grow: 1; padding: 8px 10px; background-color: rgba(0,0,0, 0.2);
     border: 1px solid #00CFE8; border-radius: 6px; font-family: 'Open Sans', sans-serif;
     font-size: 1em; color: #E0E0FF;
-    margin-left: 0;
+    margin-left: 0; /* Align with checkbox if needed, or adjust */
 }
 .task-edit-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.3); }
 
@@ -1355,19 +1387,18 @@ main#tab-content {
 .dragging { opacity: 0.5 !important; border: 2px dashed #00CFE8 !important; box-shadow: 0 5px 15px rgba(0, 207, 232, 0.2) !important; }
 .tab-button.dragging { background-color: rgba(0, 207, 232, 0.1) !important; color: #00CFE8 !important; }
 .task-item.drag-over-indicator-task {
-    box-shadow: inset 0 3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important;
+    box-shadow: inset 0 3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important; /* Top indicator */
 }
 .task-list .task-item.drag-over-indicator-task-bottom {
-    box-shadow: inset 0 -3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important;
+    box-shadow: inset 0 -3px 0 #7FFFD4, 0 2px 5px rgba(0,0,0, 0.08) !important; /* Bottom indicator */
 }
 
 
 /* Footer */
 footer {
-    display: none; /* Removed footer as per request */
     text-align: center; padding: 25px 45px; border-top: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 0.9em; color: #8A83A0; font-weight: 400; flex-shrink: 0;
-    margin-top: auto;
+    margin-top: auto; /* Push footer to bottom in flex container */
 }
 
 /* Modal Styles */
@@ -1379,8 +1410,8 @@ footer {
 }
 .modal:not(.hidden) { opacity: 1; visibility: visible; transition: opacity 0.3s ease; }
 
-.modal-content {
-    background-color: #1A1724;
+.modal-content { /* General style for the box INSIDE a modal overlay */
+    background-color: #1A1724; /* Base for most modals */
     margin: auto;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 15px;
@@ -1388,9 +1419,9 @@ footer {
     position: relative;
     transform: scale(0.95);
     transition: transform 0.3s ease;
-    padding: 30px 35px;
-    width: 90%;
-    max-width: 550px;
+    padding: 30px 35px; /* Default padding */
+    width: 90%; /* Default width */
+    max-width: 550px; /* Default max-width */
 }
 .modal:not(.hidden) .modal-content { transform: scale(1); }
 
@@ -1401,10 +1432,11 @@ footer {
 }
 .close-button:hover, .close-button:focus { color: #E0E0FF; text-decoration: none; }
 
-.modal-title-text {
+/* Modal specific inputs and buttons */
+.modal-title-text { /* Shared title style for modals */
     margin-top: 0; margin-bottom: 25px; color: #00E5FF; font-size: 1.7em; text-align: center;
 }
-.modal-input {
+.modal-input { /* Generic input field within modals */
     width: 100%;
     padding: 12px 15px;
     background-color: rgba(0,0,0, 0.2);
@@ -1412,20 +1444,20 @@ footer {
     border-radius: 8px;
     font-family: 'Open Sans', sans-serif;
     font-size: 1em;
-    color: #E0E0FF;
-    margin-bottom: 25px;
+    color: #E0E0FF; /* Lighter text for input */
+    margin-bottom: 25px; /* Space below input */
 }
 .modal-input::placeholder { color: #706A82; }
 .modal-input:focus {
     outline: none; border-color: #00CFE8;
     box-shadow: 0 0 0 2px rgba(0, 207, 232, 0.25);
 }
-.modal-actions-centered {
+.modal-actions-centered { /* For centering action buttons */
     display: flex;
     justify-content: center;
     gap: 15px;
 }
-.modal-button, .modal-button-primary {
+.modal-button, .modal-button-primary { /* Base for modal buttons */
     padding: 10px 25px;
     border: none;
     border-radius: 8px;
@@ -1435,21 +1467,21 @@ footer {
     cursor: pointer;
     transition: background-color 0.2s ease, transform 0.1s ease;
 }
-.modal-button {
-    background-color: #454153;
+.modal-button { /* Secondary/Cancel button style */
+    background-color: #454153; /* Darker grey/purple */
     color: #C5C1D6;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
 }
 .modal-button:hover { background-color: #5a556b; }
 .modal-button:active { transform: scale(0.98); background-color: #3a3647; }
 
-.modal-button-primary {
-    background-color: #00CFE8;
-    color: #12101A;
+.modal-button-primary { /* Primary/Confirm button style */
+    background-color: #00CFE8; /* Bright Cyan */
+    color: #12101A; /* Dark text for contrast */
     box-shadow: 0 2px 5px rgba(0, 207, 232, 0.2);
 }
-.modal-button-primary:hover { background-color: #33DFFF; }
-.modal-button-primary:active { transform: scale(0.98); background-color: #00B8D4; }
+.modal-button-primary:hover { background-color: #33DFFF; } /* Lighter cyan */
+.modal-button-primary:active { transform: scale(0.98); background-color: #00B8D4; } /* Darker cyan */
 
 
 /* History Modal Specifics */
@@ -1460,6 +1492,9 @@ footer {
     padding-bottom: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+#history-modal-stats p { font-size: 1.05em; color: #C5C1D6; margin-bottom: 8px; }
+#history-modal-stats p strong { color: #00CFE8; }
+
 
 .history-section { margin-bottom: 25px; }
 .history-section-header {
@@ -1473,7 +1508,7 @@ footer {
     font-size: 1.25em;
     margin: 0;
 }
-.expand-section-button {
+.expand-section-button { 
     padding: 3px;
     color: #A09CB8;
 }
@@ -1492,6 +1527,8 @@ footer {
     padding-left: 25px; font-family: 'Open Sans', sans-serif;
 }
 #history-tasks-list li::before { content: '✔'; color: #00CFE8; position: absolute; left: 0; top: 7px; font-weight: bold; }
+#history-tasks-list li span { text-decoration: line-through; text-decoration-color: #817A99; }
+
 
 #historical-reflection-wrapper { margin-top: 0; }
 .history-note-paragraph { background-color: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); min-height: 60px; color: #B0ACC9; font-size: 1em; line-height: 1.6; white-space: pre-wrap; margin-bottom: 15px; }
@@ -1515,14 +1552,14 @@ footer {
 #historical-note-status { font-size: 0.9em; color: #7FFFD4; margin-left: 10px; flex-grow: 1; text-align: right; }
 
 /* Fullscreen Content Modal Specifics */
-.fullscreen-modal-content-box {
+.fullscreen-modal-content-box { 
     width: 90vw;
-    max-width: 1200px;
+    max-width: 1200px; 
     height: 90vh;
-    padding: 25px 30px;
+    padding: 25px 30px; 
     display: flex;
     flex-direction: column;
-    background-color: #161420;
+    background-color: #161420; 
 }
 .fullscreen-modal-title-text {
     margin-top: 0;
@@ -1537,7 +1574,7 @@ footer {
 .fullscreen-modal-scrollable-area {
     flex-grow: 1;
     overflow-y: auto;
-    padding-right: 15px;
+    padding-right: 15px; 
     color: #C5C1D6;
     font-size: 1.05em;
     line-height: 1.7;
@@ -1546,20 +1583,24 @@ footer {
 .fullscreen-modal-scrollable-area .history-category-title { font-size: 1.3em; color: #00CFE8; margin-bottom: 10px; }
 .fullscreen-modal-scrollable-area ul { list-style: none; padding-left: 0; }
 .fullscreen-modal-scrollable-area li {
-    padding: 8px 0 8px 30px;
-    font-size: 1.1em;
+    padding: 8px 0 8px 30px; 
+    font-size: 1.1em; 
     position: relative;
 }
 .fullscreen-modal-scrollable-area li::before {
     content: '✔'; color: #00CFE8; position: absolute; left: 0; top: 10px; font-weight: bold; font-size: 1.1em;
 }
-.fullscreen-modal-scrollable-area pre {
+.fullscreen-modal-scrollable-area li span { text-decoration: line-through; text-decoration-color: #817A99; }
+.fullscreen-modal-scrollable-area pre { 
     white-space: pre-wrap;
     word-wrap: break-word;
-    font-family: Tahoma, Geneva, sans-serif;
+    font-family: Tahoma, Geneva, sans-serif; 
     font-size: 1.1em;
     color: #D5D0E5;
 }
+
+/* Save Progress Confirmation Modal Styles Removed */
+
 
 /* Delete Confirmation Modal Styles (Generic) */
 .delete-task-modal-content { max-width: 400px; padding: 25px 30px; }
@@ -1586,21 +1627,22 @@ footer {
     width: 100%;
     height: 100%;
     background-color: #12101A;
-    z-index: 1080;
-    display: flex;
+    z-index: 1080; 
+    display: flex; 
     flex-direction: column;
     padding: 20px;
     overflow: hidden;
 }
+
 #menu-selected-content-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 10px 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    margin: 0 -20px 20px -20px;
-    padding-left: 20px; /* Adjusted from 40px as menu icon is hidden here */
-    padding-right: 40px;
+    margin: 0 -20px 20px -20px; 
+    padding-left: 20px; 
+    padding-right: 40px; 
     flex-shrink: 0;
 }
 #menu-selected-content-title {
@@ -1613,19 +1655,19 @@ footer {
 #close-menu-selected-view-button {
 }
 #close-menu-selected-view-button svg {
-    width: 28px;
+    width: 28px; 
     height: 28px;
 }
 #menu-selected-content-area {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 0 20px;
-    display: flex;
+    padding: 0 20px; 
+    display: flex; 
     align-items: center;
     justify-content: center;
 }
-.menu-view-content {
-    height: 100%;
+.menu-view-content { 
+    height: 100%; 
     width: 100%;
 }
 
@@ -1637,54 +1679,54 @@ footer {
 
 /* Analog Clock Styles */
 .analog-clock {
-    width: 80vmin;
+    width: 80vmin; 
     height: 80vmin;
-    max-width: 300px;
+    max-width: 300px; 
     max-height: 300px;
-    position: relative;
-    margin: auto;
+    position: relative; 
+    margin: auto; 
 }
 
 .clock-face {
     width: 100%;
     height: 100%;
     border-radius: 50%;
-    background-color: rgba(13, 12, 21, 0.7);
-    border: 2px solid rgba(0, 207, 232, 0.4);
+    background-color: rgba(13, 12, 21, 0.7); 
+    border: 2px solid rgba(0, 207, 232, 0.4); 
     box-shadow:
-        inset 0 0 15px rgba(0, 207, 232, 0.3),
-        0 0 25px rgba(190, 147, 253, 0.3),
-        0 0 10px rgba(0, 207, 232, 0.5);
+        inset 0 0 15px rgba(0, 207, 232, 0.3), 
+        0 0 25px rgba(190, 147, 253, 0.3),    
+        0 0 10px rgba(0, 207, 232, 0.5);      
     position: relative;
 }
 
 .clock-face .hand {
     position: absolute;
-    bottom: 50%;
+    bottom: 50%; 
     left: 50%;
-    transform-origin: center bottom;
-    border-radius: 6px 6px 0 0;
-    transition: transform 0.5s cubic-bezier(0.4, 2.5, 0.6, 1);
-    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    transform-origin: center bottom; 
+    border-radius: 6px 6px 0 0; 
+    transition: transform 0.5s cubic-bezier(0.4, 2.5, 0.6, 1); 
+    box-shadow: 0 0 5px rgba(0,0,0,0.3); 
 }
 .clock-face .hour-hand {
     width: 6px;
-    height: 28%;
-    background-color: #BE93FD;
-    transform: translateX(-50%) rotate(0deg);
+    height: 28%; 
+    background-color: #BE93FD; 
+    transform: translateX(-50%) rotate(0deg); 
     z-index: 1;
 }
 .clock-face .minute-hand {
     width: 4px;
     height: 38%;
-    background-color: #E0E0FF;
+    background-color: #E0E0FF; 
     transform: translateX(-50%) rotate(0deg);
     z-index: 2;
 }
 .clock-face .second-hand {
     width: 2px;
-    height: 42%;
-    background-color: #7FFFD4;
+    height: 42%; 
+    background-color: #7FFFD4; 
     transform: translateX(-50%) rotate(0deg);
     z-index: 3;
 }
@@ -1694,34 +1736,34 @@ footer {
     left: 50%;
     width: 12px;
     height: 12px;
-    background-color: #7FFFD4;
+    background-color: #7FFFD4; 
     border-radius: 50%;
     transform: translate(-50%, -50%);
     z-index: 4;
-    border: 2px solid #12101A;
+    border: 2px solid #12101A; 
 }
 
 .clock-face .hour-mark {
     position: absolute;
-    width: 2px;
-    height: 100%;
-    left: calc(50% - 1px);
+    width: 2px; 
+    height: 100%; 
+    left: calc(50% - 1px); 
     top: 0;
 }
 .clock-face .hour-mark::before {
     content: '';
     position: absolute;
     width: 100%;
-    height: 8px;
-    background-color: rgba(190, 147, 253, 0.7);
-    top: 4%;
+    height: 8px; 
+    background-color: rgba(190, 147, 253, 0.7); 
+    top: 4%; 
     border-radius: 1px;
 }
 .clock-face .hour-mark.major::before {
-    height: 14px;
-    background-color: rgba(0, 207, 232, 0.9);
-    width: 3px;
-    left: -0.5px;
+    height: 14px; 
+    background-color: rgba(0, 207, 232, 0.9); 
+    width: 3px; 
+    left: -0.5px; 
 }
 
 .clock-face .mark-12 { transform: rotate(0deg); }
@@ -1738,31 +1780,29 @@ footer {
 .clock-face .mark-11 { transform: rotate(330deg); }
 
 /* Clock Numbers */
-.clock-number-wrapper {
+.clock-number-wrapper { 
     position: absolute;
     width: 100%;
     height: 100%;
     top: 0;
     left: 0;
-    pointer-events: none; /* So they don't interfere with clock interactions if any */
+    pointer-events: none; 
 }
 .clock-number {
     position: absolute;
     left: 50%;
-    top: 6%; /* Adjust distance from edge, e.g. 5%-10% */
-    transform: translateX(-50%); /* Center the number horizontally */
-    font-size: clamp(12px, 3.5vmin, 18px); /* Responsive font size */
+    top: 6%; 
+    transform: translateX(-50%); 
+    font-size: clamp(12px, 3.5vmin, 18px); 
     color: #E0E0FF;
     font-family: 'Poppins', sans-serif;
     font-weight: 500;
-    width: 24px; /* Ensure numbers have some space, adjust if needed */
+    width: 24px; 
     height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-/* Counter-rotate each number individually (done via JS or individual styles) */
-/* Example for number 1 which is at 30deg from 12 o'clock */
 .clock-number.number-1  { transform: translateX(-50%) rotate(-30deg); }
 .clock-number.number-2  { transform: translateX(-50%) rotate(-60deg); }
 .clock-number.number-3  { transform: translateX(-50%) rotate(-90deg); }
@@ -1774,61 +1814,43 @@ footer {
 .clock-number.number-9  { transform: translateX(-50%) rotate(-270deg); }
 .clock-number.number-10 { transform: translateX(-50%) rotate(-300deg); }
 .clock-number.number-11 { transform: translateX(-50%) rotate(-330deg); }
-/* Number 12 needs no counter-rotation if its wrapper is at 0deg */
 .clock-number.number-12 { transform: translateX(-50%) rotate(0deg); }
 
 
 /* Accessibility */
 .hidden { display: none !important; }
 
-/*
-    ========================================
-    RESPONSIVE DESIGN & MEDIA QUERIES
-    This section ensures the application adapts
-    to different screen sizes (PC, tablet, mobile).
-    ========================================
-*/
-
-/* Responsive Design */
-@media (min-width: 1025px) { /* PC View - New Progress Sidebar and Layout */
+@media (min-width: 1025px) { 
     #app-view-wrapper {
-        flex-direction: row; /* Sidebar and main content side-by-side */
+        flex-direction: row; 
     }
     #app-progress-sidebar {
-        display: flex; /* Show PC progress sidebar */
+        display: flex; 
     }
     #mobile-progress-location {
-        display: none !important; /* Hide mobile progress location */
+        display: none !important; 
     }
     #main-content-wrapper {
-        padding-left: 45px; /* Adjust if menu button + sidebar cause overlap issues */
+        padding-left: 45px; 
     }
     #left-column {
-       /* Takes full width of main-content-wrapper now */
+       flex-grow: 1; 
     }
 }
 
 
-@media (max-width: 1024px) { /* General Tablet + Smaller */
+@media (max-width: 1024px) { 
     #app-container { height: 100vh; max-height: none; padding-bottom: 0; }
-    #main-content-wrapper { flex-direction: column; padding: 25px 30px 0; padding-left: 65px; }
-    #app-progress-sidebar { display: none; } /* Ensure PC sidebar is hidden */
-    #mobile-progress-location { display: block; } /* Ensure mobile progress is shown */
+    #main-content-wrapper { flex-direction: column; padding: 25px 30px 0; /* padding-left: 65px REMOVED */ }
+    #app-progress-sidebar { display: none; } 
+    #mobile-progress-location { display: block; } 
 
-    #dashboard-column { padding: 15px; }
-    #dashboard-column > h2 { margin-top: 0; font-size: 1.9em; }
-
-    #left-column {
-        flex-basis: auto;
-        padding-left: 0;
-        border-left: none;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        padding-top: 30px;
-        flex-grow: 1; /* Ensures #left-column takes available space in #main-content-wrapper */
-        min-height: 0; /* Allows #left-column to shrink if content is small, critical for flex scrolling children */
+    
+    #left-column { 
+        flex-basis: auto; 
+        padding-left: 0; 
+        padding-top: 30px; 
     }
-    /* main#tab-content already handles its own scrolling (overflow-y: auto, flex-grow: 1, min-height:0) */
-
     header { margin-bottom: 25px; }
     header h1 { font-size: 2.3em; }
     #main-logo { width: 60px; height: 60px; margin-bottom: 8px; }
@@ -1840,6 +1862,7 @@ footer {
 
 
     .category-section .category-header .category-title-text { font-size: 1.9em; }
+    .dashboard-section-title { font-size: 1.9em; } 
     .dashboard-category-summary h3 { font-size: 1.4em; }
     .dashboard-category-summary .category-stats { font-size: 1.15em; }
 
@@ -1849,6 +1872,7 @@ footer {
 
     .fullscreen-modal-content-box { width: 95vw; height: 95vh; }
 
+    .folders-grid { gap: 18px; }
     .folder-box { width: 90px; height: 90px; padding: 12px;}
     .folder-box-name { max-width: 90px; font-size: 0.88em;}
     .add-folder-button { width: 90px; height: 90px; }
@@ -1863,7 +1887,7 @@ footer {
     .analog-clock { max-width: 250px; max-height: 250px; }
 }
 
-@media (min-width: 768px) and (max-width: 1024px) {
+@media (min-width: 768px) and (max-width: 1024px) { 
     #dashboard-summaries { grid-template-columns: repeat(2, 1fr);  }
      .task-item { font-size: 1.15em; }
      .folders-grid { gap: 18px; }
@@ -1873,11 +1897,11 @@ footer {
 }
 
 
-@media (max-width: 700px) { /* Mobile */
+@media (max-width: 700px) { 
     body { padding: 15px 10px; animation-duration: 70s; }
     #app-container { height: 100vh; max-height: none; padding-bottom: 0; }
-    #app-progress-sidebar { display: none; } /* Ensure PC sidebar is hidden */
-    #mobile-progress-location { display: block; } /* Ensure mobile progress is shown */
+    #app-progress-sidebar { display: none; } 
+    #mobile-progress-location { display: block; } 
 
 
     #menu-toggle-button { top: 12px; left: 12px; }
@@ -1890,11 +1914,10 @@ footer {
     #menu-selected-content-title { font-size: 1.4em; }
     #close-menu-selected-view-button svg { width: 24px; height: 24px; }
     #menu-selected-content-area { padding: 0 5px; }
-    #dashboard-column { padding: 10px; }
     .analog-clock { max-width: 200px; max-height: 200px; }
 
 
-    #main-content-wrapper { padding: 20px 15px 0; padding-left: 50px; }
+    #main-content-wrapper { padding: 20px 15px 0; /* padding-left: 50px REMOVED */ }
     header { margin-bottom: 20px; }
     header h1 { font-size: 2em; }
     #main-logo { width: 55px; height: 55px; margin-bottom: 8px; }
@@ -1931,7 +1954,7 @@ footer {
 
     .folder-view-title { font-size: 1.4em; }
 
-    #dashboard-column h2 { font-size: 1.8em; margin-bottom: 20px; padding-bottom: 15px; }
+    .dashboard-section-title { font-size: 1.8em; margin-bottom: 20px; padding-bottom: 15px; } 
     #dashboard-summaries { gap: 20px; margin-bottom: 35px; grid-template-columns: repeat(1, 1fr); }
     .dashboard-category-summary { padding: 22px; }
     .dashboard-category-summary h3 { font-size: 1.3em; margin-bottom: 12px; padding-bottom: 10px; }
@@ -2007,7 +2030,7 @@ footer {
     .history-section-header h4 { font-size: 1.1em; }
     .expand-section-button svg { width: 16px; height: 16px; }
     #history-modal-title-text { font-size: 1.6em; }
-    #history-modal-stats .points-stat { font-size: 1em; }
+    #history-modal-stats .points-stat { font-size: 1em; } 
     #history-tasks-list { max-height: 150px; }
     .fullscreen-modal-title-text { font-size: 1.6em; }
     .fullscreen-modal-scrollable-area { font-size: 1em; }
@@ -2015,7 +2038,9 @@ footer {
     .fullscreen-modal-scrollable-area li::before { top: 7px; font-size: 1em; }
     .fullscreen-modal-scrollable-area pre { font-size: 1em; }
 
-    footer { font-size: 0.85em; padding: 20px 25px; }
+    #historical-note-controls button { font-size: 0.9em; padding: 8px 15px; }
+    #history-user-note-edit { font-size: 0.95em; }
+    footer { padding: 15px 20px; }
 }
 @media (max-width: 480px) {
     body { padding: 10px 5px; }
@@ -2029,7 +2054,7 @@ footer {
     .analog-clock { max-width: 180px; max-height: 180px; }
 
 
-    #main-content-wrapper { padding: 15px 10px 0; padding-left: 45px; }
+    #main-content-wrapper { padding: 15px 10px 0; /* padding-left: 45px REMOVED */ }
     header { margin-bottom: 15px; }
     header h1 { font-size: 1.8em; }
     #main-logo { width: 50px; height: 50px; margin-bottom: 5px; }
@@ -2067,7 +2092,7 @@ footer {
 
     .folder-view-title { font-size: 1.3em; }
 
-    #dashboard-column h2 { font-size: 1.6em; margin-bottom: 18px; padding-bottom: 12px; }
+    .dashboard-section-title { font-size: 1.6em; margin-bottom: 18px; padding-bottom: 12px; } 
     .dashboard-category-summary { padding: 20px; }
     .dashboard-category-summary h3 { font-size: 1.25em; margin-bottom: 10px; padding-bottom: 8px; }
     .dashboard-category-summary .category-stats { font-size: 0.95em; }
@@ -2122,15 +2147,16 @@ footer {
     .task-delete-button-editmode svg { width: 16px; height: 16px; }
 
     .modal-content { padding: 20px; }
-    .delete-task-modal-content { padding: 18px 22px; }
-    #delete-confirmation-title { font-size: 1.4em; }
-    #delete-confirmation-message { font-size: 0.95em; }
-    #delete-confirmation-actions button { font-size: 0.9em; padding: 8px 16px; }
+    #delete-task-confirmation-modal .modal-content { padding: 18px 22px; } 
+    #delete-task-confirmation-modal #delete-task-modal-title { font-size: 1.4em; } 
+    #delete-task-confirmation-modal #delete-task-modal-message { font-size: 0.95em; } 
+    #delete-task-confirmation-modal #delete-task-modal-actions button { font-size: 0.9em; padding: 8px 16px; } 
+
 
     .history-section-header h4 { font-size: 1.1em; }
     .expand-section-button svg { width: 14px; height: 14px; }
     #history-modal-title-text { font-size: 1.4em; }
-    #history-modal-stats .points-stat { font-size: 0.9em; }
+    #history-modal-stats .points-stat { font-size: 0.9em; } 
     #history-tasks-list { max-height: 120px; }
     .fullscreen-modal-title-text { font-size: 1.4em; }
     .fullscreen-modal-scrollable-area { font-size: 0.95em; }
@@ -2143,11 +2169,64 @@ footer {
     footer { padding: 15px 20px; }
 }
 
-/* Ensure modal input fields are styled appropriately */
+/* Ensure modal input fields are styled appropriately for ADD CATEGORY/FOLDER modals if they exist */
+/* These are placeholders as the current HTML doesn't define these specific modal IDs */
+#add-category-modal .modal-content,
 #choose-folder-type-modal .modal-content,
-#enter-folder-name-modal .modal-content {
-    max-width: 400px;
+#enter-folder-name-modal .modal-content,
+#rename-folder-modal .modal-content,
+#delete-folder-warning-modal .modal-content {
+    max-width: 400px; /* Consistent small modal size */
 }
-#enter-folder-name-modal #folder-name-input {
-    margin-bottom: 25px;
+#enter-folder-name-modal #folder-name-input, 
+#rename-folder-modal #rename-folder-input {
+    margin-bottom: 25px; /* Consistent spacing */
+}
+/* Radio group styling for choose folder type */
+.modal-radio-group label {
+    display: block; /* Stack radio options */
+    margin-bottom: 10px;
+    font-size: 1em;
+    color: #C5C1D6;
+    cursor: pointer;
+}
+.modal-radio-group input[type="radio"] {
+    margin-right: 10px;
+    vertical-align: middle;
+    transform: scale(1.1);
+    accent-color: #00CFE8; /* Cyan accent for radio */
+}
+
+
+/* Correcting .delete-task-modal-content for consistency */
+#delete-task-confirmation-modal .modal-content { 
+    max-width: 400px; padding: 25px 30px;
+}
+@media (max-width: 700px) {
+    #delete-task-confirmation-modal .modal-content { padding: 20px 25px; }
+}
+@media (max-width: 480px) {
+    #delete-task-confirmation-modal .modal-content { padding: 18px 22px; }
+}
+#delete-task-confirmation-modal #delete-task-modal-title { 
+    margin-top: 0; margin-bottom: 15px; color: #FF6B6B; font-size: 1.6em; text-align: center;
+}
+#delete-task-confirmation-modal #delete-task-modal-message {
+    color: #C5C1D6; font-size: 1.05em; line-height: 1.6; text-align: center; margin-bottom: 25px;
+}
+#delete-task-confirmation-modal #delete-task-modal-actions button {
+    padding: 10px 20px; border: none; border-radius: 8px; font-family: 'Playfair Display', serif;
+    font-size: 1em; font-weight: 600; cursor: pointer; transition: background-color 0.25s ease, transform 0.1s ease;
+}
+#delete-task-confirmation-modal #confirm-delete-task-button { background-color: #FF6B6B; color: #FFFFFF; box-shadow: 0 2px 5px rgba(255, 107, 107, 0.3); }
+#delete-task-confirmation-modal #confirm-delete-task-button:hover { background-color: #FF8787; }
+#delete-task-confirmation-modal #cancel-delete-task-button { background-color: #454153; color: #C5C1D6; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); }
+#delete-task-confirmation-modal #cancel-delete-task-button:hover { background-color: #5a556b; }
+
+/* Ensure body scroll is prevented on mobile if app container is meant to be full viewport */
+@media (max-width: 1024px) {
+  html, body {
+    overflow: hidden; 
+    height: 100%;
+  }
 }
