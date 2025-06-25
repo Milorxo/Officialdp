@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#00CFE8">
     <title>Daily Productivity Tracker</title>
     
-    <link rel="icon" type="image/x-icon" sizes="192x192" href="dp.png">
-<!-- Android home screen icon -->
+    <link rel="icon" type="image/x-icon" sizes="512x512" href="dp.png">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
     <link rel="manifest" href="manifest.json">
 
     
@@ -20,230 +20,93 @@
 </head>
 <body>
     <div id="app-container">
-        <div id="main-content-wrapper">
-            <!-- dashboard-column aside removed -->
-            <div id="left-column">
-                <header>
-                  <img src="dp.png" alt="Daily Productivity Logo" id="main-logo">
-                  <h1>Daily Productivity</h1>
-                </header>
+        <div id="app-view-wrapper"> 
+            <div id="main-content-wrapper">
+                <div id="left-column">
+                    <header>
+                      <img src="dp.png" alt="Daily Productivity Logo" id="main-logo">
+                      <h1>Daily Productivity</h1>
+                    </header>
 
-                <nav id="tabs">
-                    <button id="dashboard-tab-button" class="tab-button active main-tab-highlight" aria-selected="true" role="tab">Main</button>
-                    <button id="routine-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="routine">Routine</button>
-                    <button id="health-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="health">Health</button>
-                    <button id="god-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="god">God</button>
-                    <button id="personal-tab-button" class="tab-button" aria-selected="false" role="tab" data-category-tab="personal">Personal</button>
-                </nav>
-                <main id="tab-content">
-                    <section id="dashboard-content" role="tabpanel" aria-labelledby="dashboard-tab-button">
-                        <div class="main-tab-intro">
-                            <p>Here's an overview of your daily and weekly progress. Select a category in the Daily Productivity to view and manage specific tasks. Reflect on your day below and check past entries in the calendar.</p>
-                        </div>
-                        <div id="calendar-container">
-                            <div id="calendar-header">
-                                <button id="calendar-prev-month" class="calendar-nav-button" aria-label="Previous month">&lt;</button>
-                                <button id="calendar-month-year-button" class="calendar-month-year-button" aria-label="Open month year picker" aria-haspopup="dialog">
-                                    <span id="calendar-month-year"></span>
-                                </button>
-                                <button id="calendar-next-month" class="calendar-nav-button" aria-label="Next month">&gt;</button>
+                    <nav id="tabs">
+                        <button id="dashboard-tab-button" class="tab-button active main-tab-highlight" aria-selected="true" role="tab">Main</button>
+                        <!-- Category tabs will be dynamically populated by JS -->
+                        <button id="add-category-button" class="tab-button icon-button" aria-label="Add new category" title="Add New Category">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                        </button>
+                    </nav>
+                    <main id="tab-content">
+                        <section id="dashboard-content" role="tabpanel" aria-labelledby="dashboard-tab-button">
+                            <!-- 1. Calendar Section -->
+                            <div id="calendar-container">
+                                <div id="calendar-header">
+                                    <button id="calendar-prev-month" class="calendar-nav-button" aria-label="Previous month">&lt;</button>
+                                    <button id="calendar-month-year-button" class="calendar-month-year-button" aria-label="Open month year picker" aria-haspopup="dialog">
+                                        <span id="calendar-month-year"></span>
+                                    </button>
+                                    <button id="calendar-next-month" class="calendar-nav-button" aria-label="Next month">&gt;</button>
+                                </div>
+                                <div id="calendar-grid">
+                                    <!-- Calendar days will be populated by JS -->
+                                </div>
                             </div>
-                            <div id="calendar-grid">
-                                <!-- Calendar days will be populated by JS -->
-                            </div>
-                        </div>
 
-                        <!-- Save Progress Button Container Removed -->
+                            <!-- 2. Today's Reflection Section -->
+                            <div id="daily-note-container">
+                                <h3>Today's Reflection</h3>
+                                <textarea id="daily-note-input" placeholder="How was your day? Any thoughts or learnings..."></textarea>
+                                <button id="save-note-button">Save Note</button>
+                            </div>
 
-                        <div id="daily-note-container">
-                            <h3>Today's Reflection</h3>
-                            <textarea id="daily-note-input" placeholder="How was your day? Any thoughts or learnings..."></textarea>
-                            <button id="save-note-button">Save Note</button>
-                        </div>
-                        
-                        <div id="today-progress-container"> 
-                            <h3>Today's Progress</h3>
-                            <div class="progress-bar-container">
-                                <div id="today-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                            <!-- 3. Progress Section -->
+                            <div id="mobile-progress-location">
+                                <div id="today-progress-container"> 
+                                    <h3>Today's Progress</h3>
+                                    <div class="progress-bar-container">
+                                        <div id="today-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                                    </div>
+                                    <p id="today-points-stat" class="points-stat">0 / 2700 points</p>
+                                </div>
+                                <div id="current-week-progress-container">
+                                    <h3>Weekly Progress</h3>
+                                    <div class="progress-bar-container">
+                                        <div id="current-week-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                                    </div>
+                                    <p id="current-week-points-stat" class="points-stat">0 / 20000 points</p>
+                                </div>
                             </div>
-                            <p id="today-points-stat" class="points-stat">0 / 2700 points</p>
-                        </div>
-                        <div id="current-week-progress-container">
-                            <h3>Weekly Progress</h3>
-                            <div class="progress-bar-container">
-                                <div id="current-week-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
-                            </div>
-                            <p id="current-week-points-stat" class="points-stat">0 / 20000 points</p>
-                        </div>
-                        
-                        <h2 class="dashboard-section-title">Activity Dashboard</h2>
-                        <div id="dashboard-summaries">
-                            <!-- Statistics will be populated here by JS -->
-                        </div>
-                    </section>
-                    <section id="health-content" class="category-section" role="tabpanel" aria-labelledby="health-tab-button" class="hidden">
-                        <div class="category-header">
-                            <h2>Health Tasks</h2>
-                            <div id="category-header-controls-health" class="category-header-controls">
-                                <button id="edit-mode-toggle-health" class="edit-mode-toggle-button icon-button" aria-label="Toggle edit mode for Health" title="Toggle Edit Mode" aria-pressed="false">
-                                    <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
-                                </button>
-                                <button id="undo-category-health" class="undo-category-button icon-button" aria-label="Uncheck all tasks in Health" title="Uncheck All Tasks">
-                                    <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="add-task-form-top-health" class="add-task-form-container">
-                            <button id="add-item-trigger-button-top-health" class="add-item-trigger-button icon-button" data-category="health" data-position="top">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-top-health" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-top-health" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-top-health" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-top-health" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                        <ul id="health-task-list" class="task-list" aria-live="polite"></ul>
-                        <div id="add-task-form-bottom-health" class="add-task-form-container">
-                             <button id="add-item-trigger-button-bottom-health" class="add-item-trigger-button icon-button" data-category="health" data-position="bottom">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-bottom-health" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-bottom-health" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-bottom-health" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-bottom-health" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                    </section>
-                    <section id="god-content" class="category-section" role="tabpanel" aria-labelledby="god-tab-button" class="hidden">
-                        <div class="category-header">
-                            <h2>God Tasks</h2>
-                            <div id="category-header-controls-god" class="category-header-controls">
-                                <button id="edit-mode-toggle-god" class="edit-mode-toggle-button icon-button" aria-label="Toggle edit mode for God" title="Toggle Edit Mode" aria-pressed="false">
-                                     <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
-                                </button>
-                                <button id="undo-category-god" class="undo-category-button icon-button" aria-label="Uncheck all tasks in God" title="Uncheck All Tasks">
-                                    <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="add-task-form-top-god" class="add-task-form-container">
-                            <button id="add-item-trigger-button-top-god" class="add-item-trigger-button icon-button" data-category="god" data-position="top">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-top-god" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-top-god" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-top-god" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-top-god" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                        <ul id="god-task-list" class="task-list" aria-live="polite"></ul>
-                        <div id="add-task-form-bottom-god" class="add-task-form-container">
-                            <button id="add-item-trigger-button-bottom-god" class="add-item-trigger-button icon-button" data-category="god" data-position="bottom">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-bottom-god" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-bottom-god" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-bottom-god" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-bottom-god" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                    </section>
-                    <section id="personal-content" class="category-section" role="tabpanel" aria-labelledby="personal-tab-button" class="hidden">
-                        <div class="category-header">
-                            <h2>Personal Tasks</h2>
-                            <div id="category-header-controls-personal" class="category-header-controls">
-                                <button id="edit-mode-toggle-personal" class="edit-mode-toggle-button icon-button" aria-label="Toggle edit mode for Personal" title="Toggle Edit Mode" aria-pressed="false">
-                                     <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
-                                </button>
-                                <button id="undo-category-personal" class="undo-category-button icon-button" aria-label="Uncheck all tasks in Personal" title="Uncheck All Tasks">
-                                    <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                         <div id="add-task-form-top-personal" class="add-task-form-container">
-                            <button id="add-item-trigger-button-top-personal" class="add-item-trigger-button icon-button" data-category="personal" data-position="top">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-top-personal" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-top-personal" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-top-personal" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-top-personal" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                        <ul id="personal-task-list" class="task-list" aria-live="polite"></ul>
-                        <div id="add-task-form-bottom-personal" class="add-task-form-container">
-                           <button id="add-item-trigger-button-bottom-personal" class="add-item-trigger-button icon-button" data-category="personal" data-position="bottom">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-bottom-personal" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-bottom-personal" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-bottom-personal" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-bottom-personal" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                    </section>
-                    <section id="routine-content" class="category-section" role="tabpanel" aria-labelledby="routine-tab-button" class="hidden">
-                         <div class="category-header">
-                            <h2>Routine Tasks</h2>
-                            <div id="category-header-controls-routine" class="category-header-controls">
-                                <button id="edit-mode-toggle-routine" class="edit-mode-toggle-button icon-button" aria-label="Toggle edit mode for Routine" title="Toggle Edit Mode" aria-pressed="false">
-                                     <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
-                                </button>
-                                <button id="undo-category-routine" class="undo-category-button icon-button" aria-label="Uncheck all tasks in Routine" title="Uncheck All Tasks">
-                                    <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24"><path d="M13.5 2c-5.621 0-10.211 4.44-10.475 10h-3.025l5 6.625 5-6.625h-2.975c.257-3.95 3.589-7 7.475-7 4.136 0 7.5 3.364 7.5 7.5s-3.364 7.5-7.5 7.5c-2.381 0-4.502-1.119-5.875-2.875l-1.751 2.334c1.889 2.299 4.811 3.541 7.626 3.541 5.79 0 10.5-4.71 10.5-10.5s-4.71-10.5-10.5-10.5z"></path></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div id="add-task-form-top-routine" class="add-task-form-container">
-                            <button id="add-item-trigger-button-top-routine" class="add-item-trigger-button icon-button" data-category="routine" data-position="top">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-top-routine" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-top-routine" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-top-routine" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-top-routine" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                        <ul id="routine-task-list" class="task-list" aria-live="polite"></ul>
-                         <div id="add-task-form-bottom-routine" class="add-task-form-container">
-                            <button id="add-item-trigger-button-bottom-routine" class="add-item-trigger-button icon-button" data-category="routine" data-position="bottom">
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
-                                Add Item
-                            </button>
-                            <div id="new-temp-task-form-bottom-routine" class="new-temp-task-form hidden">
-                                <input type="text" id="new-temp-task-input-bottom-routine" class="new-task-temp-input" placeholder="Enter task text...">
-                                <button id="new-temp-task-save-button-bottom-routine" class="new-task-temp-save">Save</button>
-                                <button id="new-temp-task-cancel-button-bottom-routine" class="new-task-temp-cancel">Cancel</button>
-                            </div>
-                        </div>
-                    </section>
-                </main>
+
+                            <!-- 4. Activity Dashboard Section -->
+                            <aside id="dashboard-column" role="complementary" class="menu-view-content">
+                                <h2>Activity Dashboard</h2>
+                                <div id="dashboard-summaries">
+                                    <!-- Statistics will be populated here by JS -->
+                                </div>
+                                <div class="main-tab-intro">
+                                    <p>Here's an overview of your daily and weekly progress. Select a category in the Daily Productivity to view and manage specific tasks or notes within folders. Reflect on your day below and check past entries in the calendar.</p>
+                                </div>
+                            </aside>
+                            
+                        </section>
+                        <!-- Category sections will be dynamically populated by JS. -->
+                    </main>
+                    <footer>
+                        <p>&copy; 2025 Daily Productivity Tracker</p>
+                    </footer>
+                </div>
             </div>
         </div>
-        <footer>
-            <!-- Content removed -->
-        </footer>
-    </div>
 
+    </div> <!-- End App Container -->
+
+    <!-- Modals and Templates -->
     <div id="month-year-picker-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="month-year-picker-title">
         <div id="month-year-picker-content" class="month-year-picker-content">
             <button id="month-year-picker-close-button" class="close-button" aria-label="Close month year picker">&times;</button>
             <h3 id="month-year-picker-title" class="sr-only">Select Month and Year</h3>
             <div class="picker-controls-container">
-                <div class="picker-months-container" id="picker-months-grid">
-                    <!-- Month buttons will be populated by JS -->
-                </div>
-                <div class="picker-years-container scrollable-list" id="picker-years-list">
-                    <!-- Year buttons will be populated by JS -->
-                </div>
+                <div class="picker-months-container" id="picker-months-grid"></div>
+                <div class="picker-years-container scrollable-list" id="picker-years-list"></div>
             </div>
         </div>
     </div>
@@ -253,30 +116,29 @@
             <button id="history-modal-close-button" class="close-button" aria-label="Close history modal">&times;</button>
             <h3 id="history-modal-title-text">History for <span id="history-modal-date"></span></h3>
             <div id="history-modal-stats">
-                <p><strong>Points Earned:</strong> <span id="history-modal-points"></span></p>
-                <p><strong>Completion:</strong> <span id="history-modal-percentage"></span>%</p>
+                <p class="points-stat history-points-text">Points Earned: <span id="history-modal-points-value">0</span> / <span id="history-modal-points-total">0</span></p>
+                <p class="points-stat history-percentage-label">Completion Percentage:</p>
+                <div class="progress-bar-container">
+                    <div id="history-percentage-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
+                </div>
             </div>
-
             <div class="history-section">
                 <div class="history-section-header">
                     <h4>Completed Tasks:</h4>
                     <button id="expand-tasks-button" class="icon-button expand-section-button hidden" aria-label="Expand completed tasks" title="View Fullscreen">
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
                     </button>
                 </div>
-                <div id="history-tasks-list">
-                    <!-- Completed tasks will be populated here by JS -->
-                </div>
+                <div id="history-tasks-list"></div>
             </div>
-
             <div class="history-section">
                 <div class="history-section-header">
                     <h4>My Reflection:</h4>
                      <button id="expand-reflection-button" class="icon-button expand-section-button hidden" aria-label="Expand reflection" title="View Fullscreen">
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
                     </button>
                 </div>
-                <diAv id="historical-reflection-wrapper">
+                <div id="historical-reflection-wrapper">
                     <p id="history-user-note-display" class="history-note-paragraph hidden"></p>
                     <textarea id="history-user-note-edit" aria-label="Reflection for selected date"></textarea>
                     <div id="historical-note-controls" class="hidden">
@@ -293,25 +155,46 @@
         <div class="modal-content fullscreen-modal-content-box">
             <button id="fullscreen-modal-close-button" class="close-button" aria-label="Close fullscreen view">&times;</button>
             <h3 id="fullscreen-modal-title" class="fullscreen-modal-title-text"></h3>
-            <div id="fullscreen-modal-area" class="fullscreen-modal-scrollable-area">
-                <!-- Content will be populated here by JS -->
-            </div>
+            <div id="fullscreen-modal-area" class="fullscreen-modal-scrollable-area"></div>
         </div>
     </div>
 
-    <!-- Save Progress Modal Removed -->
-
-    <div id="delete-task-confirmation-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="delete-task-modal-title">
+    <div id="delete-confirmation-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="delete-confirmation-title">
         <div class="modal-content delete-task-modal-content">
-            <button id="delete-task-modal-close-button" class="close-button" aria-label="Close delete confirmation">&times;</button>
-            <h3 id="delete-task-modal-title">Confirm Deletion</h3>
-            <p id="delete-task-modal-message">Are you sure you want to delete this task? This action cannot be undone.</p>
-            <div id="delete-task-modal-actions">
-                <button id="confirm-delete-task-button">Delete Task</button>
-                <button id="cancel-delete-task-button">Cancel</button>
+            <button id="delete-confirmation-close-button" class="close-button" aria-label="Close delete confirmation">&times;</button>
+            <h3 id="delete-confirmation-title" class="delete-task-modal-title">Confirm Deletion</h3>
+            <p id="delete-confirmation-message" class="delete-task-modal-message">Are you sure you want to delete this? This action cannot be undone.</p>
+            <div id="delete-confirmation-actions" class="delete-task-modal-actions">
+                <button id="confirm-delete-button" class="confirm-delete-task-button">Delete</button>
+                <button id="cancel-delete-button" class="cancel-delete-task-button">Cancel</button>
             </div>
         </div>
     </div>
+
+    <!-- Folder System Modals -->
+    <div id="choose-folder-type-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="choose-folder-type-title">
+        <div class="modal-content">
+            <button id="choose-folder-type-close-button" class="close-button" aria-label="Close">&times;</button>
+            <h3 id="choose-folder-type-title" class="modal-title-text">Choose Folder Type</h3>
+            <div class="modal-actions-centered">
+                <button id="select-task-folder-button" class="modal-button">Task Folder</button>
+                <button id="select-note-folder-button" class="modal-button">Note Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="enter-folder-name-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="enter-folder-name-title">
+        <div class="modal-content">
+            <button id="enter-folder-name-close-button" class="close-button" aria-label="Close">&times;</button>
+            <h3 id="enter-folder-name-title" class="modal-title-text">Name Your Folder</h3>
+            <input type="text" id="folder-name-input" class="modal-input" placeholder="Enter folder name">
+            <div class="modal-actions-centered">
+                <button id="create-folder-button" class="modal-button-primary">Create</button>
+                <button id="cancel-create-folder-button" class="modal-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Template for inline task editing -->
     <div id="task-edit-controls-template" style="display: none;">
@@ -319,6 +202,37 @@
         <button class="task-edit-save">Save</button>
         <button class="task-edit-cancel">Cancel</button>
     </div>
+    
+    <!-- Template for category section (will be dynamically filled with folder system or folder content) -->
+    <template id="category-section-template">
+        <section class="category-section" role="tabpanel">
+            <div class="category-header"> <!-- This header might be adjusted or parts shown/hidden based on view -->
+                <h2 class="category-title-text">Category Name</h2>
+                <!-- Category-level controls (like the old edit mode/undo) might be removed or adapted -->
+            </div>
+            <div class="category-content-area">
+                <!-- This area will be populated with:
+                    1. Folder grid + add folder button (default)
+                    2. Task Folder content (tasks, add task forms, back button, folder-specific controls)
+                    3. Note Folder content (note editor/viewer, back button, folder-specific controls)
+                -->
+            </div>
+        </section>
+    </template>
+
+    <!-- Shared Context Menu for Category Tabs -->
+    <div id="category-tab-context-menu" class="context-menu hidden">
+        <button id="ctx-rename-category">Rename</button>
+        <button id="ctx-delete-category">Delete</button>
+    </div>
+
+    <!-- Shared Context Menu for Folder Boxes -->
+    <div id="folder-options-context-menu" class="context-menu hidden">
+        <button id="ctx-rename-folder">Rename</button>
+        <button id="ctx-delete-folder">Delete</button>
+    </div>
+
+    <input type="file" id="image-upload-input" accept="image/*" style="display: none;">
 
     <script type="module" src="index.js"></script>
 </body>
