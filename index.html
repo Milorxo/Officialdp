@@ -19,6 +19,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
+    <button id="hamburger-button" class="hamburger-button" aria-label="Open menu" aria-controls="side-panel-menu" aria-expanded="false">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+    </button>
+
+    <div id="side-panel-menu" class="side-panel-menu" role="navigation" aria-hidden="true">
+        <nav>
+            <ul>
+                <li><button id="menu-main-view" class="side-panel-item">Main</button></li>
+                <li><button id="menu-live-clock" class="side-panel-item">Live Clock</button></li>
+                <li><button id="menu-activity-dashboard" class="side-panel-item">Activity Dashboard</button></li>
+            </ul>
+        </nav>
+    </div>
+    <div id="side-panel-overlay" class="side-panel-overlay hidden"></div>
+
     <div id="app-container">
         <div id="app-view-wrapper"> 
             <div id="main-content-wrapper">
@@ -31,7 +48,7 @@
                     <nav id="tabs">
                         <button id="dashboard-tab-button" class="tab-button active main-tab-highlight" aria-selected="true" role="tab">Main</button>
                         <!-- Category tabs will be dynamically populated by JS -->
-                        <button id="add-category-button" class="tab-button icon-button" aria-label="Add new category" title="Add New Category">
+                        <button id="add-new-item-button" class="tab-button icon-button" aria-label="Add new category" title="Add New Category">
                             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
                         </button>
                     </nav>
@@ -75,29 +92,39 @@
                                     <p id="current-week-points-stat" class="points-stat">0 / 20000 points</p>
                                 </div>
                             </div>
-
-                            <!-- 4. Activity Dashboard Section -->
-                            <aside id="dashboard-column" role="complementary" class="menu-view-content">
-                                <h2>Activity Dashboard</h2>
-                                <footer>
-                                    <h2> </h2>
-                                    
-                                </footer>
-                                <div id="dashboard-summaries">
-                                    <!-- Statistics will be populated here by JS -->
-                                </div>
-                                <div class="main-tab-intro">
-                                    <p>Here's an overview of your daily and weekly progress. Select a category in the Daily Productivity to view and manage specific tasks or notes within folders. Reflect on your day below and check past entries in the calendar.</p>
-                                </div>
-                            </aside>
                             
                         </section>
                         <!-- Category sections will be dynamically populated by JS. -->
                     </main>
                 </div>
             </div>
-        </div>
 
+            <aside id="dashboard-column" class="hidden" role="complementary">
+                <h2>Activity Dashboard</h2>
+                 <div class="main-tab-intro">
+                    <p>Here's an overview of your daily and weekly productivity. Select a category in the Daily Productivity to view and manage specific tasks or notes within folders. Reflect on your day below and check past entries in the calendar.</p>
+                </div>
+                <div id="dashboard-summaries">
+                    <!-- Statistics will be populated here by JS -->
+                </div>
+            </aside>
+
+            <div id="live-clock-view-wrapper" class="hidden">
+                <button id="live-clock-fullscreen-button" class="icon-button live-clock-fullscreen-button" aria-label="Toggle fullscreen clock" title="Toggle Fullscreen">
+                    <svg class="fullscreen-icon-expand" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"></path></svg>
+                    <svg class="fullscreen-icon-contract hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
+                </button>
+                <div id="analog-clock-container">
+                    <canvas id="analog-clock-canvas"></canvas>
+                </div>
+                <div id="live-clock-digital-display-container">
+                    <div id="live-clock-time">00:00:00</div>
+                    <div id="live-clock-period">AM</div>
+                    <div id="live-clock-date">Sunday, January 1, 2023</div>
+                </div>
+            </div>
+
+        </div> <!-- End App View Wrapper -->
     </div> <!-- End App Container -->
 
     <!-- Modals and Templates -->
@@ -172,11 +199,35 @@
         </div>
     </div>
 
-    <!-- Folder System Modals -->
-    <div id="choose-folder-type-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="choose-folder-type-title">
+    <!-- Category Creation Modals -->
+    <div id="choose-category-type-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="choose-category-type-title">
         <div class="modal-content">
-            <button id="choose-folder-type-close-button" class="close-button" aria-label="Close">&times;</button>
-            <h3 id="choose-folder-type-title" class="modal-title-text">Choose Folder Type</h3>
+            <button id="choose-category-type-close-button" class="close-button" aria-label="Close">&times;</button>
+            <h3 id="choose-category-type-title" class="modal-title-text">Choose Category Type</h3>
+            <div class="modal-actions-centered">
+                <button id="select-standard-category-button" class="modal-button">Standard Category</button>
+                <button id="select-special-category-button" class="modal-button">Special Category</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="enter-category-name-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="enter-category-name-title">
+        <div class="modal-content">
+            <button id="enter-category-name-close-button" class="close-button" aria-label="Close">&times;</button>
+            <h3 id="enter-category-name-title" class="modal-title-text">Name Your Category</h3>
+            <input type="text" id="category-name-input" class="modal-input" placeholder="Enter category name">
+            <div class="modal-actions-centered">
+                <button id="create-category-button" class="modal-button-primary">Create</button>
+                <button id="cancel-create-category-button" class="modal-button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Folder System Modals -->
+    <div id="choose-folder-type-modal-folder" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="choose-folder-type-title-folder">
+        <div class="modal-content">
+            <button id="choose-folder-type-close-button-folder" class="close-button" aria-label="Close">&times;</button>
+            <h3 id="choose-folder-type-title-folder" class="modal-title-text">Choose Folder Type</h3>
             <div class="modal-actions-centered">
                 <button id="select-task-folder-button" class="modal-button">Task Folder</button>
                 <button id="select-note-folder-button" class="modal-button">Note Folder</button>
