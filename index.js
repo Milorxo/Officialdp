@@ -102,11 +102,11 @@ const domElements = {
   addNewItemButton: null, // Renamed from addCategoryButton
   categorySectionTemplate: null, 
   categoryTabContextMenu: null,
-  ctxRenameCategoryButton: null,
-  ctxDeleteCategoryButton: null,
+  ctxRenameCategory: null,
+  ctxDeleteCategory: null,
   folderOptionsContextMenu: null,
-  ctxRenameFolderButton: null,
-  ctxDeleteFolderButton: null,
+  ctxRenameFolder: null,
+  ctxDeleteFolder: null,
   
   dashboardSummariesContainer: null,
   todayProgressFill: null,
@@ -184,9 +184,15 @@ const domElements = {
 
 function getProgressFillColor(percentage) {
     const p = Math.max(0, Math.min(100, percentage));
-    const hue = (p / 100) * 120;
-    return `hsl(${hue}, 100%, 50%)`;
+    
+    // Always return a cyan scale for standard tasks or a mix of standard and special.
+    // HSL: Hue ~185 is cyan.
+    const hue = 185;
+    const saturation = 100;
+    const lightness = 45 + (p / 100) * 15; // from 45% to 60% lightness
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
+
 
 function getTodayDateString() {
   const now = new Date();
@@ -458,7 +464,9 @@ function saveDailyNote() {
         pointsEarned: progress.pointsEarned,
         percentageCompleted: progress.percentage,
         totalTasksOnDate: progress.totalStandardTasks,
-        dailyTargetPoints: DAILY_TARGET_POINTS
+        dailyTargetPoints: DAILY_TARGET_POINTS,
+        hasStandard: progress.hasStandard,
+        hasSpecial: progress.hasSpecial
     };
     
     // Save the comprehensive history entry
@@ -486,8 +494,7 @@ function loadCurrentDayNote() {
 function saveDayToHistory(dateToSave) {
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateToSave;
     
-    // Calculate progress based ONLY on standard tasks for points and percentage.
-    const { pointsEarned, percentage, totalStandardTasks, completedStandardTasks } = calculateProgressForDate(dateToSave);
+    const { pointsEarned, percentage, totalStandardTasks, hasStandard, hasSpecial } = calculateProgressForDate(dateToSave);
     
     const completedTasksHistory = {}; 
     currentCategories.forEach(cat => {
@@ -515,12 +522,14 @@ function saveDayToHistory(dateToSave) {
     
     const historyEntry = {
         date: dateToSave,
-        completedTaskStructure: completedTasksHistory, // This now includes special category tasks
+        completedTaskStructure: completedTasksHistory,
         userNote: mainReflection, 
-        pointsEarned: pointsEarned, // Based on standard tasks
-        percentageCompleted: percentage, // This is now the VISUAL percentage based on ALL tasks
-        totalTasksOnDate: totalStandardTasks, // Total STANDARD tasks defined on that day for progress calculation
-        dailyTargetPoints: DAILY_TARGET_POINTS
+        pointsEarned: pointsEarned,
+        percentageCompleted: percentage,
+        totalTasksOnDate: totalStandardTasks,
+        dailyTargetPoints: DAILY_TARGET_POINTS,
+        hasStandard: hasStandard,
+        hasSpecial: hasSpecial
     };
 
     localStorage.setItem(historyKey, JSON.stringify(historyEntry));
@@ -901,6 +910,29 @@ function showDeleteConfirmation(type, id, message, nameForConfirmation = '', cat
     }
 }
 
+function deleteFolder(folderId, categoryId) {
+    if (!folderId || !categoryId || !foldersByCategoryId[categoryId]) return;
+
+    const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
+    
+    // Clear associated task states if it's a task folder
+    const folderToDelete = foldersByCategoryId[categoryId].find(f => f.id === folderId);
+    if (folderToDelete && folderToDelete.type === 'task' && folderToDelete.content) {
+        folderToDelete.content.forEach(taskDef => {
+            localStorage.removeItem(getTaskStateStorageKey(today, folderId, taskDef.id));
+        });
+    }
+
+    // Remove folder from data structure
+    foldersByCategoryId[categoryId] = foldersByCategoryId[categoryId].filter(f => f.id !== folderId);
+    saveFoldersByCategoryId(foldersByCategoryId);
+    
+    // Re-render the UI
+    renderFolderSystemForCategory(categoryId, document.querySelector(`#category-section-${categoryId} .category-content-area`));
+    updateAllProgress();
+}
+
+
 function confirmDeletion() {
     if (!itemToDelete) return;
     const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
@@ -915,18 +947,7 @@ function confirmDeletion() {
             renderTaskFolderContents(categoryId, folderId);
         }
     } else if (itemToDelete.type === 'folder') {
-        const { id: folderId, categoryId } = itemToDelete;
-        if (foldersByCategoryId[categoryId]) {
-            const folderToDelete = foldersByCategoryId[categoryId].find(f => f.id === folderId);
-            if (folderToDelete && folderToDelete.type === 'task' && folderToDelete.content) {
-                folderToDelete.content.forEach(taskDef => {
-                    localStorage.removeItem(getTaskStateStorageKey(today, folderId, taskDef.id));
-                });
-            }
-            foldersByCategoryId[categoryId] = foldersByCategoryId[categoryId].filter(f => f.id !== folderId);
-            saveFoldersByCategoryId(foldersByCategoryId);
-            renderFolderSystemForCategory(categoryId, document.querySelector(`#category-section-${categoryId} .category-content-area`));
-        }
+        deleteFolder(itemToDelete.id, itemToDelete.categoryId);
     } else if (itemToDelete.type === 'category') {
         const categoryId = itemToDelete.id;
         const category = currentCategories.find(c => c.id === categoryId);
@@ -991,6 +1012,7 @@ function renderCategorySectionContent(categoryId) {
 }
 
 function renderFolderSystemForCategory(categoryId, container) {
+    if (!container) return;
     container.innerHTML = ''; 
     
     const foldersGrid = document.createElement('div');
@@ -1559,43 +1581,39 @@ function switchTab(categoryIdToActivate) {
 function calculateProgressForDate(dateString) {
   let completedStandardTasks = 0;
   let totalStandardTasks = 0;
-  let completedAllTasks = 0;
-  let totalAllTasks = 0;
+  let totalSpecialTasks = 0;
 
   currentCategories.forEach(category => {
       (foldersByCategoryId[category.id] || []).forEach(folder => {
           if (folder.type === 'task' && folder.content) {
-              const taskCount = folder.content.length;
-              let completedInFolder = 0;
-              folder.content.forEach(taskDef => {
-                  if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
-                      completedInFolder++;
-                  }
-              });
-
-              totalAllTasks += taskCount;
-              completedAllTasks += completedInFolder;
-
               if (category.type === 'standard') {
+                  const taskCount = folder.content.length;
+                  let completedInFolder = 0;
+                  folder.content.forEach(taskDef => {
+                      if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
+                          completedInFolder++;
+                      }
+                  });
                   totalStandardTasks += taskCount;
                   completedStandardTasks += completedInFolder;
+              } else if (category.type === 'special') {
+                  totalSpecialTasks += folder.content.length;
               }
           }
       });
   });
-
-  // Visual percentage is based on ALL tasks (standard + special)
-  const percentage = totalAllTasks > 0 ? Math.round((completedAllTasks / totalAllTasks) * 100) : 0;
   
-  // Points logic remains based on STANDARD tasks only
+  const percentage = totalStandardTasks > 0 ? Math.round((completedStandardTasks / totalStandardTasks) * 100) : 0;
   const pointsPerTask = totalStandardTasks > 0 ? DAILY_TARGET_POINTS / totalStandardTasks : 0;
   const pointsEarned = Math.round(completedStandardTasks * pointsPerTask);
   
   return { 
-    percentage, // This now reflects completion of all tasks for visual feedback
+    percentage,
     pointsEarned, 
     completedStandardTasks,
-    totalStandardTasks
+    totalStandardTasks,
+    hasStandard: totalStandardTasks > 0,
+    hasSpecial: totalSpecialTasks > 0,
   };
 }
 
@@ -1605,9 +1623,9 @@ function updateDashboardSummaries() {
   domElements.dashboardSummariesContainer.innerHTML = '';
   const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
 
-  currentCategories.forEach(category => {
-    if (category.id === 'dashboard') return; 
+  const standardCategories = currentCategories.filter(cat => cat.type === 'standard');
 
+  standardCategories.forEach(category => {
     let tasksInCategory = 0;
     let completedInCategory = 0;
     (foldersByCategoryId[category.id] || []).forEach(folder => {
@@ -1623,10 +1641,6 @@ function updateDashboardSummaries() {
 
     const summaryDiv = document.createElement('div');
     summaryDiv.className = 'dashboard-category-summary';
-    // Add class if special category for potential distinct styling in dashboard cards later, if needed
-    if (category.type === 'special') {
-        summaryDiv.classList.add('special-category-summary'); 
-    }
     summaryDiv.innerHTML = `
       <h3>${category.name}</h3>
       <p class="category-stats">${completedInCategory} / ${tasksInCategory}</p>
@@ -1641,7 +1655,7 @@ function updateDashboardSummaries() {
 
 function updateTodaysProgress() {
   const today = localStorage.getItem(STORAGE_KEY_LAST_VISIT_DATE) || getTodayDateString();
-  const progress = calculateProgressForDate(today); // This now correctly uses standard tasks
+  const progress = calculateProgressForDate(today);
   
   if (domElements.todayProgressFill) {
       domElements.todayProgressFill.style.width = `${progress.percentage}%`;
@@ -1745,18 +1759,18 @@ function renderCalendar() {
     cell.dataset.date = dateString;
     cell.innerHTML = `<span class="calendar-day-number">${day}</span><div class="calendar-day-fill"></div>`;
     
-    let percentageCompleted = 0; // This will be from all tasks for visual fill
-    let hasHistoryData = false; 
-    const fillDiv = cell.querySelector('.calendar-day-fill');
-    fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)'; 
+    let percentageCompleted = 0;
+    let hasHistoryData = false;
 
+    const fillDiv = cell.querySelector('.calendar-day-fill');
+    
     if (dateString === todayDateStr) { 
         cell.classList.add('current-day');
         const progress = calculateProgressForDate(dateString); 
         percentageCompleted = progress.percentage;
-        fillDiv.style.backgroundColor = getProgressFillColor(percentageCompleted); 
+        fillDiv.style.backgroundColor = getProgressFillColor(percentageCompleted);
         if (percentageCompleted > 40) cell.classList.add('high-fill'); 
-        // hasHistoryData checks if ANY tasks (standard or special) were done OR if there's a note
+
         let anyTasksCompletedToday = false;
         currentCategories.forEach(cat => {
             (foldersByCategoryId[cat.id] || []).forEach(folder => {
@@ -1779,13 +1793,15 @@ function renderCalendar() {
                 percentageCompleted = historyEntry.percentageCompleted || 0; 
                 fillDiv.style.backgroundColor = getProgressFillColor(percentageCompleted);
                 if (cellDate < todayNorm) fillDiv.style.opacity = '0.7'; 
-                // Check if any tasks (standard OR special) were recorded in history, or if a note exists
+
                 hasHistoryData = (historyEntry.completedTaskStructure && Object.values(historyEntry.completedTaskStructure).some(cat => Object.values(cat).some(folder => folder.tasks && folder.tasks.length > 0))) || !!historyEntry.userNote;
             } catch(e) { 
-                if (cellDate < todayNorm) fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)'; 
+                percentageCompleted = 0;
+                fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)';
             }
-        } else if (cellDate < todayNorm) { 
-             fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.3)';
+        } else {
+             percentageCompleted = 0;
+             fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)';
         }
         if (cellDate < todayNorm) cell.classList.add('calendar-day-past');
     }
@@ -1810,7 +1826,7 @@ function showHistoryModal(dateString) {
   if (isToday) { 
     const progress = calculateProgressForDate(dateString); 
     const completedTasksTodayStruct = {};
-    currentCategories.forEach(cat => { // Include ALL categories for listing tasks
+    currentCategories.forEach(cat => {
       completedTasksTodayStruct[cat.id] = {};
       (foldersByCategoryId[cat.id] || []).forEach(folder => {
         if (folder.type === 'task') {
@@ -1830,12 +1846,14 @@ function showHistoryModal(dateString) {
     
     historyEntry = {
         date: dateString,
-        completedTaskStructure: completedTasksTodayStruct, // All completed tasks
+        completedTaskStructure: completedTasksTodayStruct,
         userNote: localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || "",
-        pointsEarned: progress.pointsEarned, // Standard tasks only
-        percentageCompleted: progress.percentage, // Visual percentage from all tasks
+        pointsEarned: progress.pointsEarned,
+        percentageCompleted: progress.percentage,
         totalTasksOnDate: progress.totalStandardTasks, 
-        dailyTargetPoints: DAILY_TARGET_POINTS
+        dailyTargetPoints: DAILY_TARGET_POINTS,
+        hasStandard: progress.hasStandard,
+        hasSpecial: progress.hasSpecial
     };
   } else if (isPastDayWithHistory) { 
       try { historyEntry = JSON.parse(localStorage.getItem(historyKey)); } catch (e) { console.error("Error parsing history for modal:", e); }
@@ -1984,7 +2002,9 @@ function saveHistoricalNote() {
             pointsEarned: progress.pointsEarned,
             percentageCompleted: progress.percentage,
             totalTasksOnDate: progress.totalStandardTasks,
-            dailyTargetPoints: DAILY_TARGET_POINTS
+            dailyTargetPoints: DAILY_TARGET_POINTS,
+            hasStandard: progress.hasStandard,
+            hasSpecial: progress.hasSpecial
         };
     } else {
         const existingHistoryStr = localStorage.getItem(historyKey);
@@ -1993,7 +2013,7 @@ function saveHistoricalNote() {
                 historyEntry = JSON.parse(existingHistoryStr);
             } catch (e) {
                 console.error(`Could not parse history for ${currentModalDate}`, e);
-                historyEntry = { date: currentModalDate, completedTaskStructure: {}, userNote: "", pointsEarned: 0, percentageCompleted: 0, totalTasksOnDate: 0, dailyTargetPoints: DAILY_TARGET_POINTS };
+                historyEntry = { date: currentModalDate, completedTaskStructure: {}, userNote: "", pointsEarned: 0, percentageCompleted: 0, totalTasksOnDate: 0, dailyTargetPoints: DAILY_TARGET_POINTS, hasStandard: true, hasSpecial: false };
             }
         } else {
             historyEntry = {
@@ -2003,7 +2023,9 @@ function saveHistoricalNote() {
                 pointsEarned: 0,
                 percentageCompleted: 0,
                 totalTasksOnDate: 0,
-                dailyTargetPoints: DAILY_TARGET_POINTS
+                dailyTargetPoints: DAILY_TARGET_POINTS,
+                hasStandard: true,
+                hasSpecial: false
             };
         }
     }
@@ -2330,7 +2352,7 @@ function showCategoryContextMenu(categoryId, tabButton) {
     if (!category || !domElements.categoryTabContextMenu) return;
 
     // Show/hide delete option based on `deletable` property
-    const deleteButton = domElements.ctxDeleteCategoryButton;
+    const deleteButton = domElements.ctxDeleteCategory;
     if (deleteButton) {
         deleteButton.style.display = category.deletable !== false ? 'block' : 'none';
     }
@@ -2669,44 +2691,50 @@ function bindInitialEventListeners() {
     if (domElements.expandReflectionButton) domElements.expandReflectionButton.onclick = () => { if (currentModalDate) openFullscreenContentModal('reflection', currentModalDate); };
 
     // Context Menu Listeners (Category Tab)
-    if(domElements.ctxRenameCategoryButton) domElements.ctxRenameCategoryButton.onclick = handleRenameCategory;
-    if(domElements.ctxDeleteCategoryButton) domElements.ctxDeleteCategoryButton.onclick = () => {
+    if(domElements.ctxRenameCategory) domElements.ctxRenameCategory.onclick = handleRenameCategory;
+    if(domElements.ctxDeleteCategory) domElements.ctxDeleteCategory.onclick = () => {
         if (!currentContextMenuTargetTab) return;
         const categoryId = currentContextMenuTargetTab.dataset.categoryId;
         const category = currentCategories.find(c => c.id === categoryId);
         if (category) {
+            hideCategoryContextMenu(); // Hide menu before alert/confirm
             if (category.deletable === false) {
                  alert(`Category "${category.name}" is a default category and cannot be deleted.`);
-                 hideCategoryContextMenu();
             } else {
                  showDeleteConfirmation('category', categoryId, `Are you sure you want to delete the category "${category.name}" and all its contents? This action cannot be undone.`);
-                 hideCategoryContextMenu();
             }
         }
     };
     // Context Menu Listeners (Folder Box)
-    if (domElements.ctxRenameFolderButton) domElements.ctxRenameFolderButton.onclick = () => {
+    if (domElements.ctxRenameFolder) domElements.ctxRenameFolder.onclick = () => {
         if (!domElements.folderOptionsContextMenu) return;
         const folderId = domElements.folderOptionsContextMenu.dataset.currentFolderId;
         const categoryId = domElements.folderOptionsContextMenu.dataset.currentCategoryId;
+        hideFolderContextMenu();
         if (!folderId || !categoryId) return;
         const folder = (foldersByCategoryId[categoryId] || []).find(f => f.id === folderId);
         if (folder) handleRenameFolder(folder);
-        hideFolderContextMenu();
     };
-    if (domElements.ctxDeleteFolderButton) domElements.ctxDeleteFolderButton.onclick = () => {
+    if (domElements.ctxDeleteFolder) domElements.ctxDeleteFolder.onclick = () => {
         if (!domElements.folderOptionsContextMenu) return;
         const folderId = domElements.folderOptionsContextMenu.dataset.currentFolderId;
         const categoryId = domElements.folderOptionsContextMenu.dataset.currentCategoryId;
+        hideFolderContextMenu(); // Hide menu immediately
         if (!folderId || !categoryId) return;
+
         const folder = (foldersByCategoryId[categoryId] || []).find(f => f.id === folderId);
         if (folder) {
-            const message = folder.type === 'task' ? 
-                          `Are you sure you want to delete the folder "${folder.name}" and all its tasks? This action cannot be undone.` :
-                          `Are you sure you want to delete the note folder "${folder.name}" and its content? This action cannot be undone.`;
-            showDeleteConfirmation('folder', folderId, message, folder.name, categoryId, folderId);
+            const isFolderEmpty = (folder.type === 'task' && (!folder.content || folder.content.length === 0)) ||
+                                  (folder.type === 'note' && !folder.content);
+            if (isFolderEmpty) {
+                deleteFolder(folderId, categoryId); // Delete directly if empty
+            } else {
+                const message = folder.type === 'task' ? 
+                              `This folder contains tasks. Are you sure you want to delete "${folder.name}" and all its contents?` :
+                              `This folder contains notes. Are you sure you want to delete "${folder.name}" and its content?`;
+                showDeleteConfirmation('folder', folderId, message, folder.name, categoryId, folderId);
+            }
         }
-        hideFolderContextMenu();
     };
 
 
