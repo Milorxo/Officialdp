@@ -1,6 +1,5 @@
 
 
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -488,7 +487,7 @@ function saveDayToHistory(dateToSave) {
     const historyKey = STORAGE_KEY_DAILY_HISTORY_PREFIX + dateToSave;
     
     // Calculate progress based ONLY on standard tasks for points and percentage.
-    const { pointsEarned, percentageCompleted, totalStandardTasks, completedStandardTasks } = calculateProgressForDate(dateToSave);
+    const { pointsEarned, percentage, totalStandardTasks, completedStandardTasks } = calculateProgressForDate(dateToSave);
     
     const completedTasksHistory = {}; 
     currentCategories.forEach(cat => {
@@ -519,7 +518,7 @@ function saveDayToHistory(dateToSave) {
         completedTaskStructure: completedTasksHistory, // This now includes special category tasks
         userNote: mainReflection, 
         pointsEarned: pointsEarned, // Based on standard tasks
-        percentageCompleted: percentageCompleted, // Based on standard tasks
+        percentageCompleted: percentage, // This is now the VISUAL percentage based on ALL tasks
         totalTasksOnDate: totalStandardTasks, // Total STANDARD tasks defined on that day for progress calculation
         dailyTargetPoints: DAILY_TARGET_POINTS
     };
@@ -1558,34 +1557,45 @@ function switchTab(categoryIdToActivate) {
 }
 
 function calculateProgressForDate(dateString) {
-  let completedTasks = 0;
-  let totalTasks = 0;
+  let completedStandardTasks = 0;
+  let totalStandardTasks = 0;
+  let completedAllTasks = 0;
+  let totalAllTasks = 0;
 
   currentCategories.forEach(category => {
-    // NOTE: Removed category type check to include all tasks in progress calculation
-    // if (category.type === 'standard') {
       (foldersByCategoryId[category.id] || []).forEach(folder => {
-        if (folder.type === 'task' && folder.content) {
-          totalTasks += folder.content.length;
-          folder.content.forEach(taskDef => {
-            if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
-              completedTasks++;
-            }
-          });
-        }
+          if (folder.type === 'task' && folder.content) {
+              const taskCount = folder.content.length;
+              let completedInFolder = 0;
+              folder.content.forEach(taskDef => {
+                  if (localStorage.getItem(getTaskStateStorageKey(dateString, folder.id, taskDef.id)) === 'true') {
+                      completedInFolder++;
+                  }
+              });
+
+              totalAllTasks += taskCount;
+              completedAllTasks += completedInFolder;
+
+              if (category.type === 'standard') {
+                  totalStandardTasks += taskCount;
+                  completedStandardTasks += completedInFolder;
+              }
+          }
       });
-    // }
   });
 
-  const percentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const pointsPerTask = totalTasks > 0 ? DAILY_TARGET_POINTS / totalTasks : 0;
-  const pointsEarned = Math.round(completedTasks * pointsPerTask);
+  // Visual percentage is based on ALL tasks (standard + special)
+  const percentage = totalAllTasks > 0 ? Math.round((completedAllTasks / totalAllTasks) * 100) : 0;
+  
+  // Points logic remains based on STANDARD tasks only
+  const pointsPerTask = totalStandardTasks > 0 ? DAILY_TARGET_POINTS / totalStandardTasks : 0;
+  const pointsEarned = Math.round(completedStandardTasks * pointsPerTask);
   
   return { 
-    percentage, 
+    percentage, // This now reflects completion of all tasks for visual feedback
     pointsEarned, 
-    completedStandardTasks: completedTasks, // Keep original property names for compatibility
-    totalStandardTasks: totalTasks,       // Keep original property names for compatibility
+    completedStandardTasks,
+    totalStandardTasks
   };
 }
 
@@ -1735,14 +1745,14 @@ function renderCalendar() {
     cell.dataset.date = dateString;
     cell.innerHTML = `<span class="calendar-day-number">${day}</span><div class="calendar-day-fill"></div>`;
     
-    let percentageCompleted = 0; // This will be from standard tasks for fill
+    let percentageCompleted = 0; // This will be from all tasks for visual fill
     let hasHistoryData = false; 
     const fillDiv = cell.querySelector('.calendar-day-fill');
     fillDiv.style.backgroundColor = 'hsla(185, 75%, 50%, 0.1)'; 
 
     if (dateString === todayDateStr) { 
         cell.classList.add('current-day');
-        const progress = calculateProgressForDate(dateString); // Live calculation (standard tasks for percentage)
+        const progress = calculateProgressForDate(dateString); 
         percentageCompleted = progress.percentage;
         fillDiv.style.backgroundColor = getProgressFillColor(percentageCompleted); 
         if (percentageCompleted > 40) cell.classList.add('high-fill'); 
@@ -1766,7 +1776,7 @@ function renderCalendar() {
         if (historyDataString) { 
             try {
                 const historyEntry = JSON.parse(historyDataString);
-                percentageCompleted = historyEntry.percentageCompleted || 0; // From standard tasks
+                percentageCompleted = historyEntry.percentageCompleted || 0; 
                 fillDiv.style.backgroundColor = getProgressFillColor(percentageCompleted);
                 if (cellDate < todayNorm) fillDiv.style.opacity = '0.7'; 
                 // Check if any tasks (standard OR special) were recorded in history, or if a note exists
@@ -1798,7 +1808,7 @@ function showHistoryModal(dateString) {
   const isPastDayWithHistory = !isToday && localStorage.getItem(historyKey);
   
   if (isToday) { 
-    const progress = calculateProgressForDate(dateString); // Standard tasks for points/percentage
+    const progress = calculateProgressForDate(dateString); 
     const completedTasksTodayStruct = {};
     currentCategories.forEach(cat => { // Include ALL categories for listing tasks
       completedTasksTodayStruct[cat.id] = {};
@@ -1823,7 +1833,7 @@ function showHistoryModal(dateString) {
         completedTaskStructure: completedTasksTodayStruct, // All completed tasks
         userNote: localStorage.getItem(STORAGE_KEY_DAILY_NOTE_PREFIX + dateString) || "",
         pointsEarned: progress.pointsEarned, // Standard tasks only
-        percentageCompleted: progress.percentage, // Standard tasks only
+        percentageCompleted: progress.percentage, // Visual percentage from all tasks
         totalTasksOnDate: progress.totalStandardTasks, 
         dailyTargetPoints: DAILY_TARGET_POINTS
     };
@@ -2514,81 +2524,93 @@ function drawAnalogClockHand(ctx, pos, length, width, color, shadow = false) {
 }
 
 function renderAnalogClock() {
-    if (!domElements.analogClockCanvas) return;
+    if (!domElements.analogClockCanvas || !domElements.analogClockContainer) return;
+
+    // FIX: Ensure canvas is sized correctly before drawing.
+    const container = domElements.analogClockContainer;
     const canvas = domElements.analogClockCanvas;
+    if (canvas.width !== container.clientWidth || canvas.height !== container.clientHeight) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+    }
+    
+    // If canvas still has no size (e.g., from being hidden), don't try to draw.
+    if (!canvas.width || !canvas.height) return;
+
     const ctx = canvas.getContext('2d');
     const radius = canvas.height / 2;
     ctx.translate(radius, radius);
     const handRadius = radius * 0.90;
 
-    // Clear canvas
+    // Clear canvas for every frame
     ctx.clearRect(-radius, -radius, canvas.width, canvas.height);
 
-    // Draw clock face markings (simplified)
-    ctx.beginPath();
-    ctx.arc(0, 0, handRadius * 1.02, 0, 2 * Math.PI); // Outer circle
-    ctx.strokeStyle = '#007A8A'; // Darker cyan for subtle markings
-    ctx.lineWidth = 2;
-    // ctx.stroke(); // Optional: stroke the outer circle
-
-    // Hour markings
+    // FEATURE: Draw clock numbers
+    ctx.font = `${handRadius * 0.15}px Poppins`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
     for (let num = 1; num <= 12; num++) {
         const ang = num * Math.PI / 6;
         ctx.rotate(ang);
         ctx.translate(0, -handRadius * 0.85);
-        ctx.rotate(-ang);
-        ctx.beginPath();
-        ctx.arc(0, 0, 3, 0, 2*Math.PI); // Small circle for hour marks
-        ctx.fillStyle = '#00CFE8';
-        ctx.fill();
-        ctx.rotate(ang);
+        ctx.rotate(-ang); // Rotate back to draw number upright
+        
+        ctx.fillStyle = '#E0FFFF';
+        ctx.shadowColor = '#00CFE8';
+        ctx.shadowBlur = 7;
+        ctx.fillText(num.toString(), 0, 0);
+        
+        ctx.rotate(ang); // Rotate to original angular position
         ctx.translate(0, handRadius * 0.85);
         ctx.rotate(-ang);
+        
+        ctx.shadowBlur = 0; // Reset shadow for next element
     }
-    // Minute markings (optional, can be dots or lines)
-     for(let i=0; i < 60; i++){
-        if(i % 5 !== 0){ // Don't draw over hour marks
-            const ang = i * Math.PI / 30;
-            ctx.rotate(ang);
-            ctx.translate(0, -handRadius * 0.9);
-            ctx.rotate(-ang);
-            ctx.beginPath();
-            ctx.moveTo(0,0);
-            ctx.lineTo(0, -2); // Tiny line for minute mark
-            ctx.strokeStyle = '#00A0B0';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-            ctx.rotate(ang);
-            ctx.translate(0, handRadius * 0.9);
-            ctx.rotate(-ang);
+
+    // FEATURE: Draw Ticks
+    for(let i = 0; i < 60; i++){
+        const ang = i * Math.PI / 30;
+        ctx.beginPath();
+        ctx.rotate(ang);
+        ctx.moveTo(0, -handRadius);
+        if(i % 5 === 0){ // Hour tick
+             ctx.lineTo(0, -handRadius * 0.9);
+             ctx.lineWidth = 2.5;
+             ctx.strokeStyle = '#00CFE8';
+        } else { // Minute tick
+            ctx.lineTo(0, -handRadius * 0.95);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#007A8A';
         }
+        ctx.stroke();
+        ctx.rotate(-ang);
     }
-
-
+    
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
     const second = now.getSeconds();
 
-    // Hour hand
-    let hourPos = (hour % 12 + minute / 60 + second / 3600) * (2 * Math.PI / 12);
-    drawAnalogClockHand(ctx, hourPos, handRadius * 0.5, radius * 0.07, '#BE93FD', true); // Purple hour hand
+    // Hands
+    let hourPos = (hour % 12 + minute / 60 + second / 3600) * (Math.PI / 6);
+    drawAnalogClockHand(ctx, hourPos, handRadius * 0.5, radius * 0.07, '#BE93FD', true);
 
-    // Minute hand
-    let minutePos = (minute + second / 60) * (2 * Math.PI / 60);
-    drawAnalogClockHand(ctx, minutePos, handRadius * 0.75, radius * 0.05, '#00E5FF', true); // Light Cyan minute hand
+    let minutePos = (minute + second / 60) * (Math.PI / 30);
+    drawAnalogClockHand(ctx, minutePos, handRadius * 0.75, radius * 0.05, '#00E5FF', true);
     
-    // Second hand
-    let secondPos = second * (2 * Math.PI / 60);
-    drawAnalogClockHand(ctx, secondPos, handRadius * 0.85, radius * 0.02, '#7FFFD4', true); // Aquamarine second hand
+    let secondPos = second * (Math.PI / 30);
+    drawAnalogClockHand(ctx, secondPos, handRadius * 0.85, radius * 0.02, '#7FFFD4', true);
 
     // Center dot
     ctx.beginPath();
     ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI);
     ctx.fillStyle = '#00CFE8';
+    ctx.shadowColor = 'rgba(0, 207, 232, 0.7)';
+    ctx.shadowBlur = 10;
     ctx.fill();
+    ctx.shadowColor = 'transparent'; // Reset shadow
     
-    ctx.translate(-radius, -radius); // Reset translation
+    ctx.translate(-radius, -radius); // Reset the origin
 }
 
 function toggleLiveClockFullscreen() {
