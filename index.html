@@ -18,25 +18,74 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
-<body>
+<body data-theme="original">
     <button id="hamburger-button" class="hamburger-button" aria-label="Open menu" aria-controls="side-panel-menu" aria-expanded="false">
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
     </button>
 
+    <button id="time-progress-button" aria-label="Open Time vs. Progress View">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/><path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"></path></svg>
+    </button>
+
     <div id="side-panel-menu" class="side-panel-menu" role="navigation" aria-hidden="true">
         <nav>
             <ul>
                 <li><button id="menu-main-view" class="side-panel-item">Main</button></li>
-                <li><button id="menu-live-clock" class="side-panel-item">Live Clock</button></li>
                 <li><button id="menu-activity-dashboard" class="side-panel-item">Activity Dashboard</button></li>
+                <li><button id="menu-progress-management" class="side-panel-item">Progress Management</button></li>
+                <li><button id="menu-scheduled-tasks" class="side-panel-item">Scheduled Tasks</button></li>
+                <li id="appearance-menu-item-container">
+                    <button id="menu-appearance" class="side-panel-item">
+                        <span>Appearance</span>
+                        <svg class="appearance-arrow" viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg>
+                    </button>
+                    <div id="theme-dropdown-container" class="theme-dropdown-container">
+                        <!-- Theme options will be populated by JS -->
+                    </div>
+                </li>
             </ul>
         </nav>
     </div>
     <div id="side-panel-overlay" class="side-panel-overlay hidden"></div>
 
     <div id="app-container">
+        <div id="scheduled-tasks-view" class="hidden">
+            <header class="progress-management-header">
+                <h1>Scheduled Tasks</h1>
+            </header>
+            <main id="scheduled-tasks-list-container">
+                <!-- Scheduled tasks will be populated here by JS -->
+            </main>
+            <footer id="scheduled-tasks-footer">
+                <button id="add-new-scheduled-task-button" class="fab-button" aria-label="Add new scheduled task">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                </button>
+            </footer>
+        </div>
+        
+        <div id="progress-management-view" class="hidden">
+            <header class="progress-management-header">
+                <h1>Progress Management</h1>
+            </header>
+            <main id="progress-management-list">
+                <section id="active-progress-section" class="progress-section">
+                    <h2 class="progress-section-title">Active Trackers</h2>
+                    <div id="active-progress-list" class="progress-list-container"></div>
+                </section>
+                <section id="archived-progress-section" class="progress-section">
+                    <h2 class="progress-section-title">Progress History</h2>
+                    <div id="archived-progress-list" class="progress-list-container"></div>
+                </section>
+            </main>
+             <footer id="progress-management-footer">
+                <button id="add-new-progress-button" class="fab-button" aria-label="Add new progress tracker">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
+                </button>
+            </footer>
+        </div>
+
         <div id="app-view-wrapper"> 
             <div id="main-content-wrapper">
                 <div id="left-column">
@@ -48,7 +97,7 @@
                     <nav id="tabs">
                         <button id="dashboard-tab-button" class="tab-button active main-tab-highlight" aria-selected="true" role="tab">Main</button>
                         <!-- Category tabs will be dynamically populated by JS -->
-                        <button id="add-new-item-button" class="tab-button icon-button" aria-label="Add new category" title="Add New Category">
+                        <button id="add-category-button" class="tab-button icon-button" aria-label="Add new category" title="Add New Category">
                             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg>
                         </button>
                     </nav>
@@ -57,15 +106,23 @@
                             <!-- 1. Calendar Section -->
                             <div id="calendar-container">
                                 <div id="calendar-header">
-                                    <button id="calendar-prev-month" class="calendar-nav-button" aria-label="Previous month">&lt;</button>
+                                    <button id="calendar-prev-month-button" class="calendar-nav-button" aria-label="Previous month">&lt;</button>
                                     <button id="calendar-month-year-button" class="calendar-month-year-button" aria-label="Open month year picker" aria-haspopup="dialog">
                                         <span id="calendar-month-year"></span>
                                     </button>
-                                    <button id="calendar-next-month" class="calendar-nav-button" aria-label="Next month">&gt;</button>
+                                    <button id="calendar-next-month-button" class="calendar-nav-button" aria-label="Next month">&gt;</button>
                                 </div>
                                 <div id="calendar-grid">
                                     <!-- Calendar days will be populated by JS -->
                                 </div>
+                            </div>
+                            
+                            <!-- New: Today's Scheduled Tasks -->
+                            <div id="scheduled-tasks-today-container" class="hidden">
+                                <h3>Today's Scheduled Tasks</h3>
+                                <ul id="scheduled-tasks-today-list">
+                                    <!-- Today's scheduled tasks will be populated by JS -->
+                                </ul>
                             </div>
 
                             <!-- 2. Today's Reflection Section -->
@@ -77,20 +134,7 @@
 
                             <!-- 3. Progress Section -->
                             <div id="mobile-progress-location">
-                                <div id="today-progress-container"> 
-                                    <h3>Today's Progress</h3>
-                                    <div class="progress-bar-container">
-                                        <div id="today-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
-                                    </div>
-                                    <p id="today-points-stat" class="points-stat">0 / 2700 points</p>
-                                </div>
-                                <div id="current-week-progress-container">
-                                    <h3>Weekly Progress</h3>
-                                    <div class="progress-bar-container">
-                                        <div id="current-week-progress-fill" class="progress-bar-fill" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">0%</div>
-                                    </div>
-                                    <p id="current-week-points-stat" class="points-stat">0 / 20000 points</p>
-                                </div>
+                                <!-- Progress bars are now dynamically generated by JS -->
                             </div>
                             
                         </section>
@@ -109,25 +153,113 @@
                 </div>
             </aside>
 
-            <div id="live-clock-view-wrapper" class="hidden">
-                <button id="live-clock-fullscreen-button" class="icon-button live-clock-fullscreen-button" aria-label="Toggle fullscreen clock" title="Toggle Fullscreen">
-                    <svg class="fullscreen-icon-expand" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"></path></svg>
-                    <svg class="fullscreen-icon-contract hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
-                </button>
-                <div id="analog-clock-container">
-                    <canvas id="analog-clock-canvas"></canvas>
-                </div>
-                <div id="live-clock-digital-display-container">
-                    <div id="live-clock-time">00:00:00</div>
-                    <div id="live-clock-period">AM</div>
-                    <div id="live-clock-date">Sunday, January 1, 2023</div>
-                </div>
-            </div>
-
         </div> <!-- End App View Wrapper -->
     </div> <!-- End App Container -->
 
     <!-- Modals and Templates -->
+    
+    <div id="time-progress-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="time-progress-title">
+        <div class="modal-content">
+            <button id="time-progress-close-button" class="close-button" aria-label="Close time vs. progress view">&times;</button>
+            <h3 id="time-progress-title" class="modal-title-text">Time vs. Progress</h3>
+            
+            <div class="comparison-section">
+                <h4>Time Remaining Today (5:30 AM - 9:30 PM)</h4>
+                <div class="comparison-bar-container">
+                    <div id="time-progress-bar" class="comparison-bar-fill"></div>
+                </div>
+                <div class="comparison-stats">
+                    <span id="time-progress-percentage">0% of time used</span>
+                    <span id="time-progress-remaining">16h 0m remaining</span>
+                </div>
+            </div>
+
+            <div class="comparison-section">
+                <h4>Today's Task Progress</h4>
+                <div class="progress-bar-container">
+                    <div id="modal-task-progress-bar" class="progress-bar-fill"></div>
+                </div>
+                <p id="modal-task-progress-stats" class="points-stat progress-value">0 / 2700 Points (0%)</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="scheduled-task-editor-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="scheduled-task-editor-title">
+        <div class="modal-content">
+            <button id="scheduled-task-editor-close-button" class="close-button" aria-label="Close scheduled task editor">&times;</button>
+            <h3 id="scheduled-task-editor-title" class="modal-title-text">New Scheduled Task</h3>
+            <div class="scheduled-task-editor-form">
+                <label for="scheduled-task-editor-input">Task</label>
+                <input type="text" id="scheduled-task-editor-input" class="modal-input" placeholder="Task description...">
+                
+                <label for="scheduled-task-editor-date-input">Date</label>
+                <input type="date" id="scheduled-task-editor-date-input" class="modal-input">
+
+                <label for="scheduled-task-recurrence-select">Repeat</label>
+                <select id="scheduled-task-recurrence-select" class="modal-input">
+                    <option value="none" selected>None</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+
+                <label for="scheduled-task-color-picker">Label Color</label>
+                <div id="scheduled-task-color-picker" class="color-picker-container">
+                    <!-- Color options populated by JS -->
+                </div>
+            </div>
+            <div class="modal-actions-centered">
+                <button id="save-scheduled-task-button" class="modal-button-primary">Save Task</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="progress-history-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="progress-history-detail-title">
+        <div class="modal-content fullscreen-modal-content-box">
+            <button id="progress-history-detail-close-button" class="close-button" aria-label="Close Progress Details">&times;</button>
+            <h3 id="progress-history-detail-title" class="fullscreen-modal-title-text">Progress Details</h3>
+            <div class="progress-history-detail-content">
+                <div id="progress-history-calendar-view" class="progress-history-detail-panel">
+                    <!-- Calendar or date list will be rendered here -->
+                </div>
+                <div id="progress-history-daily-summary" class="progress-history-detail-panel">
+                    <!-- Daily summary will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="progress-editor-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="progress-editor-title">
+        <div class="modal-content">
+            <button id="progress-editor-close-button" class="close-button" aria-label="Close progress editor">&times;</button>
+            <h3 id="progress-editor-title" class="modal-title-text">Edit Progress Tracker</h3>
+            <div class="progress-editor-form">
+                <label for="progress-name-input">Tracker Name</label>
+                <input type="text" id="progress-name-input" class="modal-input" placeholder="e.g., Fitness Sprint">
+                
+                <label for="progress-target-input">Target Points</label>
+                <input type="number" id="progress-target-input" class="modal-input" placeholder="e.g., 10000">
+                
+                <label for="progress-type-select">Duration Type</label>
+                <select id="progress-type-select" class="modal-input">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="custom">Custom</option>
+                </select>
+                
+                <div id="progress-custom-dates-container" class="hidden">
+                    <label for="progress-start-date">Start Date</label>
+                    <input type="date" id="progress-start-date" class="modal-input">
+                    <label for="progress-end-date">End Date</label>
+                    <input type="date" id="progress-end-date" class="modal-input">
+                </div>
+            </div>
+            <div class="modal-actions-centered">
+                <button id="save-progress-button" class="modal-button-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <div id="month-year-picker-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="month-year-picker-title">
         <div id="month-year-picker-content" class="month-year-picker-content">
             <button id="month-year-picker-close-button" class="close-button" aria-label="Close month year picker">&times;</button>
@@ -199,93 +331,111 @@
         </div>
     </div>
 
-    <!-- Category Creation Modals -->
+    <!-- Category Type Choice Modal -->
     <div id="choose-category-type-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="choose-category-type-title">
         <div class="modal-content">
-            <button id="choose-category-type-close-button" class="close-button" aria-label="Close">&times;</button>
+            <button id="choose-category-type-close-button" class="close-button" aria-label="Close category type choice">&times;</button>
             <h3 id="choose-category-type-title" class="modal-title-text">Choose Category Type</h3>
+            <p class="modal-description">Standard categories contribute to progress tracking. Special categories do not.</p>
             <div class="modal-actions-centered">
-                <button id="select-standard-category-button" class="modal-button">Standard Category</button>
-                <button id="select-special-category-button" class="modal-button">Special Category</button>
+                <button id="select-standard-category-button" class="modal-button">Standard</button>
+                <button id="select-special-category-button" class="modal-button">Special</button>
             </div>
         </div>
     </div>
 
-    <div id="enter-category-name-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="enter-category-name-title">
+    <!-- Name Entry Modal (used for categories, folders, tasks, and renaming items) -->
+    <div id="name-entry-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="name-entry-title">
         <div class="modal-content">
-            <button id="enter-category-name-close-button" class="close-button" aria-label="Close">&times;</button>
-            <h3 id="enter-category-name-title" class="modal-title-text">Name Your Category</h3>
-            <input type="text" id="category-name-input" class="modal-input" placeholder="Enter category name">
-            <div class="modal-actions-centered">
-                <button id="create-category-button" class="modal-button-primary">Create</button>
-                <button id="cancel-create-category-button" class="modal-button">Cancel</button>
+            <button id="name-entry-close-button" class="close-button" aria-label="Close name entry">&times;</button>
+            <h3 id="name-entry-title" class="modal-title-text">Name Your Item</h3>
+            <input type="text" id="name-entry-input" class="modal-input" placeholder="Enter name">
+            <div id="name-entry-actions" class="modal-actions-centered">
+                <button id="confirm-name-entry-button" class="modal-button-primary">Confirm</button> <!-- Text will be set by JS -->
+                <button id="cancel-name-entry-button" class="modal-button">Cancel</button>
             </div>
         </div>
     </div>
 
-    <!-- Folder System Modals -->
-    <div id="choose-folder-type-modal-folder" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="choose-folder-type-title-folder">
-        <div class="modal-content">
-            <button id="choose-folder-type-close-button-folder" class="close-button" aria-label="Close">&times;</button>
-            <h3 id="choose-folder-type-title-folder" class="modal-title-text">Choose Folder Type</h3>
-            <div class="modal-actions-centered">
-                <button id="select-task-folder-button" class="modal-button">Task Folder</button>
-                <button id="select-note-folder-button" class="modal-button">Note Folder</button>
+    <!-- Note Editor Modal -->
+    <div id="note-editor-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="note-editor-title">
+        <div class="modal-content fullscreen-modal-content-box">
+             <button id="note-editor-close-button" class="close-button" aria-label="Close note editor">&times;</button>
+            <div class="note-editor-header">
+                <h3 id="note-editor-title" class="fullscreen-modal-title-text">Edit Note</h3>
+                <div class="note-editor-controls">
+                    <button id="note-add-image-button" class="icon-button" title="Add Image">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="note-folder-content-wrapper">
+                <div id="note-editor-area" class="note-editor" contenteditable="true"></div>
             </div>
         </div>
     </div>
 
-    <div id="enter-folder-name-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="enter-folder-name-title">
-        <div class="modal-content">
-            <button id="enter-folder-name-close-button" class="close-button" aria-label="Close">&times;</button>
-            <h3 id="enter-folder-name-title" class="modal-title-text">Name Your Folder</h3>
-            <input type="text" id="folder-name-input" class="modal-input" placeholder="Enter folder name">
-            <div class="modal-actions-centered">
-                <button id="create-folder-button" class="modal-button-primary">Create</button>
-                <button id="cancel-create-folder-button" class="modal-button">Cancel</button>
+    <!-- Task List Modal -->
+    <div id="task-list-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="task-list-title">
+        <div class="modal-content fullscreen-modal-content-box">
+            <button id="task-list-close-button" class="close-button" aria-label="Close task list">&times;</button>
+            <div class="task-list-header">
+                <h3 id="task-list-title" class="fullscreen-modal-title-text">Task Checklist</h3>
+                <div class="task-list-controls">
+                    <button id="task-list-edit-button" class="icon-button" title="Edit tasks">
+                        <svg class="edit-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
+                        <svg class="done-icon hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"></path></svg>
+                    </button>
+                    <button id="task-list-reset-button" class="icon-button" title="Reset all tasks for today">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"></path></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="task-list-content-wrapper">
+                <ul id="checklist-items-list" class="checklist-items-list">
+                    <!-- Checklist items will be populated here -->
+                </ul>
+                <form id="add-checklist-item-form" class="add-checklist-item-form hidden">
+                    <input type="text" id="add-checklist-item-input" placeholder="Add a new task to the list...">
+                    <button type="submit" class="modal-button-primary">Add Task</button>
+                </form>
             </div>
         </div>
-    </div>
-
-
-    <!-- Template for inline task editing -->
-    <div id="task-edit-controls-template" style="display: none;">
-        <input type="text" class="task-edit-input" />
-        <button class="task-edit-save">Save</button>
-        <button class="task-edit-cancel">Cancel</button>
     </div>
     
-    <!-- Template for category section (will be dynamically filled with folder system or folder content) -->
+    <!-- Context Menus -->
+    <div id="category-tab-context-menu" class="context-menu hidden" role="menu">
+        <button id="ctx-rename-category" role="menuitem">Rename Category</button>
+        <button id="ctx-delete-category" role="menuitem">Delete Category</button>
+    </div>
+
+    <!-- Hidden Input for Image Upload -->
+    <input type="file" id="image-upload-input" accept="image/*" class="hidden">
+
+
+    <!-- Templates (Must be outside of main rendered DOM flow initially) -->
     <template id="category-section-template">
-        <section class="category-section" role="tabpanel">
-            <div class="category-header"> <!-- This header might be adjusted or parts shown/hidden based on view -->
-                <h2 class="category-title-text">Category Name</h2>
-                <!-- Category-level controls (like the old edit mode/undo) might be removed or adapted -->
+        <section class="category-section hidden" role="tabpanel">
+            <div class="category-header">
+                <div class="category-header-left">
+                    <div class="category-title-container">
+                        <button class="icon-button category-back-button" aria-label="Go back">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"></path></svg>
+                        </button>
+                        <h2 class="category-title-text">Category Name</h2>
+                    </div>
+                    <div class="breadcrumbs-container"></div>
+                </div>
+                <div class="category-header-right">
+                    <!-- Action buttons will be inserted here by JS -->
+                </div>
             </div>
             <div class="category-content-area">
-                <!-- This area will be populated with:
-                    1. Folder grid + add folder button (default)
-                    2. Task Folder content (tasks, add task forms, back button, folder-specific controls)
-                    3. Note Folder content (note editor/viewer, back button, folder-specific controls)
-                -->
+                <!-- Items grid will be rendered here by JS -->
             </div>
         </section>
     </template>
-
-    <!-- Shared Context Menu for Category Tabs -->
-    <div id="category-tab-context-menu" class="context-menu hidden">
-        <button id="ctx-rename-category">Rename</button>
-        <button id="ctx-delete-category">Delete</button>
-    </div>
-
-    <!-- Shared Context Menu for Folder Boxes -->
-    <div id="folder-options-context-menu" class="context-menu hidden">
-        <button id="ctx-rename-folder">Rename</button>
-        <button id="ctx-delete-folder">Delete</button>
-    </div>
-
-    <input type="file" id="image-upload-input" accept="image/*" style="display: none;">
-
-    <script type="module" src="index.js"></script>
+    
+    <script src="index.js" type="module"></script>
 </body>
 </html>
